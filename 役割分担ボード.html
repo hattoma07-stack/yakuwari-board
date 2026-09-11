@@ -776,6 +776,8 @@ const DEF_STATUS_HOME=[ // 訪問介護：24時間体制のためシフト区分
 
 /* ---------- storage（ローカル保存＋Googleスプレッドシート同期） ---------- */
 const SYNC_URL="https://script.google.com/macros/s/AKfycbym02ONfVKg0ctj13fwFhhSyeX6rBI1lcluj_h65IVHu72p0MMehEzoUcgJqR-JBlWSGQ/exec";
+// Google Apps Script側の API_TOKEN と必ず同じ値にしてください（一致しないと拒否されます）
+const SYNC_TOKEN="vwhO7Nt49C51xyc-SannBWMhvldfkVkm";
 const jget=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
 const jset=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} syncPush(k,v);};
 
@@ -801,7 +803,7 @@ async function drainSyncQueue(){
       try{
         setSyncStatus("busy");
         await fetch(SYNC_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-          body:JSON.stringify({key:item.key,value:item.value})});
+          body:JSON.stringify({key:item.key,value:item.value,token:SYNC_TOKEN})});
         syncFailCount=0; setSyncStatus("ok");
       }catch(err){ syncFailCount++; setSyncStatus("error"); }
     }
@@ -812,7 +814,7 @@ async function syncPull(){
   if(!SYNC_URL)return false;
   setSyncStatus("busy");
   try{
-    const res=await fetch(SYNC_URL,{cache:"no-store"});
+    const res=await fetch(SYNC_URL+"?token="+encodeURIComponent(SYNC_TOKEN),{cache:"no-store"});
     const json=await res.json();
     if(!json||!json.ok){ setSyncStatus("error"); return false; }
     let changed=false;
@@ -1579,14 +1581,49 @@ function showGatePassStep(role){
   pendingRole=role;
   $("#gateRoles").hidden=true; $("#gatePass").hidden=false;
   $("#gatePassLabel").textContent=`${ROLE_LABEL[role]} のパスコード`;
-  $("#gateError").hidden=true; $("#gatePassInput").value=""; $("#gatePassInput").focus();
+  $("#gatePassInput").value=""; $("#gatePassInput").focus();
+  const remain=checkLock(role);
+  if(remain>0){ $("#gateError").textContent=lockMsg(remain); $("#gateError").hidden=false; $("#gatePassInput").disabled=true; }
+  else { $("#gateError").hidden=true; $("#gatePassInput").disabled=false; }
 }
 $$("#gateRoles .gate-role").forEach(b=>b.onclick=()=>showGatePassStep(b.dataset.role));
 $("#gateBack").onclick=showGateRoles;
+// ---- ログイン試行回数のロック（総当たり対策） ----
+const LOCK_KEY="yakuwari:gate:lockstate";
+const LOCK_MAX_FAILS=5, LOCK_MINUTES=5;
+function loadLockState(){return jgetPlain(LOCK_KEY,{});}
+function jgetPlain(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}} // 同期対象外のローカル専用データ
+function saveLockState(s){try{localStorage.setItem(LOCK_KEY,JSON.stringify(s));}catch(e){}}
+function checkLock(role){
+  const st=loadLockState()[role]; if(!st||!st.lockedUntil)return 0;
+  const remain=st.lockedUntil-Date.now();
+  return remain>0?remain:0;
+}
+function registerFail(role){
+  const all=loadLockState(); const st=all[role]||{fails:0,lockedUntil:0};
+  st.fails=(st.fails||0)+1;
+  if(st.fails>=LOCK_MAX_FAILS){ st.lockedUntil=Date.now()+LOCK_MINUTES*60000; st.fails=0; }
+  all[role]=st; saveLockState(all);
+  return st.lockedUntil>Date.now() ? st.lockedUntil-Date.now() : 0;
+}
+function clearFails(role){
+  const all=loadLockState(); delete all[role]; saveLockState(all);
+}
+function lockMsg(ms){const m=Math.ceil(ms/60000);return `試行回数が多いため一時的にロックされています。約${m}分後にもう一度お試しください。`;}
+
 async function attemptLogin(){
+  if(!pendingRole)return;
+  const remain=checkLock(pendingRole);
+  if(remain>0){ $("#gateError").textContent=lockMsg(remain); $("#gateError").hidden=false; return; }
   const codes=loadPasscodes();
   const val=$("#gatePassInput").value.trim();
-  if(!pendingRole||val===""||val!==codes[pendingRole]){ $("#gateError").hidden=false; return; }
+  if(val===""||val!==codes[pendingRole]){
+    const lockedFor=registerFail(pendingRole);
+    $("#gateError").textContent = lockedFor>0 ? lockMsg(lockedFor) : "パスコードが違います";
+    $("#gateError").hidden=false;
+    return;
+  }
+  clearFails(pendingRole);
   ROLE=pendingRole;
   sessSet("yakuwari:gate:role",ROLE);
   FSCOPE = ROLE==="home" ? "home" : "day"; // admin は day から開始（切替可）

@@ -16,6 +16,16 @@
  * 【あとで組織のアカウントに譲渡する場合】
  * スプレッドシートの共有設定で新しい管理者を「オーナー」に変更し、
  * Apps Scriptも同様に共有・移管すれば、このコードはそのまま使えます。
+ *
+ * 【コードを更新した場合の再デプロイ】
+ * Code.gsを保存しただけでは、公開中のURLには反映されません。
+ * 「デプロイ」→「デプロイを管理」→ 編集（鉛筆アイコン）→
+ * バージョン「新しいバージョン」を選んで「デプロイ」を押してください
+ * （URLは変わりません）。
+ *
+ * 【APIトークンについて】
+ * 下のAPI_TOKENは、役割分担ボード側のSYNC_TOKENと必ず同じ値にしてください。
+ * これが一致しないアクセスはすべて拒否されます。
  */
 
 const SHEET_NAME = "KV";
@@ -24,6 +34,14 @@ const SHEET_NAME = "KV";
 // 組織のGoogleアカウントが決まったら、ここに列挙してアクセスを絞ってください。
 // 例: const ALLOWED_EMAILS = ["leader1@example.com", "admin@example.com"];
 const ALLOWED_EMAILS = [];
+
+// APIトークン（合言葉）。この値と一致しないGET/POSTリクエストは拒否します。
+// アプリ側（役割分担ボードのHTML）の SYNC_TOKEN と必ず同じ値にしてください。
+const API_TOKEN = "vwhO7Nt49C51xyc-SannBWMhvldfkVkm";
+
+function checkToken_(token) {
+  return API_TOKEN && token === API_TOKEN;
+}
 
 function getSheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -41,9 +59,11 @@ function jsonOut_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// 全データ取得：GET ?action=getAll
+// 全データ取得：GET ?token=API_TOKEN
 function doGet(e) {
   try {
+    const token = (e && e.parameter && e.parameter.token) || "";
+    if (!checkToken_(token)) return jsonOut_({ ok: false, error: "forbidden" });
     const sh = getSheet_();
     const data = sh.getDataRange().getValues();
     const out = {};
@@ -62,9 +82,12 @@ function doGet(e) {
   }
 }
 
-// 1件保存：POST { key, value }（valueは任意のJSON）
+// 1件保存：POST { key, value, token }（valueは任意のJSON）
 function doPost(e) {
   try {
+    const body = JSON.parse(e.postData.contents);
+    if (!checkToken_(body && body.token)) return jsonOut_({ ok: false, error: "forbidden" });
+
     let email = "";
     try { email = Session.getActiveUser().getEmail(); } catch (err) { email = ""; }
 
@@ -72,7 +95,6 @@ function doPost(e) {
       return jsonOut_({ ok: false, error: "forbidden", email: email });
     }
 
-    const body = JSON.parse(e.postData.contents);
     if (!body || !body.key) return jsonOut_({ ok: false, error: "key is required" });
 
     const sh = getSheet_();
