@@ -78,17 +78,18 @@
   .gate-pass-btns .btn{flex:1;justify-content:center}
 
   /* ---------- Facility switcher / session bar ---------- */
-  .fac-switch{display:inline-flex;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden}
-  .fac-switch[hidden],.fac-badge[hidden]{display:none}
-  .fac-switch button{border:none;background:var(--surface);color:var(--ink-soft);font:inherit;font-weight:700;
-    font-size:12.5px;padding:7px 12px;cursor:pointer;border-left:1px solid var(--line-strong)}
-  .fac-switch button:first-child{border-left:none}
-  .fac-switch button[aria-pressed="true"]{background:var(--accent);color:#fff}
+  .fac-switch{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--ink-soft)}
+  .fac-switch[hidden],.fac-badge[hidden],#btnPrintAll[hidden]{display:none}
+  .fac-switch select{font:inherit;font-weight:700;color:var(--ink);background:var(--surface);
+    border:1px solid var(--line-strong);border-radius:9px;padding:7px 10px}
   .fac-badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--ink-soft);
     background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:7px 12px}
   .sync-status{font-size:11.5px;color:var(--ink-faint);white-space:nowrap}
   .sync-status[data-state="error"]{color:var(--alert)}
   .sync-status[data-state="busy"]{color:var(--accent-ink)}
+  #allDeptPrint{display:none}
+  .print-dept{margin-bottom:24px}
+  .print-dept h2{font-size:16px;margin:0 0 10px;padding-bottom:8px;border-bottom:2px solid #333;font-family:inherit}
 
   header.top{
     display:flex;flex-wrap:wrap;gap:14px 18px;align-items:center;justify-content:space-between;
@@ -350,6 +351,12 @@
     table.roster td.rc{height:22px}
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
+  @media print{
+    body.print-all-mode .app,body.print-all-mode .gate{display:none!important}
+    body.print-all-mode #allDeptPrint{display:block!important}
+    body.print-all-mode .print-dept{page-break-after:always}
+    body.print-all-mode .print-dept:last-child{page-break-after:auto}
+  }
 </style>
 
 <!-- ============ LOGIN GATE ============ -->
@@ -359,9 +366,12 @@
     <h1>役割分担ボード</h1>
     <p class="gate-sub">ご自身の区分を選んでください</p>
     <div class="gate-roles" id="gateRoles">
-      <button class="gate-role" data-role="admin"><span class="gr-ico">🛡️</span><span class="gr-lbl">管理者</span><span class="gr-sub">デイサービス・訪問介護 両方</span></button>
-      <button class="gate-role" data-role="day"><span class="gr-ico">📋</span><span class="gr-lbl">デイサービス</span><span class="gr-sub">デイサービスの役割分担・勤務表</span></button>
-      <button class="gate-role" data-role="home"><span class="gr-ico">🚶</span><span class="gr-lbl">訪問介護</span><span class="gr-sub">訪問介護の役割分担・勤務表</span></button>
+      <button class="gate-role" data-role="admin"><span class="gr-ico">🛡️</span><span class="gr-lbl">管理者</span><span class="gr-sub">全部署をまとめて確認・発行</span></button>
+      <button class="gate-role" data-role="day"><span class="gr-ico">📋</span><span class="gr-lbl">デイサービス</span><span class="gr-sub">役割分担・勤務表</span></button>
+      <button class="gate-role" data-role="home"><span class="gr-ico">🚶</span><span class="gr-lbl">訪問介護</span><span class="gr-sub">役割分担・勤務表</span></button>
+      <button class="gate-role" data-role="office"><span class="gr-ico">🗂️</span><span class="gr-lbl">事務</span><span class="gr-sub">勤務表の作成</span></button>
+      <button class="gate-role" data-role="nursing"><span class="gr-ico">🩺</span><span class="gr-lbl">看護</span><span class="gr-sub">勤務表の作成</span></button>
+      <button class="gate-role" data-role="kitchen"><span class="gr-ico">🍳</span><span class="gr-lbl">栄養士・厨房</span><span class="gr-sub">勤務表の作成</span></button>
     </div>
     <div class="gate-pass" id="gatePass" hidden>
       <p class="gate-pass-label" id="gatePassLabel"></p>
@@ -396,16 +406,17 @@
   </header>
 
   <div class="toolbar no-print" style="margin-top:-4px" id="sessionBar">
-    <div class="fac-switch" id="facSwitch" hidden>
-      <button data-fac="day">📋 デイサービス</button>
-      <button data-fac="home">🚶 訪問介護</button>
-    </div>
+    <label class="fac-switch" id="facSwitch" hidden>部署
+      <select id="facSwitchSel"></select>
+    </label>
     <span class="fac-badge" id="facBadge" hidden></span>
     <span class="sync-status" id="syncStatus" data-state="off"></span>
     <button class="btn ghost sm" id="btnSyncNow" title="最新の状態を取得">🔄 今すぐ同期</button>
+    <button class="btn ghost sm" id="btnPrintAll" hidden title="全部署の勤務表を1つにまとめて印刷">🖨 全部署まとめて印刷</button>
     <span class="spacer" style="flex:1"></span>
     <button class="btn ghost sm" id="btnLogout">ログアウト</button>
   </div>
+  <div id="allDeptPrint"></div>
 
   <!-- ============ BOARD VIEW ============ -->
   <div id="viewBoard">
@@ -479,7 +490,7 @@
   <div id="viewSettings" hidden>
     <p class="hint no-print" style="margin:0 0 16px;text-align:left">日々の操作画面とは分けています。ここでの変更はすぐに反映されます。</p>
 
-    <div class="settings-group">
+    <div class="settings-group" data-board-only>
       <h2 class="settings-group-title"><span class="sgt-ico">📋</span>役割分担の設定</h2>
       <div class="settings-grid">
         <div class="setting-card">
@@ -700,7 +711,9 @@ const K={
   get rmeta(){return `yakuwari:${FSCOPE}:rmeta:`}, get rauto(){return `yakuwari:${FSCOPE}:rauto:`},
   theme:"yakuwari:theme" // 表示テーマは施設共通
 };
-const FACILITY_NAME={day:"デイサービス",home:"訪問介護"};
+const FACILITY_NAME={day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房"};
+const BOARD_FACILITIES=["day","home"]; // 役割分担ボードを使う部署（それ以外は勤務表のみ）
+const ALL_FACILITIES=["day","home","office","nursing","kitchen"];
 
 /* ---------- defaults ---------- */
 const STAFF_COLORS=["#3E7CB1","#C7803E","#5B9E7A","#8E6FB0","#C25E6E","#C9A227","#6E8FA6","#4C8C8C","#B2632F","#7C9A46"];
@@ -1556,6 +1569,37 @@ $("#btnStaffMgr").onclick=$("#stgStaff").onclick=()=>{renderStaffList();openModa
 $("#btnTplSave").onclick=openTplSave;$("#btnTplLoad").onclick=openTplLoad;
 $("#btnPrintBoard").onclick=$("#btnPrintRoster").onclick=()=>window.print();
 
+// ---- 管理者：全部署の勤務表を1つにまとめて印刷 ----
+async function printAllDepartments(){
+  const origScope=FSCOPE, origYm=S.ym, origTab=S.tab;
+  const sections=[];
+  for(const scope of ALL_FACILITIES){
+    FSCOPE=scope;
+    loadMasters();
+    loadRoster(origYm);
+    renderRoster();
+    const tableHTML=$("#rosterTable").outerHTML;
+    sections.push({label:FACILITY_NAME[scope],facility:S.facility||"",tableHTML});
+  }
+  FSCOPE=origScope;
+  loadMasters();loadRoster(origYm);
+  if(origTab==="roster")renderRoster();
+  $("#allDeptPrint").innerHTML=sections.map(s=>`
+    <div class="print-dept">
+      <h2>${escapeHtml(s.label)}${s.facility?`　${escapeHtml(s.facility)}`:""}　（${origYm.replace("-","年")}月）</h2>
+      ${s.tableHTML}
+    </div>`).join("");
+  document.body.classList.add('print-all-mode');
+  window.print();
+}
+window.addEventListener('afterprint',()=>{
+  if(document.body.classList.contains('print-all-mode')){
+    document.body.classList.remove('print-all-mode');
+    $("#allDeptPrint").innerHTML="";
+  }
+});
+$("#btnPrintAll").onclick=printAllDepartments;
+
 function toggleTheme(){const root=document.documentElement,cur=root.getAttribute('data-theme');
   const next=cur==="dark"?"light":cur==="light"?"dark":(matchMedia('(prefers-color-scheme:dark)').matches?"light":"dark");
   root.setAttribute('data-theme',next);jset(K.theme,next);}
@@ -1564,9 +1608,9 @@ $("#btnTheme").onclick=$("#btnTheme2").onclick=toggleTheme;
 
 /* ================= ログイン（管理者／デイサービス／訪問介護） ================= */
 const GK={pass:"yakuwari:gate:passcodes"};
-const DEF_PASS={admin:"1234",day:"0000",home:"1111"};
-const ROLE_LABEL={admin:"管理者",day:"デイサービス",home:"訪問介護"};
-function loadPasscodes(){return jget(GK.pass,null)||JSON.parse(JSON.stringify(DEF_PASS));}
+const DEF_PASS={admin:"1234",day:"0000",home:"1111",office:"2222",nursing:"3333",kitchen:"4444"};
+const ROLE_LABEL={admin:"管理者",day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房"};
+function loadPasscodes(){const saved=jget(GK.pass,null); return {...DEF_PASS,...(saved||{})};} // 新しい部署が増えても既定値で補完
 function savePasscodes(p){jset(GK.pass,p);}
 let ROLE=null, pendingRole=null;
 function sessGet(k){try{return sessionStorage.getItem(k);}catch(e){return null;}}
@@ -1626,7 +1670,7 @@ async function attemptLogin(){
   clearFails(pendingRole);
   ROLE=pendingRole;
   sessSet("yakuwari:gate:role",ROLE);
-  FSCOPE = ROLE==="home" ? "home" : "day"; // admin は day から開始（切替可）
+  FSCOPE = ROLE==="admin" ? "day" : ROLE; // admin は day から開始（切替可）。それ以外は自分の部署固定。
   if(ROLE==="admin"){ const savedFac=sessGet("yakuwari:gate:facility"); if(savedFac)FSCOPE=savedFac; }
   sessSet("yakuwari:gate:facility",FSCOPE);
   $("#gate").hidden=true; $("#appRoot").hidden=false;
@@ -1639,21 +1683,37 @@ async function attemptLogin(){
 $("#gateEnter").onclick=attemptLogin;
 $("#gatePassInput").addEventListener('keydown',e=>{if(e.key==="Enter")attemptLogin();});
 
+const FACILITY_ICON={day:"📋",home:"🚶",office:"🗂️",nursing:"🩺",kitchen:"🍳"};
+const FACILITY_PLACEHOLDER={day:"○○デイサービスセンター",home:"○○訪問介護ステーション",office:"○○事務局",nursing:"○○看護室",kitchen:"○○栄養課・厨房"};
 function updateFacilityUI(){
   const isAdmin=ROLE==="admin";
   $("#facSwitch").hidden=!isAdmin;
   $("#facBadge").hidden=isAdmin;
-  if(isAdmin){ $$("#facSwitch button").forEach(b=>b.setAttribute('aria-pressed',b.dataset.fac===FSCOPE)); }
-  else { $("#facBadge").textContent=(FSCOPE==="home"?"🚶 ":"📋 ")+FACILITY_NAME[FSCOPE]; }
+  $("#btnPrintAll").hidden=!isAdmin;
+  if(isAdmin){
+    const sel=$("#facSwitchSel");
+    if(!sel.dataset.built){
+      sel.innerHTML=ALL_FACILITIES.map(f=>`<option value="${f}">${FACILITY_ICON[f]} ${FACILITY_NAME[f]}</option>`).join("");
+      sel.dataset.built="1";
+    }
+    sel.value=FSCOPE;
+  } else {
+    $("#facBadge").textContent=FACILITY_ICON[FSCOPE]+" "+FACILITY_NAME[FSCOPE];
+  }
   $("#grpAccess").hidden=!isAdmin;
-  $("#facility").placeholder = FSCOPE==="home" ? "○○訪問介護ステーション" : "○○デイサービスセンター";
+  $("#facility").placeholder = FACILITY_PLACEHOLDER[FSCOPE]||"";
+  // 役割分担ボードを使わない部署（事務・看護・栄養士/厨房）は勤務表のみ
+  const usesBoard=BOARD_FACILITIES.includes(FSCOPE);
+  $("#tabBoard").hidden=!usesBoard;
+  $$(".settings-group[data-board-only]").forEach(g=>g.hidden=!usesBoard);
+  if(!usesBoard && S.tab==="board") S.tab="roster";
 }
-$$("#facSwitch button").forEach(b=>b.onclick=async ()=>{
-  if(FSCOPE===b.dataset.fac)return;
-  FSCOPE=b.dataset.fac; sessSet("yakuwari:gate:facility",FSCOPE);
+$("#facSwitchSel").onchange=async (e)=>{
+  const v=e.target.value; if(FSCOPE===v)return;
+  FSCOPE=v; sessSet("yakuwari:gate:facility",FSCOPE);
   await syncPull();
   bootApp();
-});
+};
 $("#btnLogout").onclick=()=>{
   showConfirm("ログアウトしますか？",()=>{
     stopSyncPolling();
@@ -1670,9 +1730,9 @@ $("#btnSyncNow").onclick=async ()=>{
 
 function renderPassList(){
   const codes=loadPasscodes(); const w=$("#passList"); w.innerHTML="";
-  ["admin","day","home"].forEach(r=>{
+  ["admin"].concat(ALL_FACILITIES).forEach(r=>{
     const row=document.createElement('div');row.className="edit-row";
-    row.innerHTML=`<span style="width:96px;font-weight:700;font-size:13px">${ROLE_LABEL[r]}</span>
+    row.innerHTML=`<span style="width:110px;flex:none;font-weight:700;font-size:13px">${ROLE_LABEL[r]}</span>
       <input type="text" inputmode="numeric" value="${codes[r]}" style="flex:1">`;
     row.querySelector('input').oninput=e=>{const c=loadPasscodes();c[r]=e.target.value;savePasscodes(c);};
     w.appendChild(row);
@@ -1684,7 +1744,7 @@ async function initGate(){
   const savedRole=sessGet("yakuwari:gate:role");
   if(savedRole && ROLE_LABEL[savedRole]){
     ROLE=savedRole;
-    FSCOPE = sessGet("yakuwari:gate:facility") || (ROLE==="home"?"home":"day");
+    FSCOPE = sessGet("yakuwari:gate:facility") || (ROLE==="admin"?"day":ROLE);
     $("#gate").hidden=true; $("#appRoot").hidden=false;
     await syncPull();
     bootApp();
@@ -1715,7 +1775,7 @@ function bootApp(){
       A(8,"鈴木","h_out","△△様宅 通院同行");
       A(9,"佐藤","h_record","日勤帯 申し送り");A(9,"田中","h_meal","○○様宅 夕食介助");
       A(10,"渡辺","h_patrol","夜間巡回 1周目");A(11,"渡辺","h_patrol","夜間巡回 2周目");
-    } else {
+    } else if(FSCOPE==="day"){
       A(0,"佐藤","t_soge","1号車");A(0,"田中","t_soge","2号車");
       A(1,"鈴木","t_vital","");A(1,"渡辺",["t_vital","t_medchk"],"");
       A(3,"高橋","t_bath_kn","");A(3,"佐藤","t_bath_ka","");A(3,"鈴木","t_chair_kn","");A(3,"田中","t_radio","");
@@ -1724,10 +1784,11 @@ function bootApp(){
       A(9,"渡辺","t_medchk","血糖確認");
       A(11,"佐藤","t_soge","1号車");A(11,"田中","t_soge","2号車");
     }
+    // office/nursing/kitchen は勤務表のみ使うため、サンプルの役割分担割り当ては作成しない
     saveDay();jset(K.meta,{...jget(K.meta,{}),seeded:true});
   }
   updateFacilityUI();
-  setTab("board");
+  setTab(BOARD_FACILITIES.includes(FSCOPE)?"board":"roster");
 }
 initGate();
 </script>
