@@ -1,0 +1,296 @@
+<title>本番システム移行 設計方針書</title>
+<meta name="description" content="役割分担ボードを組織の本番システムへ引き継ぐための、複数人同時利用とデータ保存に関する設計指針">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=BIZ+UDPGothic:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root{
+    --ground:#F5F4EF; --surface:#FFFFFF; --surface-2:#FBFAF6;
+    --ink:#242B2E; --ink-soft:#5C6569; --ink-faint:#8B9296;
+    --line:#E2E0D8; --line-strong:#CFCCC1;
+    --accent:#3A5A78; --accent-ink:#2A4459; --accent-soft:#E6EDF2;
+    --good:#3E7D5C; --good-soft:#E4F0E8;
+    --warn:#B2721E; --warn-soft:#F6EEDC;
+    --block:#B2472F; --block-soft:#F6E4DF;
+    --mono:"JetBrains Mono",ui-monospace,"SF Mono",Consolas,monospace;
+    --shadow:0 1px 2px rgba(36,43,46,.05),0 8px 22px rgba(36,43,46,.06);
+    --radius:14px;
+  }
+  :root:not([data-theme="light"]){
+    @media (prefers-color-scheme:dark){
+      --ground:#161A1C; --surface:#1E2427; --surface-2:#232A2D;
+      --ink:#E8EAE9; --ink-soft:#A3ACAF; --ink-faint:#727C80;
+      --line:#31383B; --line-strong:#414A4E;
+      --accent:#7DA3C4; --accent-ink:#A9C6DE; --accent-soft:#233542;
+      --good:#79B996; --good-soft:#1E3327;
+      --warn:#D9A44E; --warn-soft:#332A18;
+      --block:#DD8571; --block-soft:#3A241E;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#161A1C; --surface:#1E2427; --surface-2:#232A2D;
+    --ink:#E8EAE9; --ink-soft:#A3ACAF; --ink-faint:#727C80;
+    --line:#31383B; --line-strong:#414A4E;
+    --accent:#7DA3C4; --accent-ink:#A9C6DE; --accent-soft:#233542;
+    --good:#79B996; --good-soft:#1E3327;
+    --warn:#D9A44E; --warn-soft:#332A18;
+    --block:#DD8571; --block-soft:#3A241E;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.3);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--ground);color:var(--ink);
+    font-family:"BIZ UDPGothic","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+    font-size:15.5px;line-height:1.75;-webkit-text-size-adjust:100%}
+  h1,h2,h3{font-family:"Zen Maru Gothic","BIZ UDPGothic",system-ui,sans-serif;font-weight:700;text-wrap:balance;margin:0}
+  code,.mono{font-family:var(--mono)}
+  .wrap{max-width:880px;margin:0 auto;padding:48px 24px 100px}
+
+  /* header */
+  header.doc-head{margin-bottom:44px}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.08em;
+    color:var(--accent-ink);background:var(--accent-soft);border-radius:20px;padding:5px 14px;margin-bottom:18px}
+  header.doc-head h1{font-size:30px;letter-spacing:.01em;margin-bottom:10px}
+  header.doc-head .sub{font-size:15px;color:var(--ink-soft);max-width:62ch}
+  .meta-row{display:flex;gap:22px;flex-wrap:wrap;margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
+  .meta-item{font-size:12.5px;color:var(--ink-faint)}
+  .meta-item b{display:block;color:var(--ink);font-size:13.5px;font-weight:700;margin-top:2px}
+
+  /* summary status table */
+  .status-table{width:100%;border-collapse:collapse;margin:20px 0 8px;font-size:14px}
+  .status-table th{text-align:left;font-size:11px;letter-spacing:.06em;color:var(--ink-faint);
+    font-weight:700;padding:0 14px 10px;border-bottom:1px solid var(--line-strong)}
+  .status-table td{padding:14px;border-bottom:1px solid var(--line);vertical-align:top}
+  .status-table tr:last-child td{border-bottom:none}
+  .status-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+    padding:4px 11px;border-radius:20px;white-space:nowrap}
+  .status-pill.now{background:var(--good-soft);color:var(--good)}
+  .status-pill.dev{background:var(--block-soft);color:var(--block)}
+  .status-table .item-name{font-weight:700}
+  .status-table .item-note{color:var(--ink-soft);font-size:13px;margin-top:3px}
+
+  /* sections */
+  section.doc-section{margin-top:56px}
+  .sec-num{font-family:var(--mono);font-size:12.5px;color:var(--accent-ink);font-weight:600;
+    letter-spacing:.04em;margin-bottom:8px;display:block}
+  section.doc-section h2{font-size:21px;margin-bottom:14px}
+  section.doc-section > .lead{color:var(--ink-soft);font-size:14.5px;max-width:64ch;margin-bottom:22px}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:22px 24px;margin-bottom:16px}
+  .panel h3{font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:9px}
+  .panel h3 .ico{font-size:17px}
+  .panel p,.panel li{font-size:14.5px;color:var(--ink-soft)}
+  .panel ul,.panel ol{margin:8px 0 0;padding-left:22px}
+  .panel li+li{margin-top:6px}
+  .panel .k{color:var(--ink);font-weight:700}
+
+  /* layer diagram */
+  .layers{display:flex;flex-direction:column;gap:2px;border-radius:var(--radius);overflow:hidden;
+    border:1px solid var(--line);margin-bottom:20px}
+  .layer{background:var(--surface);padding:16px 20px;display:flex;align-items:center;gap:16px}
+  .layer+.layer{border-top:1px solid var(--line)}
+  .layer .lnum{font-family:var(--mono);font-size:11px;color:var(--ink-faint);width:64px;flex:none}
+  .layer .lname{font-weight:700;font-size:15px;min-width:150px}
+  .layer .ldesc{font-size:13.5px;color:var(--ink-soft);flex:1}
+  .layer.l-front{background:var(--accent-soft)}
+
+  /* two column grid */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:640px){.grid2{grid-template-columns:1fr}}
+
+  /* data model table */
+  .dm-table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px}
+  .dm-table th{text-align:left;background:var(--surface-2);font-size:11px;letter-spacing:.05em;
+    color:var(--ink-faint);font-weight:700;padding:9px 12px;border:1px solid var(--line)}
+  .dm-table td{padding:9px 12px;border:1px solid var(--line);color:var(--ink-soft)}
+  .dm-table td.key{font-family:var(--mono);color:var(--ink);font-size:12.5px;white-space:nowrap}
+  .overflow-x{overflow-x:auto}
+
+  /* checklist */
+  .check-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .check-list li{display:flex;gap:10px;font-size:14.5px;color:var(--ink-soft);align-items:flex-start}
+  .check-list .cb{flex:none;width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line-strong);
+    margin-top:1px}
+
+  .callout{border-left:3px solid var(--warn);background:var(--warn-soft);border-radius:0 10px 10px 0;
+    padding:14px 18px;font-size:14px;color:var(--ink);margin:18px 0}
+  .callout.block{border-left-color:var(--block);background:var(--block-soft)}
+  .callout b{display:block;margin-bottom:4px;font-size:13px;letter-spacing:.03em}
+
+  footer.doc-foot{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);
+    font-size:12.5px;color:var(--ink-faint);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="doc-head">
+    <span class="eyebrow">🔧 引き継ぎ用資料</span>
+    <h1>役割分担ボード：本番システム移行 設計方針書</h1>
+    <p class="sub">現在プロトタイプとして稼働している「役割分担ボード」を、複数人が同時に利用できる組織の本番システムへ引き継ぐための、アーキテクチャとデータ保存の設計方針をまとめたものです。</p>
+    <div class="meta-row">
+      <div class="meta-item">対象<b>デイサービス／訪問介護 兼用</b></div>
+      <div class="meta-item">現行資産<b>役割分担ボード（HTML試作版）</b></div>
+      <div class="meta-item">主な論点<b>同時編集・データ保存・アクセス制御</b></div>
+    </div>
+  </header>
+
+  <section class="doc-section">
+    <span class="sec-num">SUMMARY</span>
+    <h2>結論：今の試作品でできること／本番化に必要なこと</h2>
+    <p class="lead">現行の試作品は「1台のブラウザで完結する業務ツール」として十分に機能します。一方で「複数の端末から同時にアクセスし、同じデータを見ながら編集する」ことは、試作品の作り（ブラウザ内保存）のままでは実現できません。まずこの前提を共有します。</p>
+    <table class="status-table">
+      <tr><th style="width:34%">項目</th><th style="width:18%">状態</th><th>補足</th></tr>
+      <tr>
+        <td class="item-name">1台での役割分担・勤務表管理</td>
+        <td><span class="status-pill now">✓ 現行版で対応</span></td>
+        <td class="item-note">スタッフ台帳・業務内容・役割セット・勤務表・休日自動配置まで、試作品でそのまま運用可能。</td>
+      </tr>
+      <tr>
+        <td class="item-name">デイサービス／訪問介護の区分</td>
+        <td><span class="status-pill now">✓ 現行版で対応</span></td>
+        <td class="item-note">データ・業務内容・時間帯（24時間対応）を分けて管理する設計は実装済み。</td>
+      </tr>
+      <tr>
+        <td class="item-name">複数端末からの同時編集</td>
+        <td><span class="status-pill dev">要 新規開発</span></td>
+        <td class="item-note">サーバー側の共有データベースと同期の仕組みが必要。試作品の保存方式では不可。</td>
+      </tr>
+      <tr>
+        <td class="item-name">現場共用ログイン（施設アカウント）</td>
+        <td><span class="status-pill dev">要 新規開発</span></td>
+        <td class="item-note">現行の簡易パスコードは端末内のみの区分けで、本番の認証基盤としては使えない。</td>
+      </tr>
+      <tr>
+        <td class="item-name">医療・福祉分野のデータ保護基準</td>
+        <td><span class="status-pill dev">要 新規開発</span></td>
+        <td class="item-note">通信・保存の暗号化、アクセスログ、バックアップ等はサーバー基盤側で担保する必要がある。</td>
+      </tr>
+    </table>
+  </section>
+
+  <section class="doc-section">
+    <span class="sec-num">01 — ARCHITECTURE</span>
+    <h2>推奨アーキテクチャ（4層構成）</h2>
+    <p class="lead">複数人・複数拠点での同時利用を前提にすると、現在の「1枚のHTML」から、役割の異なる4つの層に分けて設計するのが基本形になります。</p>
+    <div class="layers">
+      <div class="layer l-front">
+        <div class="lnum">LAYER 1</div>
+        <div class="lname">画面（フロントエンド）</div>
+        <div class="ldesc">タブレット・PCのブラウザで動く画面。現行の役割分担ボードの見た目・操作感はこのまま踏襲できる。</div>
+      </div>
+      <div class="layer">
+        <div class="lnum">LAYER 2</div>
+        <div class="lname">API（バックエンド）</div>
+        <div class="ldesc">「誰が」「何を」変更したかを受け取り、正当な操作か確認してからデータベースに反映する窓口。</div>
+      </div>
+      <div class="layer">
+        <div class="lnum">LAYER 3</div>
+        <div class="lname">データベース</div>
+        <div class="ldesc">スタッフ・勤務表・役割分担を保存する本体。複数端末から同じデータを参照・更新する基盤。</div>
+      </div>
+      <div class="layer">
+        <div class="lnum">LAYER 4</div>
+        <div class="lname">認証基盤</div>
+        <div class="ldesc">「誰がログインしているか」「管理者／デイサービス／訪問介護のどの権限か」を管理する仕組み。</div>
+      </div>
+    </div>
+    <div class="callout">
+      <b>試作品の役割</b>
+      現行のHTML版はLAYER 1の見た目・操作フロー・機能仕様（後述のデータモデル）をすでに固めています。ゼロから画面設計をやり直す必要はなく、「同じ画面をLAYER 2〜4に接続し直す」移行として進められます。
+    </div>
+  </section>
+
+  <section class="doc-section">
+    <span class="sec-num">02 — AUTH</span>
+    <h2>ログイン設計：施設共用＋個人アカウントの併用</h2>
+    <p class="lead">現場のタブレットは共用ログインにしたい一方、誰がいつ何を変更したかは記録したい——という現実的な要件に対しては、2種類のログインを組み合わせる設計が実務上よく使われます。</p>
+    <div class="grid2">
+      <div class="panel">
+        <h3><span class="ico">📟</span>施設共用アカウント</h3>
+        <ul>
+          <li>タブレットごとに「デイサービス」「訪問介護」の共用アカウントでログインしたままにする</li>
+          <li>閲覧・日々の入力はこのアカウントで完結し、現場の運用負担を増やさない</li>
+          <li>共用アカウントには<span class="k">見せてよい範囲</span>だけの権限を持たせる</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3><span class="ico">🔑</span>個人アカウント（管理者・責任者）</h3>
+        <ul>
+          <li>勤務表の確定、パスコード変更、スタッフ台帳の編集など<span class="k">重要な操作</span>は個人ログインを必須にする</li>
+          <li>誰が確定したか・いつ変更したかの記録（監査ログ）を残せる</li>
+          <li>退職者のアクセス無効化など、個人単位でのアカウント管理が可能になる</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout">
+      <b>複数人同時タップへの対応方針</b>
+      同じマスに複数人が同時に触れる可能性がある操作（役割の割り当てなど）は、「先に保存した人を優先し、後から保存しようとした人には最新の状態を再表示して確認を求める」方式（楽観的ロック）が現実的です。ホワイトボードのように「誰かが今まさに編集中」を画面上に薄く表示する仕組みも、現場の混乱を防ぐうえで有効です。
+    </div>
+  </section>
+
+  <section class="doc-section">
+    <span class="sec-num">03 — DATA</span>
+    <h2>データ保存の設計方針</h2>
+    <p class="lead">「どんなデータベース製品を使うか」よりも先に、次の3点を発注先・開発チームと合意しておくことを推奨します。</p>
+    <ol class="panel" style="list-style:decimal;padding-left:38px">
+      <li><span class="k">保存場所（リージョン）</span>：データを日本国内のデータセンターに保存できるクラウド事業者を選ぶ。</li>
+      <li><span class="k">暗号化</span>：通信経路（HTTPS/TLS）と保存データの両方を暗号化する。</li>
+      <li><span class="k">認証・認定</span>：ISMS（ISO27001）やプライバシーマークなど第三者認証を持つ事業者・製品を優先する。</li>
+    </ol>
+    <div class="panel">
+      <h3><span class="ico">🗂️</span>参考：現行試作品のデータモデル</h3>
+      <p style="margin-bottom:10px">開発チームへの仕様提示に使えるよう、試作品が内部で管理しているデータの単位を整理しました。本番DBの設計のたたき台としてそのまま利用できます。</p>
+      <div class="overflow-x">
+        <table class="dm-table">
+          <tr><th>データ単位</th><th>内容</th><th>備考</th></tr>
+          <tr><td class="key">facility</td><td>デイサービス／訪問介護の区分</td><td>データを完全に分離</td></tr>
+          <tr><td class="key">staff</td><td>氏名・色・雇用形態・休日数・勤務時間帯</td><td>2施設で個別管理</td></tr>
+          <tr><td class="key">status（勤務記号）</td><td>出勤・公休・有休 等の記号と定義</td><td>施設ごとにカスタマイズ可</td></tr>
+          <tr><td class="key">roster（月間勤務表）</td><td>スタッフ×日付の勤務記号</td><td>月単位</td></tr>
+          <tr><td class="key">times（時間帯）</td><td>役割分担ボードの列（時刻）</td><td>訪問介護は24時間分</td></tr>
+          <tr><td class="key">tasks（業務の種類）</td><td>業務名・色・所要時間</td><td>施設ごとに別カタログ</td></tr>
+          <tr><td class="key">roles（役割セット）</td><td>リーダー／役割A-E等の型</td><td>時間帯ごとの標準業務を保持</td></tr>
+          <tr><td class="key">day.assign（日次の割り当て）</td><td>日付×時間帯×スタッフの業務割り当て</td><td>同時編集が最も発生する箇所</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="doc-section">
+    <span class="sec-num">04 — SECURITY</span>
+    <h2>医療・福祉分野として確認すべき項目</h2>
+    <p class="lead">発注先やクラウド事業者と契約する前に、次の項目が満たされているかを確認してください。</p>
+    <ul class="check-list panel">
+      <li><span class="cb"></span>通信の暗号化（HTTPS/TLS）が全画面で有効になっている</li>
+      <li><span class="cb"></span>保存データが暗号化されている（データベース側の暗号化機能）</li>
+      <li><span class="cb"></span>「誰が」「いつ」「何を」変更したかのログが一定期間残る</li>
+      <li><span class="cb"></span>退職・異動時にアカウントを即時無効化できる</li>
+      <li><span class="cb"></span>定期的な自動バックアップと、復元手順の確認が取れている</li>
+      <li><span class="cb"></span>個人情報保護法・自治体のガイドラインに沿った委託先選定基準を満たしている</li>
+      <li><span class="cb"></span>入力する情報の範囲（病名・既往歴等を含めるか）を運用ルールとして明文化している</li>
+    </ul>
+  </section>
+
+  <section class="doc-section">
+    <span class="sec-num">05 — NEXT</span>
+    <h2>進め方の選択肢</h2>
+    <div class="grid2">
+      <div class="panel">
+        <h3><span class="ico">🏗️</span>専用システムを新規開発する</h3>
+        <p>今回の試作品を仕様の土台として、開発会社・社内システム部門に見積もりを依頼する進め方です。組織の運用に完全に合わせられる一方、開発期間（数ヶ月単位）と費用がかかります。</p>
+      </div>
+      <div class="panel">
+        <h3><span class="ico">📦</span>既存の介護シフト管理サービスを比較検討する</h3>
+        <p>すでに医療・福祉業界向けに提供されている勤務表・シフト管理のクラウドサービスを導入する方法です。開発コストをかけずに、複数人同時利用やセキュリティ基準を満たせる場合があります。今回の試作品は、それらのサービスに求める機能要件の整理にも活用できます。</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="doc-foot">
+    <span>役割分担ボード プロジェクト</span>
+    <span>本資料は組織内での検討・発注のための参考資料です</span>
+  </footer>
+</div>

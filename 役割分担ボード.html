@@ -1,0 +1,1696 @@
+<title>役割分担ボード</title>
+<meta name="description" content="デイサービスの月間勤務表と1日の役割分担表を作り、PDFで共有できるボード">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=BIZ+UDPGothic:wght@400;700&display=swap">
+<style>
+  :root{
+    --ground:#F5F4EF; --surface:#FFFFFF; --surface-2:#FBFAF6;
+    --ink:#26302D; --ink-soft:#5E6A66; --ink-faint:#8A938E;
+    --line:#E4E1D9; --line-strong:#D2CEC3;
+    --accent:#2F7D6B; --accent-ink:#1F5A4C; --accent-soft:#E4F0EC;
+    --warn:#B26B1E; --warn-soft:#F6EBDA;
+    --alert:#BC4A3C; --alert-soft:#F7E3E0;
+    --sat:#EAF1F6; --sun:#F8ECEB; --closed:#ECE6DB;
+    --shadow:0 1px 2px rgba(38,48,45,.06),0 6px 18px rgba(38,48,45,.06);
+    --radius:12px;
+  }
+  :root:not([data-theme="light"]){
+    @media (prefers-color-scheme:dark){
+      --ground:#171B1A; --surface:#1F2523; --surface-2:#242B29;
+      --ink:#E9EEEB; --ink-soft:#A6B0AB; --ink-faint:#7C8783;
+      --line:#333B39; --line-strong:#414A47;
+      --accent:#5BB39C; --accent-ink:#8FCFBD; --accent-soft:#22322E;
+      --warn:#D9A05A; --warn-soft:#33291A;
+      --alert:#E08578; --alert-soft:#38231F;
+      --sat:#22303A; --sun:#3A2724; --closed:#33302A;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#171B1A; --surface:#1F2523; --surface-2:#242B29;
+    --ink:#E9EEEB; --ink-soft:#A6B0AB; --ink-faint:#7C8783;
+    --line:#333B39; --line-strong:#414A47;
+    --accent:#5BB39C; --accent-ink:#8FCFBD; --accent-soft:#22322E;
+    --warn:#D9A05A; --warn-soft:#33291A;
+    --alert:#E08578; --alert-soft:#38231F;
+    --sat:#22303A; --sun:#3A2724; --closed:#33302A;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"BIZ UDPGothic","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+    font-size:15px; line-height:1.5; -webkit-text-size-adjust:100%;
+  }
+  h1,h2,h3{font-family:"Zen Maru Gothic","BIZ UDPGothic",system-ui,sans-serif;margin:0;font-weight:700}
+  button{font-family:inherit}
+  .num{font-variant-numeric:tabular-nums}
+
+  .app{max-width:1440px;margin:0 auto;padding:16px 18px 90px}
+
+  /* ---------- Login gate ---------- */
+  .gate{position:fixed;inset:0;background:var(--ground);display:flex;align-items:center;justify-content:center;
+    padding:20px;z-index:100}
+  .gate[hidden]{display:none}
+  .gate-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
+    padding:32px 28px;width:min(420px,100%);text-align:center}
+  .gate-mark{width:52px;height:52px;border-radius:13px;background:var(--accent-soft);color:var(--accent-ink);
+    display:grid;place-items:center;font-size:26px;margin:0 auto 14px}
+  .gate-card h1{font-size:19px;margin-bottom:6px}
+  .gate-sub{font-size:13px;color:var(--ink-soft);margin-bottom:22px}
+  .gate-roles{display:flex;flex-direction:column;gap:10px}
+  .gate-role{display:flex;align-items:center;gap:12px;text-align:left;width:100%;
+    border:1.5px solid var(--line-strong);background:var(--surface-2);border-radius:11px;padding:12px 14px;cursor:pointer;font:inherit}
+  .gate-role:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .gate-role .gr-ico{font-size:22px;flex:none}
+  .gate-role .gr-lbl{font-weight:700;font-size:14.5px;color:var(--ink);display:block}
+  .gate-role .gr-sub{font-size:11.5px;color:var(--ink-soft);display:block;margin-top:1px}
+  .gate-pass{margin-top:20px;text-align:left}
+  .gate-pass-label{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px}
+  .gate-pass input{width:100%;font:inherit;font-size:16px;letter-spacing:.08em;color:var(--ink);
+    background:var(--surface-2);border:1.5px solid var(--line-strong);border-radius:9px;padding:10px 12px;text-align:center}
+  .gate-pass input:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+  .gate-error{color:var(--alert);font-size:12.5px;margin-top:8px;text-align:center}
+  .gate-pass-btns{display:flex;gap:8px;margin-top:14px}
+  .gate-pass-btns .btn{flex:1;justify-content:center}
+
+  /* ---------- Facility switcher / session bar ---------- */
+  .fac-switch{display:inline-flex;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden}
+  .fac-switch[hidden],.fac-badge[hidden]{display:none}
+  .fac-switch button{border:none;background:var(--surface);color:var(--ink-soft);font:inherit;font-weight:700;
+    font-size:12.5px;padding:7px 12px;cursor:pointer;border-left:1px solid var(--line-strong)}
+  .fac-switch button:first-child{border-left:none}
+  .fac-switch button[aria-pressed="true"]{background:var(--accent);color:#fff}
+  .fac-badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--ink-soft);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:7px 12px}
+  .sync-status{font-size:11.5px;color:var(--ink-faint);white-space:nowrap}
+  .sync-status[data-state="error"]{color:var(--alert)}
+  .sync-status[data-state="busy"]{color:var(--accent-ink)}
+
+  header.top{
+    display:flex;flex-wrap:wrap;gap:14px 18px;align-items:center;justify-content:space-between;
+    padding:12px 18px;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:14px;
+  }
+  .brand{display:flex;align-items:center;gap:12px;min-width:0}
+  .brand .mark{width:40px;height:40px;border-radius:11px;flex:none;background:var(--accent-soft);
+    color:var(--accent-ink);display:grid;place-items:center;font-size:22px}
+  .brand h1{font-size:20px;letter-spacing:.01em;line-height:1.15}
+  .brand .sub{font-size:12px;color:var(--ink-soft);margin-top:2px}
+
+  .tabs{display:flex;gap:4px;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:4px}
+  .tab{border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;color:var(--ink-soft);
+    padding:8px 18px;border-radius:8px;display:flex;align-items:center;gap:7px}
+  .tab[aria-selected="true"]{background:var(--surface);color:var(--accent-ink);box-shadow:var(--shadow)}
+  .tab:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:11px;color:var(--ink-soft);letter-spacing:.06em;font-weight:700}
+  .field input,.field select{font:inherit;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line-strong);border-radius:9px;padding:7px 10px;min-width:150px}
+  .field input:focus-visible,.field select:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;margin-bottom:14px}
+  .toolbar .spacer{flex:1}
+  .btn{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:13.5px;font-weight:700;
+    color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:9px;
+    padding:8px 13px;transition:.12s}
+  .btn:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .btn .ico{font-size:15px;line-height:1}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{filter:brightness(1.05);color:#fff}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--ink-soft)}
+  .btn.ghost:hover{background:var(--surface);border-color:var(--line)}
+  .btn.sm{padding:5px 9px;font-size:12px;border-radius:7px}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden}
+  .panel-head{display:flex;align-items:center;gap:10px;padding:10px 15px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+  .panel-head h2{font-size:14px;letter-spacing:.03em}
+  .panel-head .count{font-size:12px;color:var(--ink-soft);font-weight:400}
+  .panel-body{padding:12px 15px}
+
+  /* ---- roster checklist on board ---- */
+  .rosterpick{display:flex;flex-wrap:wrap;gap:8px}
+  .spick{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;
+    background:var(--surface-2);border:1px solid var(--line-strong);border-left:5px solid var(--sc,#888);
+    border-radius:9px;padding:6px 11px 6px 10px;font-weight:700;font-size:14px}
+  .spick input{accent-color:var(--accent);width:16px;height:16px}
+  .spick.off{opacity:.45}
+  .leader-tag{display:block;font-size:10px;font-weight:700;color:var(--accent-ink);
+    background:var(--accent-soft);border-radius:4px;padding:2px 6px;line-height:1.5;margin-top:8px;width:fit-content}
+  .leadbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+  .leadlabel{font-size:13px;font-weight:700;color:var(--ink);display:inline-flex;align-items:center;gap:7px}
+  .leadlabel select{font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px}
+
+  /* ---------- Board grid ---------- */
+  .board-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow)}
+  table.board{border-collapse:collapse;width:100%;min-width:640px}
+  table.board th,table.board td{border:1px solid var(--line);padding:0;vertical-align:top}
+  table.board thead th{background:var(--surface-2);position:sticky;top:0;z-index:3;padding:7px 5px;font-size:12.5px}
+  th.time-head{min-width:104px}
+  th.time-head .t{font-weight:700;font-size:14px;letter-spacing:.02em}
+  th.time-head .phase{font-size:10px;color:var(--ink-soft);margin-top:2px;line-height:1.2;font-weight:400}
+  .staff-col{width:94px;min-width:94px;background:var(--surface-2);position:sticky;left:0;z-index:4}
+  td.staff-cell{background:var(--surface-2);position:sticky;left:0;z-index:2;padding:8px 8px}
+  td.staff-cell .row-staff{display:flex;align-items:center;gap:7px}
+  td.staff-cell .bar{width:5px;align-self:stretch;min-height:26px;border-radius:3px;background:var(--sc,#888)}
+  td.staff-cell .nm{font-weight:700;font-size:14px}
+  td.staff-cell .hrs{font-size:10px;color:var(--accent-ink);margin-top:3px;font-weight:700;line-height:1.2}
+  td.cell{cursor:pointer;transition:background .1s;min-width:104px;height:52px}
+  td.cell.offhours{cursor:default;background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 5px,transparent 5px,transparent 10px)}
+  td.cell.offhours::after{content:"勤務時間外";display:grid;place-items:center;height:100%;font-size:10px;color:var(--ink-faint)}
+  td.cell:hover{background:var(--accent-soft)}
+  td.cell .assign{display:flex;flex-direction:column;gap:3px;height:100%;padding:5px 6px}
+  td.cell .tchip{font-weight:700;font-size:12.5px;border-radius:4px;padding:2px 6px;border-left:3px solid var(--tc);
+    background:var(--tbg);color:var(--tink);line-height:1.25}
+  td.cell .note{font-size:11px;color:var(--ink-soft);margin-top:1px;white-space:pre-wrap;word-break:break-word}
+  td.cell.empty .assign{border-left-color:transparent}
+  td.cell.empty::after{content:"＋";color:var(--ink-faint);opacity:0;font-size:15px;display:grid;place-items:center;height:100%}
+  td.cell.empty:hover::after{opacity:.55}
+  td.cell.empty:hover .assign{display:none}
+
+  .foot-legend{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px;padding:0 2px;font-size:12px;color:var(--ink-soft)}
+  .leg{display:inline-flex;align-items:center;gap:6px}
+  .leg .sw{width:14px;height:14px;border-radius:4px;border:1px solid rgba(0,0,0,.08)}
+  .hint{margin-top:10px;font-size:12px;color:var(--ink-faint);text-align:center}
+
+  /* ---------- Roster (勤務表) ---------- */
+  .brushbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+  .brushbar .lb{font-size:12px;color:var(--ink-soft);font-weight:700;letter-spacing:.04em;margin-right:2px}
+  .brush{display:inline-flex;align-items:center;gap:7px;cursor:pointer;border:1.5px solid var(--line-strong);
+    background:var(--surface);border-radius:9px;padding:6px 11px;font-weight:700;font-size:13px}
+  .brush .chip{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff}
+  .brush[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft) inset}
+  .brush.eraser .chip{background:repeating-linear-gradient(45deg,var(--line-strong),var(--line-strong) 3px,transparent 3px,transparent 6px);color:var(--ink-soft)}
+
+  .rtable-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow)}
+  table.roster{border-collapse:collapse;width:100%}
+  table.roster th,table.roster td{border:1px solid var(--line);text-align:center;padding:0}
+  table.roster thead th{position:sticky;top:0;background:var(--surface-2);z-index:3;font-size:12px;padding:4px 2px}
+  table.roster .rname{position:sticky;left:0;z-index:2;background:var(--surface-2);min-width:88px;width:88px;
+    text-align:left;padding:6px 8px;font-weight:700;font-size:13.5px}
+  table.roster thead .rname{z-index:5}
+  table.roster th.dcol{min-width:30px;width:30px}
+  table.roster th.dcol .dow{font-size:9.5px;font-weight:700;color:var(--ink-soft)}
+  table.roster th.dcol .dn{font-size:12px;font-weight:700}
+  table.roster .sumcol,table.roster td.sumcell{min-width:52px;width:52px;background:var(--surface-2);position:sticky;z-index:2}
+  table.roster .s-off{right:0} table.roster .s-work{right:52px}
+  table.roster thead .sumcol{z-index:4}
+  table.roster td.sumcell.s-off{font-size:12px}
+  table.roster td.sumcell.s-off .cnt{font-weight:700;font-size:13px}
+  table.roster td.sumcell.s-off.under{color:var(--alert)}
+  table.roster td.sumcell.s-off.ok{color:var(--accent-ink)}
+  table.roster td.sumcell.s-off.over{color:var(--warn)}
+  table.roster td.rc{cursor:pointer;height:34px;font-weight:700;font-size:14px}
+  table.roster td.rc:hover{outline:2px solid var(--accent);outline-offset:-2px}
+  table.roster col.sat,table.roster td.sat{background:var(--sat)}
+  table.roster col.sun,table.roster td.sun{background:var(--sun)}
+  table.roster col.off,table.roster td.off{background:var(--closed)}
+  table.roster th.dcol.off .dn{color:var(--ink-soft)}
+  table.roster th.dcol .rest{font-size:9px;font-weight:700;color:var(--warn);line-height:1}
+  table.roster td.rc.auto{opacity:.5}
+  table.roster td.sumcell{font-weight:700;font-size:13px;background:var(--surface-2);color:var(--ink)}
+  table.roster td.sumcell.s-work{color:var(--accent-ink)}
+  table.roster tfoot td{background:var(--surface-2);font-weight:700;font-size:11.5px;color:var(--ink-soft);height:26px}
+  table.roster tfoot td.low{background:var(--alert-soft);color:var(--alert);font-size:13px}
+  table.roster tfoot .rname{color:var(--ink-soft)}
+
+  .rlegend{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px;font-size:12px;color:var(--ink-soft);align-items:center}
+  .rlegend .rl{display:inline-flex;align-items:center;gap:6px}
+  .rlegend .rl .chip{width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff}
+
+  /* ---------- Modal ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(20,26,24,.45);backdrop-filter:blur(2px);display:none;place-items:center;z-index:50;padding:16px}
+  #assignOverlay{z-index:60}
+  .overlay.open{display:grid}
+  .modal{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:min(480px,100%);max-height:88vh;overflow:auto}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
+  .modal-head h3{font-size:16px}
+  .modal-head .x{background:none;border:none;font-size:22px;cursor:pointer;color:var(--ink-soft);line-height:1}
+  .modal-body{padding:16px 18px}
+  .modal-foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:var(--surface)}
+  .task-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+  .task-opt{display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid var(--line-strong);border-radius:9px;background:var(--surface-2);text-align:left;font:inherit;color:var(--ink)}
+  .task-opt:hover{border-color:var(--accent)}
+  .task-opt.sel{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+  .task-opt .dot{width:14px;height:14px;border-radius:4px;flex:none}
+  .task-opt .lbl{font-weight:700;font-size:13.5px;flex:1}
+  .task-opt .dur{font-size:10.5px;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:1px 7px;font-weight:700;white-space:nowrap}
+  .task-opt.sel .dot{box-shadow:0 0 0 2px var(--accent)}
+  .task-opt.clear{grid-column:1/-1;justify-content:center;color:var(--ink-soft)}
+  textarea.note-in{width:100%;font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:9px;padding:9px;resize:vertical;min-height:56px}
+  .mlabel{font-size:11px;color:var(--ink-soft);letter-spacing:.06em;font-weight:700;margin:2px 0 6px}
+  .edit-list{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
+  .edit-row{display:flex;gap:7px;align-items:center}
+  .edit-row input[type=text]{flex:1;font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:8px;padding:6px 9px}
+  .edit-row input[type=color]{width:34px;height:34px;padding:0;border:1px solid var(--line-strong);border-radius:8px;background:none;cursor:pointer;flex:none}
+  .edit-row input[type=time]{font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px}
+  .edit-row .code{width:44px;text-align:center;font:inherit;font-weight:700;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:8px;padding:6px 4px}
+  .edit-row .wk{display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--ink-soft);white-space:nowrap}
+  .staff-edit{border:1px solid var(--line-strong);border-radius:10px;padding:9px 10px;background:var(--surface-2);display:flex;flex-direction:column;gap:9px}
+  .staff-edit .line1{display:flex;gap:8px;align-items:center}
+  .staff-edit .line1 input[type=color]{width:32px;height:32px;padding:0;border:1px solid var(--line-strong);border-radius:8px;background:none;cursor:pointer;flex:none}
+  .staff-edit .line1 .nm-in{flex:1;min-width:80px;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:7px 9px;font-weight:700}
+  .staff-edit .line1 .del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:18px}
+  .staff-edit .line1 .del:hover{color:var(--alert)}
+  .staff-edit .line2{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;padding-left:2px}
+  .staff-edit .fl{display:flex;flex-direction:column;gap:4px}
+  .staff-edit .fl>span{font-size:10.5px;color:var(--ink-soft);font-weight:700;letter-spacing:.04em}
+  .staff-edit .fl .off-in{width:110px;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:6px 9px}
+  .staff-edit .hrows{display:flex;flex-wrap:wrap;gap:8px 18px;padding:2px 2px 0}
+  .staff-edit .hrow{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .staff-edit .hrow input[type=time]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:5px 7px}
+  .seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+  .segbtn{border:none;background:var(--surface);color:var(--ink-soft);font:inherit;font-weight:700;font-size:13px;padding:7px 14px;cursor:pointer;border-left:1px solid var(--line-strong)}
+  .segbtn:first-child{border-left:none}
+  .segbtn[aria-pressed="true"]{background:var(--accent);color:#fff}
+  .edit-row.wrap{flex-wrap:wrap}
+  .edit-row .nm-in{flex:1;min-width:96px;font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:8px;padding:6px 9px}
+  .edit-row select{font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:8px;padding:6px 6px}
+  .edit-row input[type=number]{width:66px;font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px}
+  .edit-row .del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:18px}
+  .edit-row .del:hover{color:var(--alert)}
+  .dow-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+  .dow-row label{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line-strong);border-radius:8px;padding:6px 11px;cursor:pointer;font-weight:700;font-size:13px}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .cal .cdow{text-align:center;font-size:11px;font-weight:700;color:var(--ink-soft);padding:2px 0}
+  .cal .cday{aspect-ratio:1;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface-2);
+    cursor:pointer;font:inherit;font-weight:700;font-size:13px;color:var(--ink);display:grid;place-items:center;padding:0}
+  .cal .cday.blank{border:none;background:none;cursor:default}
+  .cal .cday.on{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+  .cal .cday.dow-off{background:var(--closed);border-color:var(--line-strong);color:var(--ink-soft);cursor:default}
+  .cal .cday.sun{color:var(--alert)} .cal .cday.sat{color:#4A7FB5}
+  .role-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  .role-tab{border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-soft);font:inherit;font-weight:700;font-size:13px;padding:6px 12px;border-radius:8px;cursor:pointer}
+  .role-tab.sel{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink)}
+  .role-grid{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+  .rg-row{display:flex;align-items:flex-start;gap:9px;width:100%;text-align:left;cursor:pointer;font:inherit;
+    border:1px solid var(--line);border-radius:9px;background:var(--surface-2);padding:7px 10px}
+  .rg-row:hover{border-color:var(--accent)}
+  .rg-time{font-weight:700;font-size:13px;min-width:44px;color:var(--ink)}
+  .rg-tasks{display:flex;flex-wrap:wrap;gap:4px;align-items:center;flex:1}
+  .rg-chip{font-weight:700;font-size:12px;border-radius:4px;padding:1px 6px;border-left:3px solid var(--tc)}
+  .rg-note{font-size:11px;color:var(--ink-soft)}
+  .rg-empty{font-size:12px;color:var(--ink-faint)}
+  .tpl-item{display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid var(--line-strong);border-radius:9px;background:var(--surface-2);margin-bottom:7px}
+  .tpl-item .tnm{flex:1;font-weight:700}
+  .tpl-empty{color:var(--ink-faint);font-size:13px;text-align:center;padding:14px}
+
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--ground);padding:10px 18px;border-radius:22px;font-size:13.5px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;transition:.25s;pointer-events:none;z-index:80}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ---------- Settings tab ---------- */
+  .settings-group{margin-bottom:28px}
+  .settings-group:last-child{margin-bottom:0}
+  .settings-group-title{display:flex;align-items:center;gap:9px;font-size:15px;letter-spacing:.02em;
+    color:var(--ink-soft);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .settings-group-title .sgt-ico{font-size:16px}
+  .settings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+  .setting-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:18px;display:flex;flex-direction:column;gap:10px}
+  .setting-card .sc-icon{font-size:26px;line-height:1;background:var(--accent-soft);color:var(--accent-ink);
+    width:44px;height:44px;border-radius:11px;display:grid;place-items:center}
+  .setting-card .sc-body{flex:1}
+  .setting-card h3{font-size:15px;margin-bottom:4px}
+  .setting-card p{font-size:12.5px;color:var(--ink-soft);line-height:1.6;margin:0}
+  .setting-card .btn{align-self:flex-start}
+
+  @media (max-width:640px){.brand h1{font-size:17px}.tab{padding:8px 12px}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+  /* ---------- タッチ端末（iPad等）向けの調整 ---------- */
+  @media (pointer:coarse){
+    input,select,textarea,button{font-size:16px} /* iOS Safariが入力欄タップ時に自動拡大するのを防止 */
+    .btn.sm,.segbtn,.role-tab{font-size:14px}
+    .btn{min-height:40px}
+    td.cell,td.rc,.spick,.gate-role,.task-opt,.rg-row{touch-action:manipulation}
+    .board-wrap,.rtable-wrap{-webkit-overflow-scrolling:touch}
+  }
+
+  /* ---------- Print ---------- */
+  @page{size:A4 landscape;margin:8mm}
+  @media print{
+    body{background:#fff;font-size:10px}
+    .app{max-width:none;padding:0}
+    .toolbar,.no-print,.tabs,.staff-chip .rm,.hint,.brushbar,.panel.no-print-panel{display:none!important}
+    header.top{box-shadow:none;border:none;padding:0 0 5px;margin-bottom:6px;border-bottom:2px solid #333}
+    .panel{box-shadow:none;border:1px solid #999;margin-bottom:8px}
+    .panel-head{background:#f0f0f0}
+    .board-wrap,.rtable-wrap{overflow:visible;box-shadow:none;border:1px solid #999}
+    table.board{min-width:0}
+    table.board thead th,table.roster thead th{position:static;background:#f0f0f0}
+    td.staff-cell,.staff-col,table.roster .rname,table.roster .sumcol,table.roster td.sumcell{position:static;background:#f6f6f6}
+    td.cell{height:auto}
+    td.cell.empty::after{display:none}
+    table.roster td.rc{height:22px}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+
+<!-- ============ LOGIN GATE ============ -->
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <div class="gate-mark">🗓️</div>
+    <h1>役割分担ボード</h1>
+    <p class="gate-sub">ご自身の区分を選んでください</p>
+    <div class="gate-roles" id="gateRoles">
+      <button class="gate-role" data-role="admin"><span class="gr-ico">🛡️</span><span class="gr-lbl">管理者</span><span class="gr-sub">デイサービス・訪問介護 両方</span></button>
+      <button class="gate-role" data-role="day"><span class="gr-ico">📋</span><span class="gr-lbl">デイサービス</span><span class="gr-sub">デイサービスの役割分担・勤務表</span></button>
+      <button class="gate-role" data-role="home"><span class="gr-ico">🚶</span><span class="gr-lbl">訪問介護</span><span class="gr-sub">訪問介護の役割分担・勤務表</span></button>
+    </div>
+    <div class="gate-pass" id="gatePass" hidden>
+      <p class="gate-pass-label" id="gatePassLabel"></p>
+      <input type="password" id="gatePassInput" inputmode="numeric" placeholder="パスコード" autocomplete="off">
+      <p class="gate-error" id="gateError" hidden>パスコードが違います</p>
+      <div class="gate-pass-btns">
+        <button class="btn" id="gateBack">戻る</button>
+        <button class="btn primary" id="gateEnter">入る</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="app" id="appRoot" hidden>
+  <header class="top">
+    <div class="brand">
+      <div class="mark">🗓️</div>
+      <div>
+        <h1>役割分担ボード</h1>
+        <div class="sub" id="brandSub">デイサービス 1日の役割分担表</div>
+      </div>
+    </div>
+    <div class="tabs no-print" role="tablist">
+      <button class="tab" id="tabBoard" role="tab" aria-selected="true"><span>📋</span>役割分担</button>
+      <button class="tab" id="tabRoster" role="tab" aria-selected="false"><span>📅</span>勤務表</button>
+      <button class="tab" id="tabSettings" role="tab" aria-selected="false"><span>⚙️</span>設定</button>
+    </div>
+    <div class="field">
+      <label for="facility">事業所名</label>
+      <input type="text" id="facility" placeholder="○○デイサービスセンター">
+    </div>
+  </header>
+
+  <div class="toolbar no-print" style="margin-top:-4px" id="sessionBar">
+    <div class="fac-switch" id="facSwitch" hidden>
+      <button data-fac="day">📋 デイサービス</button>
+      <button data-fac="home">🚶 訪問介護</button>
+    </div>
+    <span class="fac-badge" id="facBadge" hidden></span>
+    <span class="sync-status" id="syncStatus" data-state="off"></span>
+    <button class="btn ghost sm" id="btnSyncNow" title="最新の状態を取得">🔄 今すぐ同期</button>
+    <span class="spacer" style="flex:1"></span>
+    <button class="btn ghost sm" id="btnLogout">ログアウト</button>
+  </div>
+
+  <!-- ============ BOARD VIEW ============ -->
+  <div id="viewBoard">
+    <div class="toolbar no-print">
+      <div class="field">
+        <label for="date">日付</label>
+        <input type="date" id="date">
+      </div>
+      <button class="btn" id="btnSync"><span class="ico">🔄</span>勤務表から出勤者を取り込む</button>
+      <span class="spacer"></span>
+      <button class="btn" id="btnTplSave"><span class="ico">💾</span>テンプレ保存</button>
+      <button class="btn" id="btnTplLoad"><span class="ico">📂</span>テンプレ読込</button>
+      <button class="btn primary" id="btnPrintBoard"><span class="ico">🖨️</span>印刷・PDF</button>
+      <button class="btn ghost sm" id="btnTheme" title="表示切替">◐</button>
+    </div>
+
+    <section class="panel no-print-panel">
+      <div class="panel-head">
+        <h2>今日の勤務スタッフ</h2>
+        <span class="count" id="staffCount"></span>
+        <span class="spacer" style="flex:1"></span>
+        <button class="btn sm" id="btnStaffMgr">スタッフ台帳を編集</button>
+      </div>
+      <div class="panel-body">
+        <div class="rosterpick" id="rosterpick"></div>
+        <div class="leadbar no-print">
+          <label class="leadlabel">リーダー <select id="leaderSel"></select></label>
+          <span class="spacer" style="flex:1"></span>
+          <button class="btn sm primary" id="btnAutoRole"><span class="ico">✨</span>役割を自動割り当て</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="board-wrap">
+      <table class="board">
+        <thead><tr id="headRow"></tr></thead>
+        <tbody id="body"></tbody>
+      </table>
+    </div>
+    <div class="foot-legend" id="legend"></div>
+    <p class="hint no-print">マスをタップして業務を割り当て／「印刷・PDF」→送信先で「PDFに保存」でLINE WORKS共有用に。</p>
+  </div>
+
+  <!-- ============ ROSTER VIEW ============ -->
+  <div id="viewRoster" hidden>
+    <div class="toolbar no-print">
+      <div class="field">
+        <label for="month">対象月</label>
+        <input type="month" id="month">
+      </div>
+      <button class="btn" id="btnSettings"><span class="ico">🧮</span>休日・休業日の設定</button>
+      <button class="btn primary" id="btnAuto"><span class="ico">✨</span>休日数に合わせて自動作成</button>
+      <span class="spacer"></span>
+      <button class="btn primary" id="btnPrintRoster"><span class="ico">🖨️</span>印刷・PDF（事務提出用）</button>
+      <button class="btn ghost sm" id="btnTheme2" title="表示切替">◐</button>
+    </div>
+
+    <div class="brushbar no-print">
+      <span class="lb">記号を選んでマスをタップ</span>
+      <div id="brushes"></div>
+    </div>
+
+    <div class="rtable-wrap">
+      <table class="roster" id="rosterTable"></table>
+    </div>
+    <div class="rlegend" id="rlegend"></div>
+    <p class="hint no-print">希望休を塗る →「休日数に合わせて自動作成」で、なるべく週2日休みになるよう不足分の公休を配置し残りを出勤に。右端の「休/目標」で過不足を確認できます。</p>
+  </div>
+
+  <!-- ============ SETTINGS VIEW ============ -->
+  <div id="viewSettings" hidden>
+    <p class="hint no-print" style="margin:0 0 16px;text-align:left">日々の操作画面とは分けています。ここでの変更はすぐに反映されます。</p>
+
+    <div class="settings-group">
+      <h2 class="settings-group-title"><span class="sgt-ico">📋</span>役割分担の設定</h2>
+      <div class="settings-grid">
+        <div class="setting-card">
+          <div class="sc-icon">🕐</div>
+          <div class="sc-body">
+            <h3>時間帯</h3>
+            <p>役割分担ボードの時間帯（列）の追加・削除・時刻変更をします。デイサービス／訪問介護でそれぞれ別に管理され、訪問介護は24時間分を初期設定しています。</p>
+          </div>
+          <button class="btn" id="stgTime">編集する</button>
+        </div>
+        <div class="setting-card">
+          <div class="sc-icon">🏷️</div>
+          <div class="sc-body">
+            <h3>業務の種類</h3>
+            <p>業務（ケア内容）の名称・色・所要時間を編集します。デイサービス／訪問介護でそれぞれ別に管理されます。</p>
+          </div>
+          <button class="btn" id="stgTask">編集する</button>
+        </div>
+        <div class="setting-card">
+          <div class="sc-icon">🧩</div>
+          <div class="sc-body">
+            <h3>役割セット</h3>
+            <p>リーダー・役割A/B/Cなど、1日の型となる業務パターンを編集します。</p>
+          </div>
+          <button class="btn" id="stgRoles">編集する</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <h2 class="settings-group-title"><span class="sgt-ico">📅</span>勤務表の設定</h2>
+      <div class="settings-grid">
+        <div class="setting-card">
+          <div class="sc-icon">🏷️</div>
+          <div class="sc-body">
+            <h3>勤務記号</h3>
+            <p>出勤・公休・有休などの記号・呼び名・色と、出勤扱いかどうかを編集します。訪問介護は初期設定で日勤・早番・遅番・夜勤に対応しています。</p>
+          </div>
+          <button class="btn" id="stgStatus">編集する</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <h2 class="settings-group-title"><span class="sgt-ico">🔗</span>共通の設定</h2>
+      <div class="settings-grid">
+        <div class="setting-card">
+          <div class="sc-icon">👥</div>
+          <div class="sc-body">
+            <h3>スタッフ台帳</h3>
+            <p>スタッフの氏名・色・雇用形態・月の休日数・勤務時間帯を編集します。役割分担・勤務表の両方で使われます。</p>
+          </div>
+          <button class="btn" id="stgStaff">編集する</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-group" id="grpAccess" hidden>
+      <h2 class="settings-group-title"><span class="sgt-ico">🔐</span>アクセスとログイン（管理者のみ）</h2>
+      <div class="settings-grid">
+        <div class="setting-card">
+          <div class="sc-icon">🔑</div>
+          <div class="sc-body">
+            <h3>パスコードの変更</h3>
+            <p>管理者・デイサービス・訪問介護、各区分のログイン用パスコードを変更します。</p>
+          </div>
+          <button class="btn" id="stgPass">編集する</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm modal（Artifactのサンドボックスでは window.confirm が使えないため自前で用意） -->
+<div class="overlay" id="confirmOverlay"><div class="modal" style="width:min(360px,100%)">
+  <div class="modal-body" style="padding-top:20px">
+    <p id="confirmMsg" style="white-space:pre-wrap;line-height:1.6;margin:0"></p>
+  </div>
+  <div class="modal-foot"><button class="btn" data-close>キャンセル</button><button class="btn primary" id="confirmYes">OK</button></div>
+</div></div>
+
+<!-- Passcode modal -->
+<div class="overlay" id="passOverlay"><div class="modal">
+  <div class="modal-head"><h3>パスコードの変更</h3><button class="x" data-close>×</button></div>
+  <div class="modal-body">
+    <div class="edit-list" id="passList"></div>
+    <p style="font-size:12px;color:var(--ink-soft)">※ このアプリの簡易的な区分わけです。厳密な個人認証ではありません。</p>
+  </div>
+  <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
+</div></div>
+
+<!-- Assign modal -->
+<div class="overlay" id="assignOverlay"><div class="modal">
+  <div class="modal-head"><h3 id="assignTitle">業務を割り当て</h3><button class="x" data-close>×</button></div>
+  <div class="modal-body">
+    <div class="mlabel">業務（複数選択できます）</div>
+    <div class="task-opts" id="taskOpts"></div>
+    <div class="mlabel">メモ（場所・担当利用者・注意など）</div>
+    <textarea class="note-in" id="assignNote" placeholder="例：１号車 / 大浴場 / 〇〇様 見守り"></textarea>
+  </div>
+  <div class="modal-foot"><button class="btn" data-close>キャンセル</button><button class="btn primary" id="assignSave">決定</button></div>
+</div></div>
+
+<!-- Staff master modal -->
+<div class="overlay" id="staffOverlay"><div class="modal">
+  <div class="modal-head"><h3>スタッフ台帳</h3><button class="x" data-close>×</button></div>
+  <div class="modal-body">
+    <div class="mlabel">名前・色／雇用形態／月の休日数（空欄=形態の既定を使用・数値を入れるとその人だけ上書き）</div>
+    <div class="edit-list" id="staffList"></div>
+    <div class="edit-row"><input type="text" id="newStaffName" placeholder="スタッフ名を追加" maxlength="12"><button class="btn sm" id="addStaff">＋ 追加</button></div>
+    <p style="margin-top:12px"><button class="btn sm" id="btnTypesFromStaff">雇用形態と既定休日数を編集</button></p>
+  </div>
+  <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
+</div></div>
+
+<!-- Combined settings modal: 休日数 + 事業所休業日 -->
+<div class="overlay" id="settingsOverlay"><div class="modal">
+  <div class="modal-head"><h3 id="settingsTitle">休日・休業日の設定</h3><button class="x" data-close>×</button></div>
+  <div class="modal-body">
+    <div class="mlabel">① 1日の最低出勤人数（自動作成でこの人数を下回らないように公休を配置）</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <input type="number" id="minStaffIn" min="0" max="99" style="width:80px;font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:8px;padding:7px 9px">
+      <span style="font-size:13px;color:var(--ink-soft)">人以上</span>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
+    <div class="mlabel">② 雇用形態ごとの「月の休日数」の既定値（例：正職員＝9）</div>
+    <div class="edit-list" id="typesList"></div>
+    <button class="btn sm" id="addType">＋ 雇用形態を追加</button>
+    <p style="font-size:12px;color:var(--ink-soft);margin:8px 0 0">※ 個人ごとの上書きは「スタッフ台帳」で設定できます。</p>
+    <hr style="border:none;border-top:1px solid var(--line);margin:18px 0">
+    <div class="mlabel">③ 事業所の休業日（全員が公休・各人の休日数にカウント）</div>
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px">毎週の定休</div>
+    <div class="dow-row" id="offDowRow"></div>
+    <div style="font-size:12px;color:var(--ink-soft);margin:12px 0 6px">臨時の休業日（日付をタップ）</div>
+    <div class="cal" id="offCal"></div>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:12px">休業日を後から追加・変更したら「休日数に合わせて自動作成」を押すと、<b>自動作成した分だけ作り直します</b>（手入力の希望休はそのまま残ります）。</p>
+  </div>
+  <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
+</div></div>
+
+<!-- Time modal -->
+<div class="overlay" id="timeOverlay"><div class="modal">
+  <div class="modal-head"><h3>時間帯の編集</h3><button class="x" data-close>×</button></div>
+  <div class="modal-body"><div class="edit-list" id="timeList"></div><button class="btn sm" id="addTime">＋ 時間帯を追加</button></div>
+  <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
+</div></div>
+
+<!-- Task modal -->
+<div class="overlay" id="taskOverlay"><div class="modal">
+  <div class="modal-head"><h3>業務の種類</h3><button class="x" data-close>×</button></div>
+  <div class="modal-body"><div class="edit-list" id="taskList"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+      <button class="btn sm" id="addTask">＋ 業務を追加</button>
+      <button class="btn sm" id="loadDefTasks">標準セットを読み込む</button>
+    </div>
+  </div>
+  <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
+</div></div>
+
+<!-- Status modal -->
+<div class="overlay" id="statusOverlay"><div class="modal">
+  <div class="modal-head"><h3>勤務記号の設定</h3><button class="x" data-close>×</button></div>
+  <div class="modal-body">
+    <div class="mlabel">記号・呼び名・色と、「出勤（役割分担に並ぶ）」かどうかを設定します</div>
+    <div class="edit-list" id="statusList"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+      <button class="btn sm" id="addStatus">＋ 記号を追加</button>
+      <button class="btn sm" id="loadDefStatus">標準セットを読み込む</button>
+    </div>
+  </div>
+  <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
+</div></div>
+
+<!-- Role sets modal -->
+<div class="overlay" id="rolesOverlay"><div class="modal" style="width:min(560px,100%)">
+  <div class="modal-head"><h3>役割セットの編集</h3><button class="x" data-close>×</button></div>
+  <div class="modal-body">
+    <div class="mlabel">役割（1つを「リーダー」に指定できます）</div>
+    <div class="role-tabs" id="roleTabs"></div>
+    <button class="btn sm" id="addRole">＋ 役割を追加</button>
+    <div id="roleDetail"></div>
+  </div>
+  <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
+</div></div>
+
+<!-- Template modal -->
+<div class="overlay" id="tplOverlay"><div class="modal">
+  <div class="modal-head"><h3 id="tplTitle">テンプレート</h3><button class="x" data-close>×</button></div>
+  <div class="modal-body" id="tplBody"></div>
+  <div class="modal-foot" id="tplFoot"></div>
+</div></div>
+
+<!-- Auto-create modal -->
+<div class="overlay" id="autoOverlay"><div class="modal">
+  <div class="modal-head"><h3>空欄を自動で埋める</h3><button class="x" data-close>×</button></div>
+  <div class="modal-body">
+    <p style="line-height:1.7;margin:0 0 8px">各スタッフの<b>目標休日数</b>に合わせて作成します。希望休・事業所休業日を差し引いた<b>不足分の公休を、なるべく週2日休みに近づくよう週ごとに分散配置</b>（<b>1日の最低出勤人数を保つ</b>ように調整）し、残りを<b>出勤</b>にします（塗り済みの希望休はそのまま）。</p>
+    <div class="mlabel" style="margin-top:12px">実行前の状況</div>
+    <p id="autoSummary" style="font-size:12.5px;color:var(--ink-soft);line-height:1.7;margin:0"></p>
+  </div>
+  <div class="modal-foot"><button class="btn" data-close>キャンセル</button><button class="btn primary" id="doAuto">実行する</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const uid=()=>Math.random().toString(36).slice(2,9);
+/* ---------- facility scope（デイサービス / 訪問介護 でデータを完全に分離） ---------- */
+let FSCOPE="day"; // "day"=デイサービス, "home"=訪問介護
+const K={
+  get staff(){return `yakuwari:${FSCOPE}:staff`}, get status(){return `yakuwari:${FSCOPE}:status`},
+  get times(){return `yakuwari:${FSCOPE}:times`}, get tasks(){return `yakuwari:${FSCOPE}:tasks`},
+  get types(){return `yakuwari:${FSCOPE}:types`}, get meta(){return `yakuwari:${FSCOPE}:meta`},
+  get tpl(){return `yakuwari:${FSCOPE}:templates`}, get roles(){return `yakuwari:${FSCOPE}:roles`},
+  get day(){return `yakuwari:${FSCOPE}:day:`}, get roster(){return `yakuwari:${FSCOPE}:roster:`},
+  get rmeta(){return `yakuwari:${FSCOPE}:rmeta:`}, get rauto(){return `yakuwari:${FSCOPE}:rauto:`},
+  theme:"yakuwari:theme" // 表示テーマは施設共通
+};
+const FACILITY_NAME={day:"デイサービス",home:"訪問介護"};
+
+/* ---------- defaults ---------- */
+const STAFF_COLORS=["#3E7CB1","#C7803E","#5B9E7A","#8E6FB0","#C25E6E","#C9A227","#6E8FA6","#4C8C8C","#B2632F","#7C9A46"];
+const DEF_TASKS=[
+  {id:"t_soge",name:"送迎",color:"#4A7FB5",dur:60},
+  {id:"t_vital",name:"バイタルチェック",color:"#5B9E7A",dur:30},
+  {id:"t_bath_ka",name:"個浴着",color:"#C7803E",dur:120},
+  {id:"t_bath_kn",name:"個浴中",color:"#B2632F",dur:120},
+  {id:"t_chair_ka",name:"チェア着",color:"#C9A227",dur:120},
+  {id:"t_chair_kn",name:"チェア中",color:"#A8861E",dur:120},
+  {id:"t_redcord",name:"レッドコード",color:"#BC4A3C",dur:30},
+  {id:"t_radio",name:"ラジオ体操",color:"#7C9A46",dur:30},
+  {id:"t_walk",name:"歩行訓練",color:"#8E6FB0",dur:30},
+  {id:"t_machine",name:"マシン",color:"#7A5BA0",dur:30},
+  {id:"t_dryer",name:"ドライヤー",color:"#6E8FA6",dur:30},
+  {id:"t_medchk",name:"薬チェック",color:"#C25E6E",dur:30},
+  {id:"t_medcol",name:"薬回収",color:"#A94456",dur:30},
+  {id:"t_toilet",name:"トイレ誘導",color:"#4C8C8C",dur:30}];
+const DEF_TASKS_HOME=[
+  {id:"h_meal",name:"食事介助",color:"#5B9E7A",dur:30},
+  {id:"h_toilet",name:"排泄介助",color:"#4C8C8C",dur:20},
+  {id:"h_bath",name:"入浴介助",color:"#C7803E",dur:40},
+  {id:"h_wipe",name:"清拭",color:"#B2632F",dur:20},
+  {id:"h_pos",name:"体位変換",color:"#A8861E",dur:10},
+  {id:"h_clean",name:"掃除",color:"#7C9A46",dur:30},
+  {id:"h_laundry",name:"洗濯",color:"#6E8FA6",dur:20},
+  {id:"h_cook",name:"調理",color:"#C9A227",dur:40},
+  {id:"h_shop",name:"買い物代行",color:"#8E6FB0",dur:30},
+  {id:"h_medchk",name:"服薬確認",color:"#C25E6E",dur:10},
+  {id:"h_vital",name:"バイタルチェック",color:"#4A7FB5",dur:15},
+  {id:"h_transfer",name:"移乗介助",color:"#A94456",dur:15},
+  {id:"h_out",name:"外出同行",color:"#7A5BA0",dur:60},
+  {id:"h_record",name:"記録・申し送り",color:"#5E6A66",dur:15},
+  {id:"h_patrol",name:"夜間巡回・安否確認",color:"#3E7CB1",dur:15},
+  {id:"h_emergency",name:"緊急コール対応",color:"#BC4A3C",dur:30}];
+const DEF_TIMES=[
+  {id:uid(),time:"08:30",phase:"送迎出発"},{id:uid(),time:"09:00",phase:"来所・健康チェック"},
+  {id:uid(),time:"09:30",phase:"水分補給"},{id:uid(),time:"10:00",phase:"入浴・レク"},
+  {id:uid(),time:"11:00",phase:"機能訓練"},{id:uid(),time:"11:45",phase:"口腔体操・配膳"},
+  {id:uid(),time:"12:00",phase:"昼食・服薬・口腔ケア"},{id:uid(),time:"13:00",phase:"休憩・臥床"},
+  {id:uid(),time:"14:00",phase:"個別機能訓練・レク"},{id:uid(),time:"15:00",phase:"おやつ・水分補給"},
+  {id:uid(),time:"15:30",phase:"送迎準備"},{id:uid(),time:"16:00",phase:"送迎出発"}];
+const DEF_TIMES_HOME=[ // 訪問介護は24時間体制のため終日カバー
+  {id:uid(),time:"00:00",phase:"夜間巡回"},{id:uid(),time:"02:00",phase:"夜間巡回"},
+  {id:uid(),time:"04:00",phase:"夜間巡回"},{id:uid(),time:"06:00",phase:"早朝訪問"},
+  {id:uid(),time:"08:00",phase:"朝の訪問"},{id:uid(),time:"10:00",phase:"午前の訪問"},
+  {id:uid(),time:"12:00",phase:"昼の訪問"},{id:uid(),time:"14:00",phase:"午後の訪問"},
+  {id:uid(),time:"16:00",phase:"夕方の訪問"},{id:uid(),time:"18:00",phase:"夜の訪問"},
+  {id:uid(),time:"20:00",phase:"夜間巡回"},{id:uid(),time:"22:00",phase:"夜間巡回"}];
+const DEF_TYPES=[{id:"ty_sey",name:"正職員",off:9},{id:"ty_part",name:"パート",off:10}];
+const DEF_ROLES=[
+  {id:"r_leader",name:"リーダー",leader:true,cells:{}},
+  {id:"r_a",name:"役割A",leader:false,cells:{}},
+  {id:"r_b",name:"役割B",leader:false,cells:{}},
+  {id:"r_c",name:"役割C",leader:false,cells:{}}];
+const DEF_STATUS=[
+  {code:"出",label:"出勤",color:"#2F7D6B",work:true},
+  {code:"公",label:"公休",color:"#9AA3A0",work:false},
+  {code:"有",label:"有休",color:"#4A7FB5",work:false},
+  {code:"半",label:"半休",color:"#C9A227",work:true},
+  {code:"希",label:"希望休",color:"#B0A99A",work:false},
+  {code:"研",label:"研修",color:"#8E6FB0",work:true},
+  {code:"欠",label:"欠勤",color:"#BC4A3C",work:false}];
+const DEF_STATUS_HOME=[ // 訪問介護：24時間体制のためシフト区分で管理
+  {code:"日",label:"日勤",color:"#2F7D6B",work:true},
+  {code:"早",label:"早番",color:"#4A7FB5",work:true},
+  {code:"遅",label:"遅番",color:"#C9722E",work:true},
+  {code:"夜",label:"夜勤",color:"#4C4C8E",work:true},
+  {code:"公",label:"公休",color:"#9AA3A0",work:false},
+  {code:"有",label:"有休",color:"#4A9E8F",work:false},
+  {code:"希",label:"希望休",color:"#B0A99A",work:false},
+  {code:"欠",label:"欠勤",color:"#BC4A3C",work:false}];
+
+/* ---------- storage（ローカル保存＋Googleスプレッドシート同期） ---------- */
+const SYNC_URL="https://script.google.com/macros/s/AKfycbym02ONfVKg0ctj13fwFhhSyeX6rBI1lcluj_h65IVHu72p0MMehEzoUcgJqR-JBlWSGQ/exec";
+const jget=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
+const jset=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} syncPush(k,v);};
+
+let syncTimer=null, syncBusy=false, syncFailCount=0;
+function setSyncStatus(state){ // "ok" | "busy" | "error" | "off"
+  const el=document.getElementById('syncStatus'); if(!el)return;
+  el.dataset.state=state;
+  el.textContent = state==="busy"?"🔄 同期中…" : state==="error"?"⚠ 同期失敗（オフラインで継続）" : state==="off"?"": "☁ 同期済み";
+}
+// 1件を裏で送信（失敗しても画面操作はブロックしない＝入力は常にローカルへ即反映）
+const syncQueue=[];
+let syncSending=false;
+function syncPush(key,value){
+  if(!SYNC_URL||!key||key.indexOf("yakuwari:")!==0)return; // アプリ自身のキーだけ同期
+  syncQueue.push({key,value});
+  drainSyncQueue();
+}
+async function drainSyncQueue(){
+  if(syncSending)return; syncSending=true;
+  try{
+    while(syncQueue.length){
+      const item=syncQueue.shift();
+      try{
+        setSyncStatus("busy");
+        await fetch(SYNC_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+          body:JSON.stringify({key:item.key,value:item.value})});
+        syncFailCount=0; setSyncStatus("ok");
+      }catch(err){ syncFailCount++; setSyncStatus("error"); }
+    }
+  } finally { syncSending=false; }
+}
+// サーバーの最新値をすべて取得し、ローカルへ反映。表示中の画面に関係する変更があれば再描画する。
+async function syncPull(){
+  if(!SYNC_URL)return false;
+  setSyncStatus("busy");
+  try{
+    const res=await fetch(SYNC_URL,{cache:"no-store"});
+    const json=await res.json();
+    if(!json||!json.ok){ setSyncStatus("error"); return false; }
+    let changed=false;
+    Object.keys(json.data||{}).forEach(key=>{
+      if(key.indexOf("yakuwari:")!==0)return;
+      const incoming=JSON.stringify(json.data[key]);
+      const current=localStorage.getItem(key);
+      if(current!==incoming){ localStorage.setItem(key,incoming); changed=true; }
+    });
+    // ローカルにしかない項目（初回起動時など）はサーバーへ送っておく
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(key&&key.indexOf("yakuwari:")===0&&!(key in (json.data||{}))){
+        try{ syncPush(key,JSON.parse(localStorage.getItem(key))); }catch(e){}
+      }
+    }
+    setSyncStatus("ok");
+    return changed;
+  }catch(err){ setSyncStatus("error"); return false; }
+}
+function startSyncPolling(){
+  stopSyncPolling();
+  syncTimer=setInterval(async ()=>{
+    const changed=await syncPull();
+    if(changed&&ROLE){
+      if(S.tab==="board"){loadDay(S.date);renderBoardAll();}
+      else if(S.tab==="roster"){loadRoster(S.ym);renderRoster();}
+    }
+  },20000);
+}
+function stopSyncPolling(){ if(syncTimer){clearInterval(syncTimer);syncTimer=null;} }
+
+/* ---------- state ---------- */
+const S={
+  tab:"board", date:todayISO(), ym:todayISO().slice(0,7),
+  staff:[], status:[], times:[], tasks:[], types:[], roles:[], facility:"", minStaff:3,
+  day:{selected:[],assign:{}}, roster:{}, rauto:{}, rmeta:{offDows:[],offDates:[]}
+};
+function todayISO(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
+function daysInMonth(ym){const[y,m]=ym.split("-").map(Number);return new Date(y,m,0).getDate();}
+function dow(ym,day){const[y,m]=ym.split("-").map(Number);return new Date(y,m-1,day).getDay();}
+const DOW=["日","月","火","水","木","金","土"];
+
+/* ---------- load/save masters ---------- */
+function loadMasters(){
+  S.staff=jget(K.staff,null); S.status=jget(K.status,null);
+  S.times=jget(K.times,null); S.tasks=jget(K.tasks,null); S.types=jget(K.types,null); S.roles=jget(K.roles,null);
+  S.facility=(jget(K.meta,{}).facility)||"";
+  const mn=jget(K.meta,{}).minStaff; S.minStaff=(mn==null?3:mn);
+  let seeded=jget(K.meta,{}).seeded;
+  if(!S.status) S.status=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_STATUS_HOME:DEF_STATUS));
+  if(!S.times) S.times=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_TIMES_HOME:DEF_TIMES));
+  if(!S.tasks) S.tasks=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_TASKS_HOME:DEF_TASKS));
+  if(!S.types) S.types=JSON.parse(JSON.stringify(DEF_TYPES));
+  if(!S.roles) S.roles=JSON.parse(JSON.stringify(DEF_ROLES));
+  if(!S.staff){
+    S.staff=["佐藤","鈴木","高橋","田中","渡辺"].map((n,i)=>({id:uid(),name:n,color:STAFF_COLORS[i],typeId:S.types[0].id,off:null}));
+    seeded=false;
+  }
+  // migrate: ensure typeId / hours / task duration
+  S.staff.forEach(s=>{if(!s.typeId)s.typeId=S.types[0].id; if(s.off===undefined)s.off=null; if(s.hours===undefined)s.hours=null;});
+  S.tasks.forEach(t=>{if(!t.dur)t.dur=30;});
+  saveStaff();jset(K.status,S.status);jset(K.times,S.times);jset(K.tasks,S.tasks);jset(K.types,S.types);jset(K.roles,S.roles);
+  return seeded;
+}
+const saveStaff=()=>jset(K.staff,S.staff);
+const saveTypes=()=>jset(K.types,S.types);
+const saveRoles=()=>jset(K.roles,S.roles);
+const roleById=id=>S.roles.find(r=>r.id===id);
+const typeById=id=>S.types.find(t=>t.id===id);
+function staffTarget(s){ if(s.off!==null&&s.off!==undefined&&s.off!=="")return Number(s.off); const t=typeById(s.typeId); return t?Number(t.off):0; }
+function typeName(s){const t=typeById(s.typeId);return t?t.name:"";}
+// 勤務時間帯（ドライバー等）: s.hours=null→終日 / {am:{s,e}|null, pm:{s,e}|null}
+const AM_DEF={s:"08:00",e:"10:00"}, PM_DEF={s:"16:00",e:"18:00"};
+function inRange(t,r){return !!r && t>=r.s && t<=r.e;}
+function worksAt(s,t){ if(!s.hours) return true; return inRange(t,s.hours.am)||inRange(t,s.hours.pm); }
+function hoursPreset(s){ if(!s.hours)return"full"; const a=!!s.hours.am,p=!!s.hours.pm; return a&&p?"both":a?"am":p?"pm":"full"; }
+function hoursLabel(s){ if(!s.hours)return"終日"; const a=s.hours.am,p=s.hours.pm;
+  const seg=[]; if(a)seg.push(`朝 ${a.s}–${a.e}`); if(p)seg.push(`夕 ${p.s}–${p.e}`); return seg.join(" / ")||"終日"; }
+function setHoursPreset(s,p){
+  const cur=s.hours||{}; const am=cur.am?{...cur.am}:{...AM_DEF}, pm=cur.pm?{...cur.pm}:{...PM_DEF};
+  if(p==="full")s.hours=null; else if(p==="both")s.hours={am,pm};
+  else if(p==="am")s.hours={am,pm:null}; else if(p==="pm")s.hours={am:null,pm};
+}
+// 1マスの実効状態。auto印の「出勤」は事業所休業日なら公休に上書き表示。
+// work=出勤としてカウント / rest=休みとしてカウント / auto=自動生成印
+function effOf(md,ym,sid,day,used){
+  const code=(md.r[sid]||{})[day];
+  const auto=!!(md.ra[sid]||{})[day];
+  const off=dayOff(ym,day,md.rm);
+  const cs=closedStatus();
+  if(code){
+    const st=statusByCode(code);
+    if(off&&auto&&st&&st.work) return {code:cs.code,color:cs.color,work:false,rest:true,auto:true};
+    const w=st?st.work:true;
+    return {code,color:st?st.color:'',work:w,rest:st?!st.work:false,auto};
+  }
+  if(off) return {code:cs.code,color:cs.color,work:false,rest:true,auto:true};
+  return {code:'',color:'',work:used,rest:false,auto:false};
+}
+const memMd=()=>({r:S.roster,ra:S.rauto,rm:S.rmeta});
+// その月の各スタッフの「休み日数」
+function offCount(sid){
+  const nd=daysInMonth(S.ym),md=memMd(),used=rmonthUsed();let n=0;
+  for(let d=1;d<=nd;d++){ if(effOf(md,S.ym,sid,d,used).rest)n++; }
+  return n;
+}
+const saveMeta=()=>jset(K.meta,{...jget(K.meta,{}),facility:S.facility,minStaff:S.minStaff});
+const staffById=id=>S.staff.find(s=>s.id===id);
+const taskById=id=>S.tasks.find(t=>t.id===id);
+const statusByCode=c=>S.status.find(s=>s.code===c);
+// セル内の業務ID配列（旧{taskId}形式も吸収）
+function cellTasks(a){ if(!a)return []; if(Array.isArray(a.taskIds))return a.taskIds.filter(id=>taskById(id)); if(a.taskId&&taskById(a.taskId))return [a.taskId]; return []; }
+function durLabel(m){ m=Number(m)||0; if(!m)return""; const h=Math.floor(m/60),mm=m%60; return (h?h+"時間":"")+(mm?mm+"分":""); }
+function toMin(t){const[h,m]=t.split(":").map(Number);return h*60+m;}
+// 業務の所要時間ぶん、後続の空いているマスへ自動でつなげる列数を計算
+function timeSpan(s,ti,ids){
+  const durs=ids.map(id=>Number((taskById(id)||{}).dur)||0); const maxDur=Math.max(0,...durs);
+  if(!maxDur)return 1;
+  const start=toMin(S.times[ti].time), end=start+maxDur;
+  let span=1;
+  for(let j=ti+1;j<S.times.length;j++){
+    if(toMin(S.times[j].time)>=end)break;
+    if(!worksAt(s,S.times[j].time))break;
+    const occ=(S.day.assign[S.times[j].id]||{})[s.id];
+    if(cellTasks(occ).length)break; // 既に予定があるマスの手前で止める
+    span++;
+  }
+  return span;
+}
+
+/* ---------- day ---------- */
+function loadDay(date){
+  S.date=date;
+  const saved=jget(K.day+date,null);
+  const derived=computeWorking(date);
+  if(saved){
+    S.day={selected: saved.manualSel?(saved.selected||derived):derived,
+      manualSel:!!saved.manualSel, assign:saved.assign||{}, leader:saved.leader||null};
+  } else { S.day={selected:derived, manualSel:false, assign:{}, leader:null}; }
+}
+function saveDay(){jset(K.day+S.date,{selected:S.day.selected,manualSel:S.day.manualSel,assign:S.day.assign,leader:S.day.leader||null});}
+// 休み = 設定休(月の休み) ∪ 各人の希望休。 その日のその月の設定を live で読む。
+function dayOff(ym,day,rm){const w=dow(ym,day);return (rm.offDates||[]).includes(day)||(rm.offDows||[]).includes(w);}
+function monthUsed(r,rm){
+  if(rm&&((rm.offDows||[]).length||(rm.offDates||[]).length))return true;
+  if(r)for(const sid in r){if(Object.keys(r[sid]||{}).length)return true;}
+  return false;
+}
+// その月のデータ。今ロード中の月なら（保存前の編集も反映するため）メモリ優先。
+function monthData(ym){
+  if(ym===S.ym) return {r:S.roster||{},ra:S.rauto||{},rm:S.rmeta||{offDows:[],offDates:[]}};
+  return {r:jget(K.roster+ym,{})||{},ra:jget(K.rauto+ym,{})||{},rm:jget(K.rmeta+ym,{offDows:[],offDates:[]})};
+}
+function monthHasRoster(ym){const md=monthData(ym);return monthUsed(md.r,md.rm);}
+function computeWorking(date){
+  const ym=date.slice(0,7), day=Number(date.slice(8,10));
+  const md=monthData(ym);
+  const used=monthUsed(md.r,md.rm);
+  if(!used) return S.staff.map(s=>s.id); // その月の勤務表が未作成 → 全員
+  return S.staff.filter(s=>effOf(md,ym,s.id,day,used).work).map(s=>s.id);
+}
+function selectedStaff(){return S.staff.filter(s=>S.day.selected.includes(s.id));}
+
+/* ---------- roster ---------- */
+function loadRoster(ym){S.ym=ym;S.roster=jget(K.roster+ym,{});S.rauto=jget(K.rauto+ym,{});S.rmeta=jget(K.rmeta+ym,{offDows:[],offDates:[]});}
+function saveRoster(){jset(K.roster+S.ym,S.roster);jset(K.rauto+S.ym,S.rauto);}
+function saveRmeta(){jset(K.rmeta+S.ym,S.rmeta);}
+function isAuto(sid,day){return !!(S.rauto[sid]||{})[day];}
+function setAuto(sid,day,on){if(!S.rauto[sid])S.rauto[sid]={};if(on)S.rauto[sid][day]=1;else delete S.rauto[sid][day];}
+function isSetOff(day){return (S.rmeta.offDates||[]).includes(day)||(S.rmeta.offDows||[]).includes(dow(S.ym,day));}
+function closedStatus(){return S.status.find(s=>s.code==="公")||S.status.find(s=>!s.work)||S.status[0];}
+function rmonthUsed(){return monthUsed(S.roster,S.rmeta);}
+
+/* ---------- helpers ---------- */
+function tint(hex,a){const h=hex.replace('#','');const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return `rgba(${r},${g},${b},${a})`;}
+
+/* ================= BOARD ================= */
+function renderRosterPick(){
+  const w=$("#rosterpick");w.innerHTML="";
+  const sel=selectedStaff();
+  $("#staffCount").textContent=`${sel.length}名`;
+  if(!S.staff.length){w.innerHTML='<span style="color:var(--ink-faint);font-size:13px">「スタッフ台帳を編集」から登録してください</span>';return;}
+  S.staff.forEach(s=>{
+    const on=S.day.selected.includes(s.id);
+    const l=document.createElement('label');l.className="spick"+(on?"":" off");l.style.setProperty('--sc',s.color);
+    l.innerHTML=`<input type="checkbox" ${on?"checked":""}><span class="nm"></span>`;
+    l.querySelector('.nm').textContent=s.name;
+    l.querySelector('input').onchange=e=>{
+      if(e.target.checked){if(!S.day.selected.includes(s.id))S.day.selected.push(s.id);}
+      else { S.day.selected=S.day.selected.filter(x=>x!==s.id); if(S.day.leader===s.id)S.day.leader=null; }
+      S.day.manualSel=true;
+      saveDay();renderRosterPick();renderBoard();
+    };
+    w.appendChild(l);
+  });
+  renderLeaderSelect();
+}
+function renderLeaderSelect(){
+  const sel=$("#leaderSel");if(!sel)return;
+  const working=selectedStaff();
+  sel.innerHTML=`<option value="">（なし）</option>`+working.map(s=>`<option value="${s.id}" ${S.day.leader===s.id?'selected':''}>${escapeHtml(s.name)}</option>`).join("");
+  sel.onchange=e=>{S.day.leader=e.target.value||null;saveDay();renderRosterPick();renderBoard();};
+}
+function renderBoard(){
+  const head=$("#headRow"),body=$("#body");
+  head.innerHTML=`<th class="staff-col">スタッフ</th>`;
+  S.times.forEach(tm=>{
+    const th=document.createElement('th');th.className="time-head";
+    th.innerHTML=`<div class="t num"></div>`;
+    th.querySelector('.t').textContent=tm.time;
+    head.appendChild(th);
+  });
+  body.innerHTML="";
+  const sel=selectedStaff();
+  if(!sel.length){
+    body.innerHTML=`<tr><td class="staff-cell" style="color:var(--ink-soft);font-weight:400">―</td>
+      <td class="cell empty" colspan="${S.times.length}" style="color:var(--ink-faint);text-align:center">上でスタッフにチェックすると行が表示されます</td></tr>`;
+    return;
+  }
+  sel.forEach(s=>{
+    const tr=document.createElement('tr');
+    const sc=document.createElement('td');sc.className="staff-cell";
+    const isLeader=s.id===S.day.leader;
+    sc.innerHTML=`<div class="row-staff"><div class="bar" style="background:${s.color}"></div><div><span class="nm"></span>${isLeader?'<span class="leader-tag">リーダー</span>':''}</div></div>${s.hours?'<div class="hrs"></div>':''}`;
+    sc.querySelector('.nm').textContent=s.name;
+    if(s.hours)sc.querySelector('.hrs').textContent=hoursLabel(s);
+    tr.appendChild(sc);
+    let ti=0;
+    while(ti<S.times.length){
+      const tm=S.times[ti];
+      const td=document.createElement('td');td.className="cell";
+      if(!worksAt(s,tm.time)){ td.className="cell offhours"; tr.appendChild(td); ti++; continue; }
+      const a=(S.day.assign[tm.id]||{})[s.id];
+      const ids=cellTasks(a);
+      const box=document.createElement('div');box.className="assign";
+      if(ids.length){
+        const span=timeSpan(s,ti,ids); if(span>1)td.colSpan=span;
+        ids.forEach(id=>{const t=taskById(id);const chip=document.createElement('span');chip.className="tchip";
+          chip.style.setProperty('--tc',t.color);chip.style.setProperty('--tbg',tint(t.color,.14));chip.style.setProperty('--tink',t.color);
+          chip.textContent=t.name;box.appendChild(chip);});
+        if(a&&a.note){const nt=document.createElement('div');nt.className="note";nt.textContent=a.note;box.appendChild(nt);}
+        td.appendChild(box);td.onclick=()=>openAssign(tm,s);tr.appendChild(td);
+        ti+=span; continue;
+      }
+      td.classList.add('empty');
+      td.appendChild(box);td.onclick=()=>openAssign(tm,s);tr.appendChild(td);
+      ti++;
+    }
+    body.appendChild(tr);
+  });
+}
+function renderLegend(){
+  const l=$("#legend");l.innerHTML="";
+  const used=new Set();Object.values(S.day.assign).forEach(r=>Object.values(r).forEach(a=>cellTasks(a).forEach(id=>used.add(id))));
+  const list=S.tasks.filter(t=>used.has(t.id));
+  if(!list.length){l.innerHTML='<span style="color:var(--ink-faint)">凡例：業務を割り当てると色が表示されます</span>';return;}
+  list.forEach(t=>{const s=document.createElement('span');s.className="leg";
+    s.innerHTML=`<span class="sw" style="background:${tint(t.color,.18)};border-color:${t.color}"></span><span></span>`;
+    s.querySelector('span:last-child').textContent=t.name;l.appendChild(s);});
+}
+function renderBoardAll(){$("#facility").value=S.facility;$("#date").value=S.date;renderRosterPick();renderBoard();renderLegend();}
+
+/* assign modal */
+let assignCtx=null;
+function openPicker(title,curIds,curNote,onSave){
+  assignCtx={onSave};
+  $("#assignTitle").textContent=title;
+  const opts=$("#taskOpts");opts.innerHTML="";
+  S.tasks.forEach(t=>{const b=document.createElement('button');b.className="task-opt"+(curIds.includes(t.id)?" sel":"");b.dataset.id=t.id;
+    b.innerHTML=`<span class="dot" style="background:${t.color}"></span><span class="lbl"></span>`;
+    b.querySelector('.lbl').textContent=t.name;
+    b.onclick=()=>b.classList.toggle('sel');opts.appendChild(b);});
+  $("#assignNote").value=curNote||"";openModal("#assignOverlay");
+}
+function openAssign(tm,s){
+  const cell=(S.day.assign[tm.id]||{})[s.id]||{};
+  openPicker(`${s.name} ・ ${tm.time}`,cellTasks(cell),cell.note,(ids,note)=>{
+    if(!S.day.assign[tm.id])S.day.assign[tm.id]={};
+    if(ids.length)S.day.assign[tm.id][s.id]={taskIds:ids,note};else delete S.day.assign[tm.id][s.id];
+    saveDay();renderBoard();renderLegend();
+  });
+}
+function openRoleCell(role,timeStr){
+  const cell=role.cells[timeStr]||{};
+  openPicker(`${role.name} ・ ${timeStr}`,cellTasks(cell),cell.note,(ids,note)=>{
+    if(ids.length)role.cells[timeStr]={taskIds:ids,note};else delete role.cells[timeStr];
+    saveRoles();renderRoleEditor();
+  });
+}
+$("#assignSave").onclick=()=>{
+  const ids=$$(".task-opt.sel",$("#taskOpts")).map(b=>b.dataset.id);
+  const note=$("#assignNote").value.trim();
+  if(assignCtx&&assignCtx.onSave)assignCtx.onSave(ids,note);
+  closeModal('#assignOverlay');
+};
+
+/* ================= ROSTER ================= */
+let brush=DEF_STATUS[0].code;
+function renderBrushes(){
+  const w=$("#brushes");w.innerHTML="";
+  S.status.forEach(st=>{
+    const b=document.createElement('button');b.className="brush";b.setAttribute('aria-pressed',brush===st.code);
+    b.innerHTML=`<span class="chip" style="background:${st.color}">${st.code}</span>${st.label}`;
+    b.onclick=()=>{brush=st.code;renderBrushes();};w.appendChild(b);
+  });
+  const er=document.createElement('button');er.className="brush eraser";er.setAttribute('aria-pressed',brush==="");
+  er.innerHTML=`<span class="chip"></span>消す`;er.onclick=()=>{brush="";renderBrushes();};w.appendChild(er);
+}
+function renderRoster(){
+  const nd=daysInMonth(S.ym),T=$("#rosterTable");
+  const used=rmonthUsed(), md=memMd();
+  const clsFor=d=>{const w=dow(S.ym,d);return isSetOff(d)?'off':(w===0?'sun':w===6?'sat':'');};
+  const eff=(sid,d)=>effOf(md,S.ym,sid,d,used);
+  let cols='<col>';
+  for(let d=1;d<=nd;d++)cols+=`<col class="${clsFor(d)}">`;
+  cols+='<col><col>';
+  let head='<thead><tr><th class="rname">スタッフ</th>';
+  for(let d=1;d<=nd;d++){const w=dow(S.ym,d);head+=`<th class="dcol ${clsFor(d)}"><div class="dow">${DOW[w]}</div><div class="dn num">${d}</div>${isSetOff(d)?'<div class="rest">休</div>':''}</th>`;}
+  head+='<th class="sumcol s-work">出勤</th><th class="sumcol s-off">休/目標</th></tr></thead>';
+  let bodyH='<tbody>';
+  S.staff.forEach(s=>{
+    let work=0;
+    bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}</td>`;
+    for(let d=1;d<=nd;d++){const e=eff(s.id,d);if(e.work)work++;
+      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${e.code}</td>`;}
+    const off=offCount(s.id),tgt=staffTarget(s);
+    const cls=off<tgt?'under':off>tgt?'over':'ok';
+    bodyH+=`<td class="sumcell s-work num">${work}</td><td class="sumcell s-off num ${cls}"><span class="cnt">${off}</span>/${tgt}</td></tr>`;
+  });
+  bodyH+='</tbody>';
+  const minS=Number(S.minStaff)||0;
+  let foot=`<tfoot><tr><td class="rname">出勤数${minS?`<span style="font-weight:400;color:var(--ink-soft)">（最低${minS}）</span>`:''}</td>`;
+  for(let d=1;d<=nd;d++){let n=0;S.staff.forEach(s=>{if(eff(s.id,d).work)n++;});
+    const low=minS&&used&&!isSetOff(d)&&n<minS;
+    foot+=`<td class="${clsFor(d)} num${low?' low':''}">${n||''}</td>`;}
+  foot+='<td class="sumcol s-work"></td><td class="sumcol s-off"></td></tr></tfoot>';
+  T.innerHTML=`<colgroup>${cols}</colgroup>`+head+bodyH+foot;
+  $$("td.rc",T).forEach(td=>{td.onclick=()=>{
+    const sid=td.dataset.sid,day=+td.dataset.day;if(!S.roster[sid])S.roster[sid]={};
+    if(brush===""||S.roster[sid][day]===brush)delete S.roster[sid][day];else S.roster[sid][day]=brush;
+    setAuto(sid,day,false); // 手入力は自動印を外す（自動作成の作り直し対象外に）
+    saveRoster();renderRoster();
+  };});
+  renderRLegend();
+}
+function renderRLegend(){
+  const l=$("#rlegend");l.innerHTML='<span style="font-weight:700;color:var(--ink-soft)">記号：</span>';
+  S.status.forEach(st=>{const e=document.createElement('span');e.className="rl";
+    e.innerHTML=`<span class="chip" style="background:${st.color}">${st.code}</span>${st.label}${st.work?'<span style="color:var(--ink-faint);font-size:11px">(出勤)</span>':''}`;
+    l.appendChild(e);});
+}
+function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ================= editors ================= */
+function renderStaffList(){
+  const w=$("#staffList");w.innerHTML="";
+  S.staff.forEach((s,i)=>{
+    const card=document.createElement('div');card.className="staff-edit";
+    const segs=S.types.map(t=>`<button class="segbtn" data-ty="${t.id}" aria-pressed="${s.typeId===t.id}">${escapeHtml(t.name)}</button>`).join("");
+    const tdef=(typeById(s.typeId)||{}).off;
+    const preset=hoursPreset(s);
+    const hbtns=[["full","終日"],["both","朝夕"],["am","朝のみ"],["pm","夕のみ"]]
+      .map(([v,l])=>`<button class="segbtn" data-h="${v}" aria-pressed="${preset===v}">${l}</button>`).join("");
+    const bandRow=(k,l,b)=>b?`<div class="hrow" data-band="${k}"><span>${l}</span><input type="time" class="hs" value="${b.s}"><span>–</span><input type="time" class="he" value="${b.e}"></div>`:"";
+    const hdetail=s.hours?`<div class="hrows">${bandRow('am','朝',s.hours.am)}${bandRow('pm','夕',s.hours.pm)}</div>`:"";
+    card.innerHTML=`
+      <div class="line1">
+        <input type="color" value="${s.color}" title="色">
+        <input type="text" class="nm-in" placeholder="スタッフ名" value="">
+        <button class="del" title="削除">🗑</button>
+      </div>
+      <div class="line2">
+        <div class="fl"><span>雇用形態</span><div class="seg tyseg">${segs}</div></div>
+        <div class="fl"><span>月の休日数（個別）</span>
+          <input type="number" class="off-in" min="0" max="31" placeholder="既定 ${tdef??''}日" value="${s.off??''}"></div>
+      </div>
+      <div class="line2">
+        <div class="fl" style="flex:1"><span>勤務時間帯（ドライバー等）</span><div class="seg hseg">${hbtns}</div></div>
+      </div>
+      ${hdetail}`;
+    card.querySelector('.nm-in').value=s.name;
+    card.querySelector('input[type=color]').oninput=e=>{s.color=e.target.value;saveStaff();refreshAll();};
+    card.querySelector('.nm-in').oninput=e=>{s.name=e.target.value;saveStaff();refreshAll();};
+    card.querySelectorAll('.tyseg .segbtn').forEach(b=>b.onclick=()=>{
+      s.typeId=b.dataset.ty;saveStaff();renderStaffList();
+      if(S.tab==="roster")renderRoster();else refreshAll();});
+    card.querySelectorAll('.hseg .segbtn').forEach(b=>b.onclick=()=>{
+      setHoursPreset(s,b.dataset.h);saveStaff();renderStaffList();
+      if(S.tab==="board")renderBoard();});
+    card.querySelectorAll('.hrow').forEach(row=>{const band=row.dataset.band;
+      row.querySelector('.hs').onchange=e=>{s.hours[band].s=e.target.value;saveStaff();if(S.tab==="board")renderBoard();};
+      row.querySelector('.he').onchange=e=>{s.hours[band].e=e.target.value;saveStaff();if(S.tab==="board")renderBoard();};});
+    card.querySelector('.off-in').oninput=e=>{s.off=e.target.value===''?null:Number(e.target.value);saveStaff();if(S.tab==="roster")renderRoster();};
+    card.querySelector('.del').onclick=()=>{showConfirm(`${s.name} を台帳から削除しますか？`,()=>{
+      S.staff.splice(i,1);S.day.selected=S.day.selected.filter(x=>x!==s.id);
+      Object.values(S.day.assign).forEach(r=>delete r[s.id]);saveStaff();saveDay();renderStaffList();refreshAll();
+    },"削除する");};
+    w.appendChild(card);
+  });
+}
+function addStaffMaster(){
+  const n=$("#newStaffName").value.trim();if(!n)return;
+  const s={id:uid(),name:n,color:STAFF_COLORS[S.staff.length%STAFF_COLORS.length]};
+  S.staff.push(s);S.day.selected.push(s.id);saveStaff();saveDay();
+  $("#newStaffName").value="";renderStaffList();refreshAll();$("#newStaffName").focus();
+}
+$("#addStaff").onclick=addStaffMaster;
+$("#newStaffName").addEventListener('keydown',e=>{if(e.key==="Enter")addStaffMaster();});
+
+function renderTypesList(){
+  const w=$("#typesList");w.innerHTML="";
+  S.types.forEach((t,i)=>{const row=document.createElement('div');row.className="edit-row";
+    row.innerHTML=`<input type="text" value="" placeholder="形態名"><input type="number" min="0" max="31" value="${t.off}" title="月の休日数" style="width:72px">
+      <span style="font-size:12px;color:var(--ink-soft)">日/月</span><button class="del" title="削除">🗑</button>`;
+    row.children[0].value=t.name;
+    row.children[0].oninput=e=>{t.name=e.target.value;saveTypes();if(S.tab==="roster")renderRoster();};
+    row.children[1].oninput=e=>{t.off=e.target.value===''?0:Number(e.target.value);saveTypes();if(S.tab==="roster")renderRoster();};
+    row.children[3].onclick=()=>{if(S.types.length<=1){toast("最低1つは必要です");return;}
+      const removed=S.types[i];S.types.splice(i,1);
+      S.staff.forEach(s=>{if(s.typeId===removed.id)s.typeId=S.types[0].id;});
+      saveTypes();saveStaff();renderTypesList();refreshAll();};
+    w.appendChild(row);});
+}
+$("#addType").onclick=()=>{S.types.push({id:uid(),name:"新しい形態",off:8});saveTypes();renderTypesList();};
+$("#btnTypesFromStaff").onclick=()=>{closeModal('#staffOverlay');openSettings();};
+
+function renderTimeList(){
+  const w=$("#timeList");w.innerHTML="";
+  S.times.forEach((tm,i)=>{const row=document.createElement('div');row.className="edit-row";
+    row.innerHTML=`<input type="time" value="${tm.time}" style="flex:1"><button class="del" title="削除">🗑</button>`;
+    row.children[0].onchange=e=>{tm.time=e.target.value;jset(K.times,S.times);renderBoard();};
+    row.children[1].onclick=()=>{S.times.splice(i,1);Object.keys(S.day.assign).forEach(k=>{if(k===tm.id)delete S.day.assign[k];});
+      jset(K.times,S.times);saveDay();renderTimeList();renderBoard();};
+    w.appendChild(row);});
+}
+$("#addTime").onclick=()=>{S.times.push({id:uid(),time:"12:00",phase:""});jset(K.times,S.times);renderTimeList();renderBoard();};
+
+function renderTaskList(){
+  const w=$("#taskList");w.innerHTML="";
+  S.tasks.forEach((t,i)=>{const row=document.createElement('div');row.className="edit-row";
+    row.innerHTML=`<input type="color" value="${t.color}"><input type="text" value="" style="flex:1">
+      <input type="number" min="0" step="5" value="${t.dur||0}" title="所要時間（分）" style="width:64px"><span style="font-size:12px;color:var(--ink-soft)">分</span>
+      <button class="del" title="削除">🗑</button>`;
+    row.children[1].value=t.name;
+    row.children[0].oninput=e=>{t.color=e.target.value;jset(K.tasks,S.tasks);renderBoard();renderLegend();};
+    row.children[1].oninput=e=>{t.name=e.target.value;jset(K.tasks,S.tasks);renderBoard();renderLegend();};
+    row.children[2].oninput=e=>{t.dur=Number(e.target.value)||0;jset(K.tasks,S.tasks);renderLegend();};
+    row.children[4].onclick=()=>{S.tasks.splice(i,1);
+      Object.values(S.day.assign).forEach(r=>Object.values(r).forEach(a=>{if(a&&Array.isArray(a.taskIds))a.taskIds=a.taskIds.filter(id=>id!==t.id);}));
+      jset(K.tasks,S.tasks);saveDay();renderTaskList();renderBoard();renderLegend();};
+    w.appendChild(row);});
+}
+$("#addTask").onclick=()=>{const pal=["#4A7FB5","#5B9E7A","#C7803E","#8E6FB0","#C25E6E","#C9A227","#6E8FA6"];
+  S.tasks.push({id:uid(),name:"新しい業務",color:pal[S.tasks.length%pal.length],dur:30});jset(K.tasks,S.tasks);renderTaskList();renderBoard();};
+$("#loadDefTasks").onclick=()=>{
+  const isHome=FSCOPE==="home";
+  const label=isHome?"訪問介護の標準セット（身体介護・生活援助・服薬確認/バイタル・移動移乗/記録など）":"デイサービスの標準セット（送迎・バイタル・入浴介助4種・レッドコード・ラジオ体操・歩行訓練・マシン・ドライヤー・薬チェック・薬回収・トイレ誘導）";
+  showConfirm(`業務の一覧を${label}に置き換えます。よろしいですか？\n※ 現在割り当て済みの業務は表示されなくなる場合があります。`,()=>{
+    S.tasks=JSON.parse(JSON.stringify(isHome?DEF_TASKS_HOME:DEF_TASKS));jset(K.tasks,S.tasks);renderTaskList();renderBoard();renderLegend();toast("標準の業務セットを読み込みました");
+  },"置き換える");};
+
+function renderStatusList(){
+  const w=$("#statusList");w.innerHTML="";
+  S.status.forEach((st,i)=>{const row=document.createElement('div');row.className="edit-row";
+    row.innerHTML=`<input type="color" value="${st.color}"><input type="text" class="code" maxlength="2" value=""><input type="text" value="">
+      <label class="wk"><input type="checkbox" ${st.work?"checked":""}>出勤</label><button class="del" title="削除">🗑</button>`;
+    row.children[1].value=st.code;row.children[2].value=st.label;
+    row.children[0].oninput=e=>{st.color=e.target.value;jset(K.status,S.status);renderRoster();};
+    row.children[1].oninput=e=>{st.code=e.target.value;jset(K.status,S.status);renderRoster();};
+    row.children[2].oninput=e=>{st.label=e.target.value;jset(K.status,S.status);renderRoster();};
+    row.children[3].querySelector('input').onchange=e=>{st.work=e.target.checked;jset(K.status,S.status);renderRoster();};
+    row.children[4].onclick=()=>{S.status.splice(i,1);jset(K.status,S.status);renderStatusList();renderRoster();};
+    w.appendChild(row);});
+}
+$("#addStatus").onclick=()=>{S.status.push({code:"新",label:"新規",color:"#6E8FA6",work:false});jset(K.status,S.status);renderStatusList();renderRoster();};
+$("#loadDefStatus").onclick=()=>{
+  const isHome=FSCOPE==="home";
+  const label=isHome?"訪問介護の標準セット（日勤・早番・遅番・夜勤・公休・有休・希望休・欠勤）":"デイサービスの標準セット（出勤・公休・有休・半休・希望休・研修・欠勤）";
+  showConfirm(`勤務記号を${label}に置き換えます。よろしいですか？\n※ 現在の記号を使った勤務表の表示が変わる場合があります。`,()=>{
+    S.status=JSON.parse(JSON.stringify(isHome?DEF_STATUS_HOME:DEF_STATUS));
+    jset(K.status,S.status);renderStatusList();renderRoster();toast("標準の勤務記号セットを読み込みました");
+  },"置き換える");
+};
+
+/* ================= 役割セット ================= */
+let curRoleId=null;
+function openRoles(){ if(!curRoleId||!roleById(curRoleId))curRoleId=(S.roles[0]||{}).id; renderRoleEditor(); openModal("#rolesOverlay"); }
+function renderRoleEditor(){
+  const tabs=$("#roleTabs");tabs.innerHTML="";
+  S.roles.forEach(r=>{const b=document.createElement('button');b.className="role-tab"+(r.id===curRoleId?" sel":"");
+    b.textContent=r.name;b.onclick=()=>{curRoleId=r.id;renderRoleEditor();};tabs.appendChild(b);});
+  const r=roleById(curRoleId), d=$("#roleDetail");
+  if(!r){d.innerHTML='<p style="color:var(--ink-faint);margin-top:12px">「＋ 役割を追加」で作成してください</p>';return;}
+  d.innerHTML=`
+    <div class="edit-row" style="margin-top:12px">
+      <input type="text" class="rn-in" value="" style="flex:1">
+      <label class="wk"><input type="checkbox" class="rl-in" ${r.leader?'checked':''}>リーダー</label>
+      <button class="del rd-in" title="この役割を削除">🗑</button>
+    </div>
+    <div class="mlabel" style="margin-top:12px">時間帯ごとの業務（タップで設定）</div>
+    <div class="role-grid" id="roleGrid"></div>`;
+  const rn=d.querySelector('.rn-in');rn.value=r.name;
+  rn.oninput=e=>{r.name=e.target.value;saveRoles();const at=tabs.children[S.roles.indexOf(r)];if(at)at.textContent=r.name;};
+  d.querySelector('.rl-in').onchange=e=>{ if(e.target.checked){S.roles.forEach(x=>x.leader=false);r.leader=true;} else r.leader=false; saveRoles();renderRoleEditor(); };
+  d.querySelector('.rd-in').onclick=()=>{ showConfirm(`役割「${r.name}」を削除しますか？`,()=>{
+    S.roles=S.roles.filter(x=>x.id!==r.id);curRoleId=(S.roles[0]||{}).id;saveRoles();renderRoleEditor();
+  },"削除する"); };
+  const g=$("#roleGrid");
+  S.times.forEach(tm=>{const cell=r.cells[tm.time]||{};const ids=cellTasks(cell);
+    const row=document.createElement('button');row.className="rg-row";
+    row.innerHTML=`<span class="rg-time num">${tm.time}</span><span class="rg-tasks"></span>`;
+    const tw=row.querySelector('.rg-tasks');
+    if(ids.length){ids.forEach(id=>{const t=taskById(id);const c=document.createElement('span');c.className="rg-chip";
+      c.style.cssText=`--tc:${t.color};background:${tint(t.color,.14)};color:${t.color}`;c.textContent=t.name;tw.appendChild(c);});
+      if(cell.note){const n=document.createElement('span');n.className="rg-note";n.textContent=cell.note;tw.appendChild(n);}}
+    else tw.innerHTML='<span class="rg-empty">＋ 業務を設定</span>';
+    row.onclick=()=>openRoleCell(r,tm.time);g.appendChild(row);});
+}
+$("#addRole").onclick=()=>{const n=S.roles.filter(r=>!r.leader).length;
+  const r={id:uid(),name:"役割"+String.fromCharCode(65+n),leader:false,cells:{}};
+  S.roles.push(r);curRoleId=r.id;saveRoles();renderRoleEditor();};
+
+function autoAssignRoles(){
+  const working=selectedStaff();
+  if(!working.length){toast("先に今日の勤務スタッフにチェックを入れてください");return;}
+  const leaderRole=S.roles.find(r=>r.leader), otherRoles=S.roles.filter(r=>!r.leader), leaderId=S.day.leader;
+  const applyRole=(sid,role)=>{ if(!role)return; S.times.forEach(tm=>{const c=role.cells[tm.time];const ids=cellTasks(c);
+    if(ids.length||(c&&c.note)){if(!S.day.assign[tm.id])S.day.assign[tm.id]={};S.day.assign[tm.id][sid]={taskIds:[...ids],note:(c&&c.note)||""};}});};
+  // 出勤者の既存割り当てをクリア → 役割で入れ直し
+  working.forEach(s=>S.times.forEach(tm=>{if(S.day.assign[tm.id])delete S.day.assign[tm.id][s.id];}));
+  if(leaderId&&leaderRole)applyRole(leaderId,leaderRole);
+  const others=working.filter(s=>s.id!==leaderId);
+  others.forEach((s,i)=>applyRole(s.id,otherRoles[i]));
+  saveDay();renderBoard();renderLegend();
+  const n=Math.min(others.length,otherRoles.length);
+  const parts=[]; if(leaderId&&leaderRole)parts.push("リーダー"); parts.push(`役割${n}件`);
+  let msg=`割り当てました（${parts.join("＋")}）`;
+  if(!leaderId)msg="リーダー未指定で割り当てました（リーダー欄で指定できます）";
+  else if(others.length>otherRoles.length)msg+=` ／ 役割が足りず ${others.length-otherRoles.length}名は未割当`;
+  toast(msg);
+}
+$("#btnAutoRole").onclick=autoAssignRoles;
+
+/* ================= templates ================= */
+function openTplSave(){
+  $("#tplTitle").textContent="テンプレート保存";
+  $("#tplBody").innerHTML=`<div class="mlabel">この日の業務割り当てパターンを名前を付けて保存します</div>
+    <input type="text" id="tplName" placeholder="例：平日・標準／土曜・少人数" style="width:100%;font:inherit;padding:9px;border:1px solid var(--line-strong);border-radius:9px;background:var(--surface-2);color:var(--ink)">
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:10px">※ 表示中のスタッフ順に「業務＋メモ」を雛形として保存。読込時は当日の出勤者に順番で割り当てます。</p>`;
+  $("#tplFoot").innerHTML=`<button class="btn" data-close>キャンセル</button><button class="btn primary" id="doTplSave">保存</button>`;
+  $("#doTplSave").onclick=()=>{
+    const tpls=jget(K.tpl,[]);const name=$("#tplName").value.trim()||("テンプレート "+(tpls.length+1));
+    const sel=selectedStaff();
+    tpls.push({id:uid(),name,data:{
+      times:JSON.parse(JSON.stringify(S.times)),
+      byIndex:sel.map(s=>S.times.map(tm=>(S.day.assign[tm.id]||{})[s.id]||null))}});
+    jset(K.tpl,tpls);closeModal('#tplOverlay');toast("テンプレートを保存しました");
+  };
+  openModal("#tplOverlay");
+}
+function openTplLoad(){
+  $("#tplTitle").textContent="テンプレート読込";const tpls=jget(K.tpl,[]);const body=$("#tplBody");
+  if(!tpls.length){body.innerHTML='<div class="tpl-empty">保存されたテンプレートはありません。<br>まず「テンプレ保存」で作成してください。</div>';}
+  else{body.innerHTML='<div class="mlabel">現在の日の割り当てが置き換わります（出勤者の順に適用）</div>';
+    tpls.forEach(t=>{const it=document.createElement('div');it.className="tpl-item";
+      it.innerHTML=`<span class="tnm"></span><button class="btn sm" data-act="load">読込</button><button class="btn sm" data-act="del" style="border-color:var(--line)">削除</button>`;
+      it.querySelector('.tnm').textContent=t.name;
+      it.querySelector('[data-act=load]').onclick=()=>applyTpl(t);
+      it.querySelector('[data-act=del]').onclick=()=>{jset(K.tpl,jget(K.tpl,[]).filter(x=>x.id!==t.id));openTplLoad();};
+      body.appendChild(it);});}
+  $("#tplFoot").innerHTML=`<button class="btn primary" data-close>閉じる</button>`;openModal("#tplOverlay");
+}
+function applyTpl(t){
+  const d=t.data;if(d.times){S.times=JSON.parse(JSON.stringify(d.times));jset(K.times,S.times);}
+  S.day.assign={};const sel=selectedStaff();
+  sel.forEach((s,si)=>{const col=(d.byIndex&&d.byIndex[si])||[];
+    S.times.forEach((tm,ti)=>{const a=col[ti];if(a){if(!S.day.assign[tm.id])S.day.assign[tm.id]={};S.day.assign[tm.id][s.id]=JSON.parse(JSON.stringify(a));}});});
+  closeModal('#tplOverlay');saveDay();renderBoard();renderLegend();toast("テンプレートを読み込みました");
+}
+
+/* ================= modals / util ================= */
+let modalStack=[];
+function openModal(sel){$(sel).classList.add('open');modalStack.push(sel);}
+function closeModal(sel){
+  if(sel){$(sel).classList.remove('open');modalStack=modalStack.filter(s=>s!==sel);return;}
+  const top=modalStack.pop();if(top)$(top).classList.remove('open');
+}
+$$(".overlay").forEach(o=>o.addEventListener('click',e=>{if(e.target===o||e.target.hasAttribute('data-close'))closeModal('#'+o.id);}));
+document.addEventListener('keydown',e=>{if(e.key==="Escape")closeModal();});
+let toastT;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2000);}
+
+// Artifactのサンドボックスでは window.confirm が使えないため、自前の確認モーダルで代用
+let confirmCtx=null;
+function showConfirm(message,onYes,yesLabel="OK"){
+  $("#confirmMsg").textContent=message;
+  $("#confirmYes").textContent=yesLabel;
+  confirmCtx=onYes;
+  openModal("#confirmOverlay");
+}
+$("#confirmYes").onclick=()=>{closeModal("#confirmOverlay");const fn=confirmCtx;confirmCtx=null;if(fn)fn();};
+
+function refreshAll(){if(S.tab==="board")renderBoardAll();else renderRoster();}
+
+/* ================= tabs ================= */
+function setTab(tab){
+  S.tab=tab;
+  $("#tabBoard").setAttribute('aria-selected',tab==="board");
+  $("#tabRoster").setAttribute('aria-selected',tab==="roster");
+  $("#tabSettings").setAttribute('aria-selected',tab==="settings");
+  $("#viewBoard").hidden=tab!=="board";$("#viewRoster").hidden=tab!=="roster";$("#viewSettings").hidden=tab!=="settings";
+  const fn=FACILITY_NAME[FSCOPE]||"";
+  $("#brandSub").textContent=tab==="board"?`${fn} 1日の役割分担表`:tab==="roster"?`${fn} 月間勤務表`:`${fn} 設定`;
+  if(tab==="board"){loadDay(S.date);renderBoardAll();}
+  else if(tab==="roster"){renderBrushes();renderRoster();}
+}
+$("#tabBoard").onclick=()=>setTab("board");
+$("#tabRoster").onclick=()=>setTab("roster");
+$("#tabSettings").onclick=()=>setTab("settings");
+$("#stgTime").onclick=()=>{renderTimeList();openModal("#timeOverlay");};
+$("#stgTask").onclick=()=>{renderTaskList();openModal("#taskOverlay");};
+$("#stgRoles").onclick=openRoles;
+
+/* ================= toolbar wiring ================= */
+$("#facility").oninput=e=>{S.facility=e.target.value;saveMeta();};
+$("#date").onchange=e=>{loadDay(e.target.value);renderBoardAll();};
+$("#month").onchange=e=>{loadRoster(e.target.value);renderRoster();};
+$("#btnSync").onclick=()=>{
+  const ym=S.date.slice(0,7);
+  S.day.manualSel=false;S.day.selected=computeWorking(S.date);saveDay();renderBoardAll();
+  if(monthHasRoster(ym)){
+    const off=S.staff.length-S.day.selected.length;
+    toast(`勤務表を反映しました（出勤${S.day.selected.length}名・休み${off}名）`);
+  } else {
+    toast(`⚠️ ${ym.replace("-","年")}月の勤務表が未作成のため全員を表示中`);
+  }
+};
+$("#stgStatus").onclick=()=>{renderStatusList();openModal("#statusOverlay");};
+// ---- 休日・休業日の設定（統合） ----
+function openSettings(){
+  const[y,m]=S.ym.split("-").map(Number);
+  $("#settingsTitle").textContent=`休日・休業日の設定（${y}年${m}月）`;
+  const mi=$("#minStaffIn");mi.value=S.minStaff;
+  mi.oninput=e=>{S.minStaff=e.target.value===''?0:Number(e.target.value);saveMeta();if(S.tab==="roster")renderRoster();};
+  renderTypesList();
+  renderOffCalendar();
+  openModal("#settingsOverlay");
+}
+function renderOffCalendar(){
+  const dr=$("#offDowRow");dr.innerHTML="";
+  DOW.forEach((d,i)=>{const on=(S.rmeta.offDows||[]).includes(i);
+    const l=document.createElement('label');l.style.color=i===0?'var(--alert)':i===6?'#4A7FB5':'';
+    l.innerHTML=`<input type="checkbox" ${on?'checked':''}> ${d}`;
+    l.querySelector('input').onchange=e=>{
+      S.rmeta.offDows=(S.rmeta.offDows||[]).filter(x=>x!==i);
+      if(e.target.checked)S.rmeta.offDows.push(i);
+      saveRmeta();renderOffCalendar();renderRoster();};
+    dr.appendChild(l);});
+  const cal=$("#offCal");cal.innerHTML="";
+  DOW.forEach(d=>{const h=document.createElement('div');h.className="cdow";h.textContent=d;cal.appendChild(h);});
+  const nd=daysInMonth(S.ym),first=dow(S.ym,1);
+  for(let i=0;i<first;i++){const b=document.createElement('div');b.className="cday blank";cal.appendChild(b);}
+  for(let d=1;d<=nd;d++){const w=dow(S.ym,d);const dowOff=(S.rmeta.offDows||[]).includes(w);
+    const on=(S.rmeta.offDates||[]).includes(d);
+    const b=document.createElement('button');
+    b.className="cday"+(w===0?' sun':w===6?' sat':'')+(dowOff?' dow-off':(on?' on':''));
+    b.textContent=d;
+    if(!dowOff)b.onclick=()=>{
+      S.rmeta.offDates=(S.rmeta.offDates||[]).filter(x=>x!==d);
+      if(!on)S.rmeta.offDates.push(d);
+      saveRmeta();renderOffCalendar();renderRoster();};
+    cal.appendChild(b);}
+}
+$("#btnSettings").onclick=openSettings;
+
+// ---- 休日数に合わせて自動作成 ----
+function openAuto(){
+  const lines=S.staff.map(s=>{const off=offCount(s.id),tgt=staffTarget(s);const need=tgt-off;
+    const mark=need>0?`あと公休${need}日`:need<0?`目標超過 ${-need}日`:`充足`;
+    return `${s.name}（${typeName(s)}）：現在 休${off}/目標${tgt} → ${mark}`;}).join("<br>");
+  $("#autoSummary").innerHTML=lines;
+  openModal("#autoOverlay");
+}
+$("#btnAuto").onclick=openAuto;
+function spread(arr,k){ if(k>=arr.length)return arr.slice(); const res=[];const step=arr.length/k;
+  for(let i=0;i<k;i++)res.push(arr[Math.floor(i*step+step/2)]); return res; }
+$("#doAuto").onclick=()=>{
+  const wcode=(S.status.find(s=>s.work)||{}).code;
+  const rcode=closedStatus().code;
+  if(!wcode){toast("「出勤」の勤務記号がありません");return;}
+  const nd=daysInMonth(S.ym), min=Number(S.minStaff)||0;
+  // 1) 前回の自動生成分をクリア（手入力は保持）
+  for(const sid in S.rauto){ if(S.roster[sid]) for(const d in S.rauto[sid]) delete S.roster[sid][+d]; }
+  S.rauto={};
+  // 2) 事業所休業日の空欄 → 公休（自動印）
+  S.staff.forEach(s=>{ if(!S.roster[s.id])S.roster[s.id]={};const rr=S.roster[s.id];
+    for(let d=1;d<=nd;d++){ if(!rr[d]&&isSetOff(d)){rr[d]=rcode;setAuto(s.id,d,true);} } });
+  // 3) 現時点の日別出勤数（空欄＝出勤候補として数える）
+  const dayWork={};
+  for(let d=1;d<=nd;d++){ let w=0; S.staff.forEach(s=>{const c=S.roster[s.id][d];
+    if(c){const st=statusByCode(c); if(!(st&&!st.work))w++;} else w++;}); dayWork[d]=w; }
+  // 4) 不足分の公休を配置（最低出勤人数を絶対の下限に、ラウンドロビンで公平＆分散）
+  const warn=[];
+  const need={};
+  S.staff.forEach(s=>{const rr=S.roster[s.id];let off=0;
+    for(let d=1;d<=nd;d++){const c=rr[d];const st=c&&statusByCode(c);if(st&&!st.work)off++;}
+    let n=staffTarget(s)-off; if(n<0){warn.push(s.name+"(希望休が目標超過)");n=0;} need[s.id]=n;});
+  const nearOff=(rr,day)=>{let best=99;for(let d=1;d<=nd;d++){const c=rr[d];const st=c&&statusByCode(c);
+    if(st&&!st.work){const dist=Math.abs(d-day);if(dist<best)best=dist;}}return best;};
+  // 週休2日に近づけるため、カレンダー週（日〜土）ごとの休み数を数え、まだ休みが少ない週を優先
+  const weekIndexOf=d=>Math.floor((d-1+dow(S.ym,1))/7);
+  const weekUsed={};
+  S.staff.forEach(s=>{ const rr=S.roster[s.id], wu={};
+    for(let d=1;d<=nd;d++){const c=rr[d];const st=c&&statusByCode(c);if(st&&!st.work){const wi=weekIndexOf(d);wu[wi]=(wu[wi]||0)+1;}}
+    weekUsed[s.id]=wu; });
+  let progress=true;
+  while(progress){ progress=false;
+    for(const s of S.staff){ if(need[s.id]<=0)continue; const rr=S.roster[s.id]; const wu=weekUsed[s.id];
+      let best=-1,bestScore=-Infinity;
+      for(let d=1;d<=nd;d++){ if(rr[d]||dayWork[d]<=min)continue;   // 空欄 かつ 休ませても最低人数を保てる日
+        const wi=weekIndexOf(d);
+        const score=-((wu[wi]||0)*1000)+dayWork[d]*5+nearOff(rr,d); // 1: 休みが少ない週を優先 2: 出勤余力 3: 既存の休みから離す
+        if(score>bestScore){bestScore=score;best=d;} }
+      if(best>0){rr[best]=rcode;setAuto(s.id,best,true);dayWork[best]--;need[s.id]--;
+        const wi=weekIndexOf(best);wu[wi]=(wu[wi]||0)+1;progress=true;}
+    }
+  }
+  S.staff.forEach(s=>{ if(need[s.id]>0)warn.push(`${s.name}(休${staffTarget(s)-need[s.id]}/目標${staffTarget(s)}日)`);
+    const rr=S.roster[s.id]; for(let d=1;d<=nd;d++){ if(!rr[d]){rr[d]=wcode;setAuto(s.id,d,true);} } }); // 残り → 出勤
+  saveRoster();renderRoster();closeModal('#autoOverlay');
+  // 5) 通知（最低人数割れ＝手入力希望休が原因の日／休日数が目標に届かない人）
+  const lowDays=[]; for(let d=1;d<=nd;d++){ if(min&&!isSetOff(d)&&dayWork[d]<min)lowDays.push(d); }
+  const parts=[];
+  if(lowDays.length)parts.push(`最低人数割れ ${lowDays.join("・")}日（希望休を調整）`);
+  if(warn.length)parts.push(`休日数が目標未達 → ${warn.join("、")}`);
+  toast(parts.length?`作成しました｜要確認：${parts.join(" ／ ")}`:"休日数に合わせて作成しました");
+};
+$("#btnStaffMgr").onclick=$("#stgStaff").onclick=()=>{renderStaffList();openModal("#staffOverlay");};
+$("#btnTplSave").onclick=openTplSave;$("#btnTplLoad").onclick=openTplLoad;
+$("#btnPrintBoard").onclick=$("#btnPrintRoster").onclick=()=>window.print();
+
+function toggleTheme(){const root=document.documentElement,cur=root.getAttribute('data-theme');
+  const next=cur==="dark"?"light":cur==="light"?"dark":(matchMedia('(prefers-color-scheme:dark)').matches?"light":"dark");
+  root.setAttribute('data-theme',next);jset(K.theme,next);}
+$("#btnTheme").onclick=$("#btnTheme2").onclick=toggleTheme;
+(()=>{const th=jget(K.theme,null);if(th)document.documentElement.setAttribute('data-theme',th);})();
+
+/* ================= ログイン（管理者／デイサービス／訪問介護） ================= */
+const GK={pass:"yakuwari:gate:passcodes"};
+const DEF_PASS={admin:"1234",day:"0000",home:"1111"};
+const ROLE_LABEL={admin:"管理者",day:"デイサービス",home:"訪問介護"};
+function loadPasscodes(){return jget(GK.pass,null)||JSON.parse(JSON.stringify(DEF_PASS));}
+function savePasscodes(p){jset(GK.pass,p);}
+let ROLE=null, pendingRole=null;
+function sessGet(k){try{return sessionStorage.getItem(k);}catch(e){return null;}}
+function sessSet(k,v){try{sessionStorage.setItem(k,v);}catch(e){}}
+function sessDel(k){try{sessionStorage.removeItem(k);}catch(e){}}
+
+function showGateRoles(){
+  $("#gatePass").hidden=true; $("#gateRoles").hidden=false;
+  $("#gateError").hidden=true; $("#gatePassInput").value=""; pendingRole=null;
+}
+function showGatePassStep(role){
+  pendingRole=role;
+  $("#gateRoles").hidden=true; $("#gatePass").hidden=false;
+  $("#gatePassLabel").textContent=`${ROLE_LABEL[role]} のパスコード`;
+  $("#gateError").hidden=true; $("#gatePassInput").value=""; $("#gatePassInput").focus();
+}
+$$("#gateRoles .gate-role").forEach(b=>b.onclick=()=>showGatePassStep(b.dataset.role));
+$("#gateBack").onclick=showGateRoles;
+async function attemptLogin(){
+  const codes=loadPasscodes();
+  const val=$("#gatePassInput").value.trim();
+  if(!pendingRole||val===""||val!==codes[pendingRole]){ $("#gateError").hidden=false; return; }
+  ROLE=pendingRole;
+  sessSet("yakuwari:gate:role",ROLE);
+  FSCOPE = ROLE==="home" ? "home" : "day"; // admin は day から開始（切替可）
+  if(ROLE==="admin"){ const savedFac=sessGet("yakuwari:gate:facility"); if(savedFac)FSCOPE=savedFac; }
+  sessSet("yakuwari:gate:facility",FSCOPE);
+  $("#gate").hidden=true; $("#appRoot").hidden=false;
+  $("#gateEnter").disabled=true;
+  await syncPull();
+  $("#gateEnter").disabled=false;
+  bootApp();
+  startSyncPolling();
+}
+$("#gateEnter").onclick=attemptLogin;
+$("#gatePassInput").addEventListener('keydown',e=>{if(e.key==="Enter")attemptLogin();});
+
+function updateFacilityUI(){
+  const isAdmin=ROLE==="admin";
+  $("#facSwitch").hidden=!isAdmin;
+  $("#facBadge").hidden=isAdmin;
+  if(isAdmin){ $$("#facSwitch button").forEach(b=>b.setAttribute('aria-pressed',b.dataset.fac===FSCOPE)); }
+  else { $("#facBadge").textContent=(FSCOPE==="home"?"🚶 ":"📋 ")+FACILITY_NAME[FSCOPE]; }
+  $("#grpAccess").hidden=!isAdmin;
+  $("#facility").placeholder = FSCOPE==="home" ? "○○訪問介護ステーション" : "○○デイサービスセンター";
+}
+$$("#facSwitch button").forEach(b=>b.onclick=async ()=>{
+  if(FSCOPE===b.dataset.fac)return;
+  FSCOPE=b.dataset.fac; sessSet("yakuwari:gate:facility",FSCOPE);
+  await syncPull();
+  bootApp();
+});
+$("#btnLogout").onclick=()=>{
+  showConfirm("ログアウトしますか？",()=>{
+    stopSyncPolling();
+    sessDel("yakuwari:gate:role"); sessDel("yakuwari:gate:facility");
+    ROLE=null; $("#appRoot").hidden=true; $("#gate").hidden=false; showGateRoles();
+  },"ログアウト");
+};
+$("#btnSyncNow").onclick=async ()=>{
+  const changed=await syncPull();
+  if(S.tab==="board"){loadDay(S.date);renderBoardAll();}
+  else if(S.tab==="roster"){loadRoster(S.ym);renderRoster();}
+  toast(changed?"最新のデータに更新しました":"変更はありませんでした");
+};
+
+function renderPassList(){
+  const codes=loadPasscodes(); const w=$("#passList"); w.innerHTML="";
+  ["admin","day","home"].forEach(r=>{
+    const row=document.createElement('div');row.className="edit-row";
+    row.innerHTML=`<span style="width:96px;font-weight:700;font-size:13px">${ROLE_LABEL[r]}</span>
+      <input type="text" inputmode="numeric" value="${codes[r]}" style="flex:1">`;
+    row.querySelector('input').oninput=e=>{const c=loadPasscodes();c[r]=e.target.value;savePasscodes(c);};
+    w.appendChild(row);
+  });
+}
+$("#stgPass").onclick=()=>{renderPassList();openModal("#passOverlay");};
+
+async function initGate(){
+  const savedRole=sessGet("yakuwari:gate:role");
+  if(savedRole && ROLE_LABEL[savedRole]){
+    ROLE=savedRole;
+    FSCOPE = sessGet("yakuwari:gate:facility") || (ROLE==="home"?"home":"day");
+    $("#gate").hidden=true; $("#appRoot").hidden=false;
+    await syncPull();
+    bootApp();
+    startSyncPolling();
+  } else {
+    showGateRoles();
+  }
+}
+
+/* ================= boot（ログイン後・施設切替のたびに実行） ================= */
+function bootApp(){
+  const seeded=loadMasters();
+  $("#month").value=S.ym;
+  loadRoster(S.ym);
+  loadDay(S.date);
+  // seed a sample day once（施設ごとに初回のみ）
+  if(!seeded){
+    const byName=n=>S.staff.find(s=>s.name===n);
+    const A=(ti,name,taskIds,note)=>{const tm=S.times[ti],s=byName(name);if(!s)return;if(!S.day.assign[tm.id])S.day.assign[tm.id]={};S.day.assign[tm.id][s.id]={taskIds:[].concat(taskIds),note:note||""};};
+    if(FSCOPE==="home"){
+      // 24時間体制：夜間巡回(0,1,10,11)〜早朝・日中・夕〜夜の訪問まで
+      A(0,"渡辺","h_patrol","夜間巡回 1周目");A(1,"渡辺","h_emergency","○○様宅 緊急コール対応");
+      A(3,"高橋","h_vital","○○様宅 早朝訪問");
+      A(4,"鈴木","h_vital","○○様宅");A(4,"佐藤",["h_vital","h_medchk"],"△△様宅");
+      A(5,"高橋","h_bath","□□様宅");A(5,"鈴木","h_toilet","△△様宅");
+      A(6,"佐藤","h_cook","△△様宅 昼食調理");A(6,"田中","h_transfer","○○様宅");
+      A(7,"田中",["h_clean","h_laundry"],"◇◇様宅");A(7,"高橋","h_shop","□□様宅");
+      A(8,"鈴木","h_out","△△様宅 通院同行");
+      A(9,"佐藤","h_record","日勤帯 申し送り");A(9,"田中","h_meal","○○様宅 夕食介助");
+      A(10,"渡辺","h_patrol","夜間巡回 1周目");A(11,"渡辺","h_patrol","夜間巡回 2周目");
+    } else {
+      A(0,"佐藤","t_soge","1号車");A(0,"田中","t_soge","2号車");
+      A(1,"鈴木","t_vital","");A(1,"渡辺",["t_vital","t_medchk"],"");
+      A(3,"高橋","t_bath_kn","");A(3,"佐藤","t_bath_ka","");A(3,"鈴木","t_chair_kn","");A(3,"田中","t_radio","");
+      A(6,"渡辺","t_medcol","昼食後 服薬・インスリン");A(6,"佐藤","t_toilet","");
+      A(8,"田中",["t_walk","t_machine"],"");A(8,"高橋","t_redcord","");
+      A(9,"渡辺","t_medchk","血糖確認");
+      A(11,"佐藤","t_soge","1号車");A(11,"田中","t_soge","2号車");
+    }
+    saveDay();jset(K.meta,{...jget(K.meta,{}),seeded:true});
+  }
+  updateFacilityUI();
+  setTab("board");
+}
+initGate();
+</script>
