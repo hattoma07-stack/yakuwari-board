@@ -62,6 +62,7 @@
   .gate-card h1{font-size:19px;margin-bottom:6px}
   .gate-sub{font-size:13px;color:var(--ink-soft);margin-bottom:22px}
   .gate-roles{display:flex;flex-direction:column;gap:10px}
+  .gate-roles[hidden]{display:none}
   .gate-role{display:flex;align-items:center;gap:12px;text-align:left;width:100%;
     border:1.5px solid var(--line-strong);background:var(--surface-2);border-radius:11px;padding:12px 14px;cursor:pointer;font:inherit}
   .gate-role:hover{border-color:var(--accent);background:var(--accent-soft)}
@@ -106,6 +107,7 @@
   .tab{border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;color:var(--ink-soft);
     padding:8px 18px;border-radius:8px;display:flex;align-items:center;gap:7px}
   .tab[aria-selected="true"]{background:var(--surface);color:var(--accent-ink);box-shadow:var(--shadow)}
+  .tab[hidden]{display:none}
   .tab:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
   .field{display:flex;flex-direction:column;gap:4px}
