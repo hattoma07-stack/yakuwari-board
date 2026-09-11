@@ -1573,26 +1573,39 @@ $("#btnPrintBoard").onclick=$("#btnPrintRoster").onclick=()=>window.print();
 
 // ---- 管理者：全部署の勤務表を1つにまとめて印刷 ----
 async function printAllDepartments(){
-  const origScope=FSCOPE, origYm=S.ym, origTab=S.tab;
-  const sections=[];
-  for(const scope of ALL_FACILITIES){
-    FSCOPE=scope;
-    loadMasters();
-    loadRoster(origYm);
-    renderRoster();
-    const tableHTML=$("#rosterTable").outerHTML;
-    sections.push({label:FACILITY_NAME[scope],facility:S.facility||"",tableHTML});
+  const btn=$("#btnPrintAll"); const origLabel=btn.textContent;
+  btn.disabled=true; btn.textContent="🖨 準備中…";
+  toast("全部署の勤務表を準備しています…");
+  try{
+    const origScope=FSCOPE, origYm=S.ym, origTab=S.tab;
+    const sections=[];
+    for(const scope of ALL_FACILITIES){
+      FSCOPE=scope;
+      loadMasters();
+      loadRoster(origYm);
+      renderRoster();
+      const tableHTML=$("#rosterTable").outerHTML;
+      sections.push({label:FACILITY_NAME[scope],facility:S.facility||"",tableHTML});
+    }
+    FSCOPE=origScope;
+    loadMasters();loadRoster(origYm);
+    if(origTab==="roster")renderRoster();
+    $("#allDeptPrint").innerHTML=sections.map(s=>`
+      <div class="print-dept">
+        <h2>${escapeHtml(s.label)}${s.facility?`　${escapeHtml(s.facility)}`:""}　（${origYm.replace("-","年")}月）</h2>
+        ${s.tableHTML}
+      </div>`).join("");
+    document.body.classList.add('print-all-mode');
+    // 描画がブラウザに反映されるのを待ってから印刷を開く（直後に呼ぶと空白で印刷されることがあるため）
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    await new Promise(r=>setTimeout(r,50));
+    window.print();
+  } catch(err){
+    toast("印刷の準備に失敗しました。もう一度お試しください。");
+    document.body.classList.remove('print-all-mode');
+  } finally {
+    btn.disabled=false; btn.textContent=origLabel;
   }
-  FSCOPE=origScope;
-  loadMasters();loadRoster(origYm);
-  if(origTab==="roster")renderRoster();
-  $("#allDeptPrint").innerHTML=sections.map(s=>`
-    <div class="print-dept">
-      <h2>${escapeHtml(s.label)}${s.facility?`　${escapeHtml(s.facility)}`:""}　（${origYm.replace("-","年")}月）</h2>
-      ${s.tableHTML}
-    </div>`).join("");
-  document.body.classList.add('print-all-mode');
-  window.print();
 }
 window.addEventListener('afterprint',()=>{
   if(document.body.classList.contains('print-all-mode')){
