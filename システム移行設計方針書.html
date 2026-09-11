@@ -129,44 +129,49 @@
   <header class="doc-head">
     <span class="eyebrow">🔧 引き継ぎ用資料</span>
     <h1>役割分担ボード：本番システム移行 設計方針書</h1>
-    <p class="sub">現在プロトタイプとして稼働している「役割分担ボード」を、複数人が同時に利用できる組織の本番システムへ引き継ぐための、アーキテクチャとデータ保存の設計方針をまとめたものです。</p>
+    <p class="sub">現在「暫定運用」として稼働している「役割分担ボード」を、組織の本番システムへ引き継ぐための、現状の構成・セキュリティ対策・今後の強化方針をまとめたものです。</p>
     <div class="meta-row">
       <div class="meta-item">対象<b>デイサービス／訪問介護 兼用</b></div>
-      <div class="meta-item">現行資産<b>役割分担ボード（HTML試作版）</b></div>
-      <div class="meta-item">主な論点<b>同時編集・データ保存・アクセス制御</b></div>
+      <div class="meta-item">現行資産<b>役割分担ボード（Netlify + Google スプレッドシート 暫定運用中）</b></div>
+      <div class="meta-item">主な論点<b>個人アカウント化・データ保護の本格化</b></div>
     </div>
   </header>
 
   <section class="doc-section">
     <span class="sec-num">SUMMARY</span>
-    <h2>結論：今の試作品でできること／本番化に必要なこと</h2>
-    <p class="lead">現行の試作品は「1台のブラウザで完結する業務ツール」として十分に機能します。一方で「複数の端末から同時にアクセスし、同じデータを見ながら編集する」ことは、試作品の作り（ブラウザ内保存）のままでは実現できません。まずこの前提を共有します。</p>
+    <h2>結論：今すでに動いていること／本格化に向けて残っている課題</h2>
+    <p class="lead">現在は「無料サービスの組み合わせによる暫定運用」として、複数端末からの利用がすでに動いています。ただし認証・データ保護は「簡易的な防御」の段階にとどまっており、組織へ譲渡した後、本格的な強化が必要です。</p>
     <table class="status-table">
       <tr><th style="width:34%">項目</th><th style="width:18%">状態</th><th>補足</th></tr>
       <tr>
-        <td class="item-name">1台での役割分担・勤務表管理</td>
-        <td><span class="status-pill now">✓ 現行版で対応</span></td>
-        <td class="item-note">スタッフ台帳・業務内容・役割セット・勤務表・休日自動配置まで、試作品でそのまま運用可能。</td>
+        <td class="item-name">役割分担・勤務表の基本機能</td>
+        <td><span class="status-pill now">✓ 稼働中</span></td>
+        <td class="item-note">スタッフ台帳・業務内容・役割セット・勤務表・休日自動配置・デイサービス／訪問介護の区分（24時間対応含む）まで実装済み。</td>
       </tr>
       <tr>
-        <td class="item-name">デイサービス／訪問介護の区分</td>
-        <td><span class="status-pill now">✓ 現行版で対応</span></td>
-        <td class="item-note">データ・業務内容・時間帯（24時間対応）を分けて管理する設計は実装済み。</td>
+        <td class="item-name">複数端末からの利用・データ共有</td>
+        <td><span class="status-pill now">✓ 暫定運用中</span></td>
+        <td class="item-note">Netlify（画面）＋ Googleスプレッドシート（データ）で稼働中。約20秒おきの自動更新（真のリアルタイムではない）。同一マスの同時編集は後勝ち。</td>
       </tr>
       <tr>
-        <td class="item-name">複数端末からの同時編集</td>
-        <td><span class="status-pill dev">要 新規開発</span></td>
-        <td class="item-note">サーバー側の共有データベースと同期の仕組みが必要。試作品の保存方式では不可。</td>
+        <td class="item-name">通信の暗号化</td>
+        <td><span class="status-pill now">✓ 対応済み</span></td>
+        <td class="item-note">Netlify・Google Apps Scriptともに通信はHTTPS。</td>
       </tr>
       <tr>
-        <td class="item-name">現場共用ログイン（施設アカウント）</td>
-        <td><span class="status-pill dev">要 新規開発</span></td>
-        <td class="item-note">現行の簡易パスコードは端末内のみの区分けで、本番の認証基盤としては使えない。</td>
+        <td class="item-name">ログインの総当たり対策</td>
+        <td><span class="status-pill now">✓ 対応済み</span></td>
+        <td class="item-note">パスコード5回失敗で5分ロック。実装・動作確認済み。</td>
       </tr>
       <tr>
-        <td class="item-name">医療・福祉分野のデータ保護基準</td>
-        <td><span class="status-pill dev">要 新規開発</span></td>
-        <td class="item-note">通信・保存の暗号化、アクセスログ、バックアップ等はサーバー基盤側で担保する必要がある。</td>
+        <td class="item-name">個人単位のアカウント・2段階認証</td>
+        <td><span class="status-pill dev">要 本格開発</span></td>
+        <td class="item-note">現行は施設共用パスコードのみ。個人ログイン・2段階認証には後述のSupabase等への移行が必要。</td>
+      </tr>
+      <tr>
+        <td class="item-name">データアクセスの本質的な保護</td>
+        <td><span class="status-pill dev">要 本格開発</span></td>
+        <td class="item-note">現行はクライアント側にAPIトークンを埋め込む方式のため、ページのソースを見れば読み取れてしまう構造的な限界がある（詳細は04章）。</td>
       </tr>
     </table>
   </section>
@@ -200,6 +205,18 @@
     <div class="callout">
       <b>試作品の役割</b>
       現行のHTML版はLAYER 1の見た目・操作フロー・機能仕様（後述のデータモデル）をすでに固めています。ゼロから画面設計をやり直す必要はなく、「同じ画面をLAYER 2〜4に接続し直す」移行として進められます。
+    </div>
+    <div class="panel">
+      <h3><span class="ico">📡</span>現在稼働している暫定構成（引き継ぎ担当者向け）</h3>
+      <p style="margin-bottom:8px">上記4層を、無料サービスの組み合わせで暫定的に実現した状態です。譲渡後はこの構成をそのまま使い続けるか、本格構成（05章）へ切り替えるかを判断してください。</p>
+      <ul>
+        <li><span class="k">LAYER 1（画面）</span>：Netlifyでホスティング（GitHubの<code>main</code>ブランチと自動連携）</li>
+        <li><span class="k">コード管理</span>：GitHub プライベートリポジトリ <code>hattoma07-stack/yakuwari-board</code></li>
+        <li><span class="k">LAYER 2（API）</span>：Google Apps Script（Webアプリとしてデプロイ、APIトークンで簡易保護）</li>
+        <li><span class="k">LAYER 3（データベース）</span>：Googleスプレッドシート（キー・値形式で全データを保存）</li>
+        <li><span class="k">LAYER 4（認証）</span>：アプリ内蔵の簡易パスコード（管理者／デイサービス／訪問介護の3区分、個人識別なし）</li>
+      </ul>
+      <p style="margin-top:12px;font-size:13px"><span class="k">⚠ 未完了のタスク：</span>APIトークン対応版のコードはGitHubにpush済みですが、Google Apps Script側は「新しいバージョン」としての再デプロイがまだ完了していません。<code>GoogleAppsScript_Code.gs</code>の内容をApps Scriptエディタに反映し、デプロイを更新してください（手順はコード先頭のコメントに記載）。</p>
     </div>
   </section>
 
@@ -261,13 +278,35 @@
 
   <section class="doc-section">
     <span class="sec-num">04 — SECURITY</span>
-    <h2>医療・福祉分野として確認すべき項目</h2>
-    <p class="lead">発注先やクラウド事業者と契約する前に、次の項目が満たされているかを確認してください。</p>
+    <h2>現状のセキュリティ対策と、残っている課題</h2>
+    <p class="lead">暫定運用にあたり、無料でできる範囲の対策はすでに施しています。ただし1点、構造的な限界が残っており、これが本格開発（05章）を検討する主な理由です。</p>
+    <div class="grid2">
+      <div class="panel">
+        <h3><span class="ico">✓</span>すでに対応済み</h3>
+        <ul>
+          <li>通信は全てHTTPS（Netlify・Google Apps Scriptとも）</li>
+          <li>ログイン試行回数の制限（5回失敗で5分ロック）</li>
+          <li>データAPIにトークン認証を追加（機械的なスキャン・偶然のアクセスを防止）</li>
+          <li>コードはGitHubのプライベートリポジトリで管理</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3><span class="ico">⚠️</span>まだ対応できていない</h3>
+        <ul>
+          <li>個人単位のログイン・2段階認証（現行は施設共用パスコードのみ）</li>
+          <li>「誰が」「いつ」変更したかの個人単位の記録</li>
+          <li>退職・異動時に特定の人だけアクセス無効化する機能</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout block">
+      <b>構造的な限界：クライアント側にしか秘密を置けない</b>
+      現行の画面（HTML/JavaScript）は、ブラウザに送られた時点で中身が丸ごと読める状態になります。データAPIのトークンもこの中に埋め込まれているため、<span class="k">ページの「ソースを表示」を選べば、狙った人には見つかります。</span>
+      トークンは「機械的に探し回るアクセス」への防御にはなりますが、「意図的にこのシステムを狙う人」への防御にはなりません。この限界は、サーバー側だけが秘密の情報を持つ構成（05章のSupabase等）に移行しない限り解消しません。
+    </div>
+    <p class="lead" style="margin-top:22px">上記に加えて、本格的な委託先・クラウド事業者を選ぶ際は次の項目も確認してください。</p>
     <ul class="check-list panel">
-      <li><span class="cb"></span>通信の暗号化（HTTPS/TLS）が全画面で有効になっている</li>
       <li><span class="cb"></span>保存データが暗号化されている（データベース側の暗号化機能）</li>
-      <li><span class="cb"></span>「誰が」「いつ」「何を」変更したかのログが一定期間残る</li>
-      <li><span class="cb"></span>退職・異動時にアカウントを即時無効化できる</li>
       <li><span class="cb"></span>定期的な自動バックアップと、復元手順の確認が取れている</li>
       <li><span class="cb"></span>個人情報保護法・自治体のガイドラインに沿った委託先選定基準を満たしている</li>
       <li><span class="cb"></span>入力する情報の範囲（病名・既往歴等を含めるか）を運用ルールとして明文化している</li>
@@ -277,6 +316,17 @@
   <section class="doc-section">
     <span class="sec-num">05 — NEXT</span>
     <h2>進め方の選択肢</h2>
+    <p class="lead">費用・手間の少ない順に並べています。組織の判断で、どの段階まで進めるかを決めてください。</p>
+    <div class="panel">
+      <h3><span class="ico">🔐</span>【推奨・次の一手】Supabase等への切り替え（個人ログイン＋2段階認証）</h3>
+      <p>今の画面はほぼそのまま活かし、裏側の保存先だけを「Googleスプレッドシート＋簡易トークン」から、<span class="k">Supabase</span>（無料枠あり）のような認証付きデータベースサービスに切り替える方法です。</p>
+      <ul>
+        <li>施設管理者・部署責任者・各リーダーに<span class="k">個人のメールアドレス＋パスワード</span>でログインしてもらえる</li>
+        <li><span class="k">2段階認証（認証アプリ）</span>を標準機能として有効化できる</li>
+        <li>「このデータは、ログインした人にしか渡さない」という制御を<span class="k">サーバー側のルール</span>として設定でき、04章の構造的な限界（トークンがソースに見える問題）を解消できる</li>
+        <li>今回のGoogleスプレッドシート連携と同程度の作業規模で実現可能</li>
+      </ul>
+    </div>
     <div class="grid2">
       <div class="panel">
         <h3><span class="ico">🏗️</span>専用システムを新規開発する</h3>
