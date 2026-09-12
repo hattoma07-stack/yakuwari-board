@@ -648,9 +648,9 @@
 
 <!-- Status modal -->
 <div class="overlay" id="statusOverlay"><div class="modal">
-  <div class="modal-head"><h3>勤務記号の設定</h3><button class="x" data-close>×</button></div>
+  <div class="modal-head"><h3 id="statusModalTitle">勤務記号の設定</h3><button class="x" data-close>×</button></div>
   <div class="modal-body">
-    <div class="mlabel">記号・呼び名・色と、「出勤（役割分担に並ぶ）」かどうかを設定します</div>
+    <div class="mlabel">記号・呼び名・色は<strong>全部署で共有</strong>されます。「◯◯で使う」のチェックだけは<strong>今ログイン中の部署だけ</strong>に反映されます。</div>
     <div class="edit-list" id="statusList"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
       <button class="btn sm" id="addStatus">＋ 記号を追加</button>
@@ -706,6 +706,7 @@ const K={
   get tpl(){return `yakuwari:${FSCOPE}:templates`}, get roles(){return `yakuwari:${FSCOPE}:roles`},
   get day(){return `yakuwari:${FSCOPE}:day:`}, get roster(){return `yakuwari:${FSCOPE}:roster:`},
   get rmeta(){return `yakuwari:${FSCOPE}:rmeta:`}, get rauto(){return `yakuwari:${FSCOPE}:rauto:`},
+  get statusEnabled(){return `yakuwari:${FSCOPE}:statusEnabled`}, // 勤務記号は共有だが「この部署で使うか」は部署ごと
   theme:"yakuwari:theme" // 表示テーマも施設共通
 };
 const FACILITY_NAME={day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房"};
@@ -780,6 +781,14 @@ const DEF_STATUS=[
   {code:"有",label:"有休",color:"#4A9E8F",work:false},
   {code:"希",label:"希望休",color:"#B0A99A",work:false},
   {code:"欠",label:"欠勤",color:"#BC4A3C",work:false}];
+// 部署ごとに「初期状態で使う記号」。あとから設定画面で自由に変更可能。
+const DEF_STATUS_ENABLED={
+  day:["出","半","研","公","有","希","欠"],
+  home:["日","早","遅","夜","公","有","希","欠"],
+  office:["出","公","有","希","欠"],
+  nursing:["出","公","有","希","欠"],
+  kitchen:["出","公","有","希","欠"]
+};
 
 /* ---------- storage（ローカル保存＋Googleスプレッドシート同期） ---------- */
 const SYNC_URL="https://script.google.com/macros/s/AKfycbym02ONfVKg0ctj13fwFhhSyeX6rBI1lcluj_h65IVHu72p0MMehEzoUcgJqR-JBlWSGQ/exec";
@@ -869,10 +878,12 @@ const DOW=["日","月","火","水","木","金","土"];
 function loadMasters(){
   S.staff=jget(K.staff,null); S.status=jget(K.status,null);
   S.times=jget(K.times,null); S.tasks=jget(K.tasks,null); S.types=jget(K.types,null); S.roles=jget(K.roles,null);
+  S.statusEnabled=jget(K.statusEnabled,null);
   S.facility=(jget(K.meta,{}).facility)||"";
   const mn=jget(K.meta,{}).minStaff; S.minStaff=(mn==null?3:mn);
   let seeded=jget(K.meta,{}).seeded;
   if(!S.status) S.status=JSON.parse(JSON.stringify(DEF_STATUS));
+  if(!S.statusEnabled) S.statusEnabled=(DEF_STATUS_ENABLED[FSCOPE]||S.status.map(s=>s.code)).slice();
   if(!S.times) S.times=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_TIMES_HOME:DEF_TIMES));
   if(!S.tasks) S.tasks=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_TASKS_HOME:DEF_TASKS));
   if(!S.types) S.types=JSON.parse(JSON.stringify(DEF_TYPES));
@@ -933,6 +944,9 @@ const saveMeta=()=>jset(K.meta,{...jget(K.meta,{}),facility:S.facility,minStaff:
 const staffById=id=>S.staff.find(s=>s.id===id);
 const taskById=id=>S.tasks.find(t=>t.id===id);
 const statusByCode=c=>S.status.find(s=>s.code===c);
+const isStatusEnabled=c=>(S.statusEnabled||[]).includes(c);
+const enabledStatuses=()=>S.status.filter(s=>isStatusEnabled(s.code));
+const saveStatusEnabled=()=>jset(K.statusEnabled,S.statusEnabled);
 // セル内の業務ID配列（旧{taskId}形式も吸収）
 function cellTasks(a){ if(!a)return []; if(Array.isArray(a.taskIds))return a.taskIds.filter(id=>taskById(id)); if(a.taskId&&taskById(a.taskId))return [a.taskId]; return []; }
 function durLabel(m){ m=Number(m)||0; if(!m)return""; const h=Math.floor(m/60),mm=m%60; return (h?h+"時間":"")+(mm?mm+"分":""); }
@@ -993,7 +1007,8 @@ function saveRmeta(){jset(K.rmeta+S.ym,S.rmeta);}
 function isAuto(sid,day){return !!(S.rauto[sid]||{})[day];}
 function setAuto(sid,day,on){if(!S.rauto[sid])S.rauto[sid]={};if(on)S.rauto[sid][day]=1;else delete S.rauto[sid][day];}
 function isSetOff(day){return (S.rmeta.offDates||[]).includes(day)||(S.rmeta.offDows||[]).includes(dow(S.ym,day));}
-function closedStatus(){return S.status.find(s=>s.code==="公")||S.status.find(s=>!s.work)||S.status[0];}
+function closedStatus(){const en=enabledStatuses();
+  return en.find(s=>s.code==="公")||en.find(s=>!s.work)||S.status.find(s=>s.code==="公")||S.status.find(s=>!s.work)||S.status[0];}
 function rmonthUsed(){return monthUsed(S.roster,S.rmeta);}
 
 /* ---------- helpers ---------- */
@@ -1123,7 +1138,7 @@ $("#assignSave").onclick=()=>{
 let brush=DEF_STATUS[0].code;
 function renderBrushes(){
   const w=$("#brushes");w.innerHTML="";
-  S.status.forEach(st=>{
+  enabledStatuses().forEach(st=>{
     const b=document.createElement('button');b.className="brush";b.setAttribute('aria-pressed',brush===st.code);
     b.innerHTML=`<span class="chip" style="background:${st.color}">${st.code}</span>${st.label}`;
     b.onclick=()=>{brush=st.code;renderBrushes();};w.appendChild(b);
@@ -1170,7 +1185,10 @@ function renderRoster(){
 }
 function renderRLegend(){
   const l=$("#rlegend");l.innerHTML='<span style="font-weight:700;color:var(--ink-soft)">記号：</span>';
-  S.status.forEach(st=>{const e=document.createElement('span');e.className="rl";
+  const usedCodes=new Set();
+  Object.values(S.roster||{}).forEach(rr=>Object.values(rr).forEach(c=>c&&usedCodes.add(c)));
+  const list=S.status.filter(st=>isStatusEnabled(st.code)||usedCodes.has(st.code));
+  list.forEach(st=>{const e=document.createElement('span');e.className="rl";
     e.innerHTML=`<span class="chip" style="background:${st.color}">${st.code}</span>${st.label}${st.work?'<span style="color:var(--ink-faint);font-size:11px">(出勤)</span>':''}`;
     l.appendChild(e);});
 }
@@ -1287,17 +1305,30 @@ $("#loadDefTasks").onclick=()=>{
 function renderStatusList(){
   const w=$("#statusList");w.innerHTML="";
   S.status.forEach((st,i)=>{const row=document.createElement('div');row.className="edit-row";
+    const on=isStatusEnabled(st.code);
     row.innerHTML=`<input type="color" value="${st.color}"><input type="text" class="code" maxlength="2" value=""><input type="text" value="">
-      <label class="wk"><input type="checkbox" ${st.work?"checked":""}>出勤</label><button class="del" title="削除">🗑</button>`;
+      <label class="wk"><input type="checkbox" class="wk-in" ${st.work?"checked":""}>出勤</label>
+      <label class="wk use-in-dept"><input type="checkbox" class="use-in" ${on?"checked":""}>${escapeHtml(FACILITY_NAME[FSCOPE])}で使う</label>
+      <button class="del" title="削除">🗑</button>`;
     row.children[1].value=st.code;row.children[2].value=st.label;
     row.children[0].oninput=e=>{st.color=e.target.value;jset(K.status,S.status);renderRoster();};
     row.children[1].oninput=e=>{st.code=e.target.value;jset(K.status,S.status);renderRoster();};
     row.children[2].oninput=e=>{st.label=e.target.value;jset(K.status,S.status);renderRoster();};
-    row.children[3].querySelector('input').onchange=e=>{st.work=e.target.checked;jset(K.status,S.status);renderRoster();};
-    row.children[4].onclick=()=>{S.status.splice(i,1);jset(K.status,S.status);renderStatusList();renderRoster();};
+    row.querySelector('.wk-in').onchange=e=>{st.work=e.target.checked;jset(K.status,S.status);renderRoster();};
+    row.querySelector('.use-in').onchange=e=>{
+      S.statusEnabled=(S.statusEnabled||[]).filter(c=>c!==st.code);
+      if(e.target.checked)S.statusEnabled.push(st.code);
+      saveStatusEnabled();renderBrushes();renderRoster();
+    };
+    row.querySelector('.del').onclick=()=>{S.status.splice(i,1);jset(K.status,S.status);renderStatusList();renderRoster();};
     w.appendChild(row);});
 }
-$("#addStatus").onclick=()=>{S.status.push({code:"新",label:"新規",color:"#6E8FA6",work:false});jset(K.status,S.status);renderStatusList();renderRoster();};
+$("#addStatus").onclick=()=>{
+  const st={code:"新",label:"新規",color:"#6E8FA6",work:false};
+  S.status.push(st);jset(K.status,S.status);
+  if(!S.statusEnabled.includes(st.code))S.statusEnabled.push(st.code); // 追加した部署では自動的に使う設定に
+  saveStatusEnabled();renderStatusList();renderRoster();
+};
 $("#loadDefStatus").onclick=()=>{
   showConfirm("勤務記号を標準セット（出勤・日勤・早番・遅番・夜勤・半休・研修・公休・有休・希望休・欠勤）に置き換えます。これは全部署で共有されます。よろしいですか？\n※ 現在の記号を使った勤務表の表示が変わる場合があります。",()=>{
     S.status=JSON.parse(JSON.stringify(DEF_STATUS));
@@ -1457,7 +1488,7 @@ $("#btnSync").onclick=()=>{
     toast(`⚠️ ${ym.replace("-","年")}月の勤務表が未作成のため全員を表示中`);
   }
 };
-$("#stgStatus").onclick=()=>{renderStatusList();openModal("#statusOverlay");};
+$("#stgStatus").onclick=()=>{$("#statusModalTitle").textContent=`勤務記号の設定（${FACILITY_NAME[FSCOPE]}）`;renderStatusList();openModal("#statusOverlay");};
 // ---- 休日・休業日の設定（統合） ----
 function openSettings(){
   const[y,m]=S.ym.split("-").map(Number);
@@ -1507,7 +1538,7 @@ $("#btnAuto").onclick=openAuto;
 function spread(arr,k){ if(k>=arr.length)return arr.slice(); const res=[];const step=arr.length/k;
   for(let i=0;i<k;i++)res.push(arr[Math.floor(i*step+step/2)]); return res; }
 $("#doAuto").onclick=()=>{
-  const wcode=(S.status.find(s=>s.work)||{}).code;
+  const wcode=(enabledStatuses().find(s=>s.work)||S.status.find(s=>s.work)||{}).code;
   const rcode=closedStatus().code;
   if(!wcode){toast("「出勤」の勤務記号がありません");return;}
   const nd=daysInMonth(S.ym), min=Number(S.minStaff)||0;
