@@ -523,22 +523,16 @@
     </div>
 
     <div class="settings-group">
-      <h2 class="settings-group-title"><span class="sgt-ico">📅</span>勤務表の設定</h2>
+      <h2 class="settings-group-title"><span class="sgt-ico">🔗</span>共通の設定（全部署で共有）</h2>
       <div class="settings-grid">
         <div class="setting-card">
           <div class="sc-icon">🏷️</div>
           <div class="sc-body">
             <h3>勤務記号</h3>
-            <p>出勤・公休・有休などの記号・呼び名・色と、出勤扱いかどうかを編集します。訪問介護は初期設定で日勤・早番・遅番・夜勤に対応しています。</p>
+            <p>出勤・日勤・早番・公休・有休などの記号・呼び名・色と、出勤扱いかどうかを編集します。<strong>全部署で共有</strong>されるため、ここでの変更はすべての部署に反映されます。</p>
           </div>
           <button class="btn" id="stgStatus">編集する</button>
         </div>
-      </div>
-    </div>
-
-    <div class="settings-group">
-      <h2 class="settings-group-title"><span class="sgt-ico">🔗</span>共通の設定</h2>
-      <div class="settings-grid">
         <div class="setting-card">
           <div class="sc-icon">👥</div>
           <div class="sc-body">
@@ -705,13 +699,14 @@ const uid=()=>Math.random().toString(36).slice(2,9);
 /* ---------- facility scope（デイサービス / 訪問介護 でデータを完全に分離） ---------- */
 let FSCOPE="day"; // "day"=デイサービス, "home"=訪問介護
 const K={
-  get staff(){return `yakuwari:${FSCOPE}:staff`}, get status(){return `yakuwari:${FSCOPE}:status`},
+  get staff(){return `yakuwari:${FSCOPE}:staff`},
+  status:"yakuwari:status", // 勤務記号は組織全体で共有（部署ごとに分けない）
   get times(){return `yakuwari:${FSCOPE}:times`}, get tasks(){return `yakuwari:${FSCOPE}:tasks`},
   get types(){return `yakuwari:${FSCOPE}:types`}, get meta(){return `yakuwari:${FSCOPE}:meta`},
   get tpl(){return `yakuwari:${FSCOPE}:templates`}, get roles(){return `yakuwari:${FSCOPE}:roles`},
   get day(){return `yakuwari:${FSCOPE}:day:`}, get roster(){return `yakuwari:${FSCOPE}:roster:`},
   get rmeta(){return `yakuwari:${FSCOPE}:rmeta:`}, get rauto(){return `yakuwari:${FSCOPE}:rauto:`},
-  theme:"yakuwari:theme" // 表示テーマは施設共通
+  theme:"yakuwari:theme" // 表示テーマも施設共通
 };
 const FACILITY_NAME={day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房"};
 const BOARD_FACILITIES=["day","home"]; // 役割分担ボードを使う部署（それ以外は勤務表のみ）
@@ -771,19 +766,16 @@ const DEF_ROLES=[
   {id:"r_a",name:"役割A",leader:false,cells:{}},
   {id:"r_b",name:"役割B",leader:false,cells:{}},
   {id:"r_c",name:"役割C",leader:false,cells:{}}];
+// 勤務記号は組織全体で共有する1つのリスト（デイサービス系の「出勤・半休・研修」と
+// 訪問介護系の「日勤・早番・遅番・夜勤」を統合。各部署は必要な記号だけを使えばよい）
 const DEF_STATUS=[
   {code:"出",label:"出勤",color:"#2F7D6B",work:true},
-  {code:"公",label:"公休",color:"#9AA3A0",work:false},
-  {code:"有",label:"有休",color:"#4A7FB5",work:false},
-  {code:"半",label:"半休",color:"#C9A227",work:true},
-  {code:"希",label:"希望休",color:"#B0A99A",work:false},
-  {code:"研",label:"研修",color:"#8E6FB0",work:true},
-  {code:"欠",label:"欠勤",color:"#BC4A3C",work:false}];
-const DEF_STATUS_HOME=[ // 訪問介護：24時間体制のためシフト区分で管理
-  {code:"日",label:"日勤",color:"#2F7D6B",work:true},
+  {code:"日",label:"日勤",color:"#3E7CB1",work:true},
   {code:"早",label:"早番",color:"#4A7FB5",work:true},
   {code:"遅",label:"遅番",color:"#C9722E",work:true},
   {code:"夜",label:"夜勤",color:"#4C4C8E",work:true},
+  {code:"半",label:"半休",color:"#C9A227",work:true},
+  {code:"研",label:"研修",color:"#8E6FB0",work:true},
   {code:"公",label:"公休",color:"#9AA3A0",work:false},
   {code:"有",label:"有休",color:"#4A9E8F",work:false},
   {code:"希",label:"希望休",color:"#B0A99A",work:false},
@@ -880,7 +872,7 @@ function loadMasters(){
   S.facility=(jget(K.meta,{}).facility)||"";
   const mn=jget(K.meta,{}).minStaff; S.minStaff=(mn==null?3:mn);
   let seeded=jget(K.meta,{}).seeded;
-  if(!S.status) S.status=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_STATUS_HOME:DEF_STATUS));
+  if(!S.status) S.status=JSON.parse(JSON.stringify(DEF_STATUS));
   if(!S.times) S.times=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_TIMES_HOME:DEF_TIMES));
   if(!S.tasks) S.tasks=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_TASKS_HOME:DEF_TASKS));
   if(!S.types) S.types=JSON.parse(JSON.stringify(DEF_TYPES));
@@ -1307,11 +1299,9 @@ function renderStatusList(){
 }
 $("#addStatus").onclick=()=>{S.status.push({code:"新",label:"新規",color:"#6E8FA6",work:false});jset(K.status,S.status);renderStatusList();renderRoster();};
 $("#loadDefStatus").onclick=()=>{
-  const isHome=FSCOPE==="home";
-  const label=isHome?"訪問介護の標準セット（日勤・早番・遅番・夜勤・公休・有休・希望休・欠勤）":"デイサービスの標準セット（出勤・公休・有休・半休・希望休・研修・欠勤）";
-  showConfirm(`勤務記号を${label}に置き換えます。よろしいですか？\n※ 現在の記号を使った勤務表の表示が変わる場合があります。`,()=>{
-    S.status=JSON.parse(JSON.stringify(isHome?DEF_STATUS_HOME:DEF_STATUS));
-    jset(K.status,S.status);renderStatusList();renderRoster();toast("標準の勤務記号セットを読み込みました");
+  showConfirm("勤務記号を標準セット（出勤・日勤・早番・遅番・夜勤・半休・研修・公休・有休・希望休・欠勤）に置き換えます。これは全部署で共有されます。よろしいですか？\n※ 現在の記号を使った勤務表の表示が変わる場合があります。",()=>{
+    S.status=JSON.parse(JSON.stringify(DEF_STATUS));
+    jset(K.status,S.status);renderStatusList();renderRoster();toast("標準の勤務記号セットを読み込みました（全部署共通）");
   },"置き換える");
 };
 
