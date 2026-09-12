@@ -97,23 +97,32 @@ function doPost(e) {
 
     if (!body || !body.key) return jsonOut_({ ok: false, error: "key is required" });
 
-    const sh = getSheet_();
-    const range = sh.getDataRange();
-    const data = range.getValues();
-    let rowIndex = -1;
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][0] === body.key) { rowIndex = i + 1; break; }
-    }
-    const valueStr = JSON.stringify(body.value);
-    const now = new Date().toISOString();
+    // 複数端末が同時に書き込んでも行が重複・破損しないよう、書き込み中は他の書き込みを待たせる
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000); // 最大10秒待つ。取れなければ下のcatchでエラーを返す
+    try {
+      const sh = getSheet_();
+      const range = sh.getDataRange();
+      const data = range.getValues();
+      let rowIndex = -1;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === body.key) { rowIndex = i + 1; break; }
+      }
+      const valueStr = JSON.stringify(body.value);
+      const now = new Date().toISOString();
 
-    if (rowIndex > 0) {
-      sh.getRange(rowIndex, 2, 1, 3).setValues([[valueStr, now, email]]);
-    } else {
-      sh.appendRow([body.key, valueStr, now, email]);
+      if (rowIndex > 0) {
+        sh.getRange(rowIndex, 2, 1, 3).setValues([[valueStr, now, email]]);
+      } else {
+        sh.appendRow([body.key, valueStr, now, email]);
+      }
+      SpreadsheetApp.flush();
+      return jsonOut_({ ok: true, updatedAt: now });
+    } finally {
+      lock.releaseLock();
     }
-    return jsonOut_({ ok: true, updatedAt: now });
   } catch (err) {
+    // ロック待ちタイムアウトなど。アプリ側が自動で再送するので、ここでは失敗を返すだけでよい。
     return jsonOut_({ ok: false, error: String(err) });
   }
 }

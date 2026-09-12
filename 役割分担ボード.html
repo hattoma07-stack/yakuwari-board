@@ -797,31 +797,53 @@ const SYNC_TOKEN="vwhO7Nt49C51xyc-SannBWMhvldfkVkm";
 const jget=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
 const jset=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} syncPush(k,v);};
 
-let syncTimer=null, syncBusy=false, syncFailCount=0;
+let syncTimer=null, syncFailCount=0;
 function setSyncStatus(state){ // "ok" | "busy" | "error" | "off"
   const el=document.getElementById('syncStatus'); if(!el)return;
   el.dataset.state=state;
-  el.textContent = state==="busy"?"🔄 同期中…" : state==="error"?"⚠ 同期失敗（オフラインで継続）" : state==="off"?"": "☁ 同期済み";
+  el.textContent = state==="busy"?"🔄 同期中…" : state==="error"?"⚠ 同期待ち（自動で再送します）" : state==="off"?"": "☁ 同期済み";
 }
-// 1件を裏で送信（失敗しても画面操作はブロックしない＝入力は常にローカルへ即反映）
-const syncQueue=[];
+// 通信が長時間固まらないよう、一定時間で打ち切って失敗扱いにする（再試行の対象になる）
+function fetchWithTimeout(url,opts,ms){
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),ms);
+  return fetch(url,{...opts,signal:ctrl.signal}).finally(()=>clearTimeout(timer));
+}
+// 1件を裏で送信。失敗しても捨てず、成功するまで再試行し続ける（＝送信中のキーは pending として保持）。
+const syncQueue=[]; // {key,value} 待機中の書き込み
+const pendingKeys=new Set(); // まだサーバーへの反映が確認できていないキー（取得時の上書きから保護）
 let syncSending=false;
 function syncPush(key,value){
   if(!SYNC_URL||!key||key.indexOf("yakuwari:")!==0)return; // アプリ自身のキーだけ同期
-  syncQueue.push({key,value});
+  // 同じキーが既に列にあれば新しい値で置き換える（古い値を送って上書きしないように）
+  const existing=syncQueue.find(it=>it.key===key);
+  if(existing)existing.value=value; else syncQueue.push({key,value});
+  pendingKeys.add(key);
   drainSyncQueue();
 }
 async function drainSyncQueue(){
   if(syncSending)return; syncSending=true;
   try{
     while(syncQueue.length){
-      const item=syncQueue.shift();
+      const item=syncQueue[0]; // 成功するまで先頭に残す（他の項目を追い越して送らない）
+      let ok=false;
       try{
         setSyncStatus("busy");
-        await fetch(SYNC_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-          body:JSON.stringify({key:item.key,value:item.value,token:SYNC_TOKEN})});
+        const res=await fetchWithTimeout(SYNC_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+          body:JSON.stringify({key:item.key,value:item.value,token:SYNC_TOKEN})},15000);
+        const json=await res.json().catch(()=>null);
+        ok=!!(json&&json.ok);
+      }catch(err){ ok=false; }
+      if(ok){
+        syncQueue.shift();
+        // キューに他の待機がなければ pending 解除（同じキーが積み直されていれば残す）
+        if(!syncQueue.some(it=>it.key===item.key))pendingKeys.delete(item.key);
         syncFailCount=0; setSyncStatus("ok");
-      }catch(err){ syncFailCount++; setSyncStatus("error"); }
+      } else {
+        syncFailCount++; setSyncStatus("error");
+        const wait=Math.min(2000*Math.pow(1.6,Math.min(syncFailCount,6)),20000); // 指数バックオフ（最大20秒）
+        await new Promise(r=>setTimeout(r,wait));
+      }
     }
   } finally { syncSending=false; }
 }
@@ -830,12 +852,13 @@ async function syncPull(){
   if(!SYNC_URL)return false;
   setSyncStatus("busy");
   try{
-    const res=await fetch(SYNC_URL+"?token="+encodeURIComponent(SYNC_TOKEN),{cache:"no-store"});
+    const res=await fetchWithTimeout(SYNC_URL+"?token="+encodeURIComponent(SYNC_TOKEN),{cache:"no-store"},15000);
     const json=await res.json();
     if(!json||!json.ok){ setSyncStatus("error"); return false; }
     let changed=false;
     Object.keys(json.data||{}).forEach(key=>{
       if(key.indexOf("yakuwari:")!==0)return;
+      if(pendingKeys.has(key))return; // まだこちらの変更が届いていないキーは、古い値で上書きしない
       const incoming=JSON.stringify(json.data[key]);
       const current=localStorage.getItem(key);
       if(current!==incoming){ localStorage.setItem(key,incoming); changed=true; }
@@ -843,11 +866,11 @@ async function syncPull(){
     // ローカルにしかない項目（初回起動時など）はサーバーへ送っておく
     for(let i=0;i<localStorage.length;i++){
       const key=localStorage.key(i);
-      if(key&&key.indexOf("yakuwari:")===0&&!(key in (json.data||{}))){
+      if(key&&key.indexOf("yakuwari:")===0&&!(key in (json.data||{}))&&!pendingKeys.has(key)){
         try{ syncPush(key,JSON.parse(localStorage.getItem(key))); }catch(e){}
       }
     }
-    setSyncStatus("ok");
+    if(!syncQueue.length)setSyncStatus("ok");
     return changed;
   }catch(err){ setSyncStatus("error"); return false; }
 }
@@ -862,6 +885,16 @@ function startSyncPolling(){
   },20000);
 }
 function stopSyncPolling(){ if(syncTimer){clearInterval(syncTimer);syncTimer=null;} }
+// タブレットの画面ロック解除・アプリ復帰時に、止まっていた同期をすぐ再開する
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==="visible"&&ROLE){
+    drainSyncQueue();
+    syncPull().then(changed=>{
+      if(changed){ if(S.tab==="board"){loadDay(S.date);renderBoardAll();}
+        else if(S.tab==="roster"){loadRoster(S.ym);renderRoster();} }
+    });
+  }
+});
 
 /* ---------- state ---------- */
 const S={
