@@ -103,12 +103,38 @@
   .brand h1{font-size:20px;letter-spacing:.01em;line-height:1.15}
   .brand .sub{font-size:12px;color:var(--ink-soft);margin-top:2px}
 
-  .tabs{display:flex;gap:4px;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:4px}
+  /* ---------- 左サイドバー ---------- */
+  .app-shell{display:flex;align-items:flex-start;gap:18px}
+  .sidebar{width:208px;flex:none;display:flex;flex-direction:column;gap:16px;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:16px 14px;position:sticky;top:16px}
+  .sidebar .brand .mark{width:36px;height:36px;font-size:19px}
+  .sidebar .brand h1{font-size:15px}
+  .side-spacer{flex:1}
+  .side-session{display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid var(--line)}
+  .side-session .btn{width:100%;justify-content:flex-start}
+  .side-session .sync-status{font-size:11px;padding:0 2px}
+  .side-session .fac-switch,.side-session .fac-badge{width:100%}
+  .side-session .fac-switch select{flex:1}
+  .main{flex:1;min-width:0}
+
+  .tabs{display:flex;flex-direction:column;gap:3px}
   .tab{border:none;background:none;cursor:pointer;font-weight:700;font-size:14px;color:var(--ink-soft);
-    padding:8px 18px;border-radius:8px;display:flex;align-items:center;gap:7px}
-  .tab[aria-selected="true"]{background:var(--surface);color:var(--accent-ink);box-shadow:var(--shadow)}
+    padding:10px 12px;border-radius:9px;display:flex;align-items:center;gap:9px;text-align:left;transition:.12s}
+  .tab:hover{background:var(--surface-2)}
+  .tab[aria-selected="true"]{background:var(--accent-soft);color:var(--accent-ink);box-shadow:none}
   .tab[hidden]{display:none}
   .tab:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+  @media (max-width:900px){
+    .app-shell{flex-direction:column}
+    .sidebar{width:100%;flex-direction:row;flex-wrap:wrap;align-items:center;position:static;gap:10px 16px}
+    .sidebar .brand{flex:none}
+    .tabs{flex-direction:row}
+    .side-spacer{display:none}
+    .side-session{flex-direction:row;flex-wrap:wrap;border-top:none;padding-top:0;flex:1;justify-content:flex-end}
+    .side-session .btn{width:auto}
+  }
 
   .field{display:flex;flex-direction:column;gap:4px}
   .field label{font-size:11px;color:var(--ink-soft);letter-spacing:.06em;font-weight:700}
@@ -185,6 +211,7 @@
   /* ---------- Roster (勤務表) ---------- */
   .brushbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
   .brushbar .lb{font-size:12px;color:var(--ink-soft);font-weight:700;letter-spacing:.04em;margin-right:2px}
+  #brushes{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   .brush{display:inline-flex;align-items:center;gap:7px;cursor:pointer;border:1.5px solid var(--line-strong);
     background:var(--surface);border-radius:9px;padding:6px 11px;font-weight:700;font-size:13px}
   .brush .chip{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff}
@@ -337,10 +364,11 @@
 
   /* ---------- Print ---------- */
   @page{size:A4 landscape;margin:8mm}
+  @page allDept{size:A3 landscape;margin:10mm}
   @media print{
     body{background:#fff;font-size:10px}
     .app{max-width:none;padding:0}
-    .toolbar,.no-print,.tabs,.staff-chip .rm,.hint,.brushbar,.panel.no-print-panel{display:none!important}
+    .toolbar,.no-print,.tabs,.staff-chip .rm,.hint,.brushbar,.panel.no-print-panel,.toast{display:none!important}
     header.top{box-shadow:none;border:none;padding:0 0 5px;margin-bottom:6px;border-bottom:2px solid #333}
     .panel{box-shadow:none;border:1px solid #999;margin-bottom:8px}
     .panel-head{background:#f0f0f0}
@@ -355,9 +383,24 @@
   }
   @media print{
     body.print-all-mode .app,body.print-all-mode .gate{display:none!important}
-    body.print-all-mode #allDeptPrint{display:block!important}
-    body.print-all-mode .print-dept{page-break-after:always}
-    body.print-all-mode .print-dept:last-child{page-break-after:auto}
+    #allDeptPrint{page:allDept}
+    body.print-all-mode #allDeptPrint{
+      display:grid!important;grid-template-columns:1fr;align-content:start;gap:4mm;
+    }
+    body.print-all-mode .print-dept{margin-bottom:0;break-inside:avoid}
+    body.print-all-mode .print-dept h2{font-size:11px;margin:0 0 3px;padding-bottom:3px;border-bottom-width:1px}
+    body.print-all-mode table.roster thead th{font-size:6.5px;padding:1px}
+    body.print-all-mode table.roster th.dcol{min-width:0;width:auto}
+    body.print-all-mode table.roster th.dcol .dow{font-size:5px}
+    body.print-all-mode table.roster th.dcol .dn{font-size:6.5px}
+    body.print-all-mode table.roster th.dcol .rest{font-size:4.5px}
+    body.print-all-mode table.roster .rname{font-size:6.5px;min-width:34px;width:34px;padding:1px}
+    body.print-all-mode table.roster .sumcol,body.print-all-mode table.roster td.sumcell{min-width:20px;width:20px}
+    body.print-all-mode table.roster .s-work{right:20px}
+    body.print-all-mode table.roster td.sumcell.s-off,body.print-all-mode table.roster td.sumcell.s-off .cnt{font-size:6.5px}
+    body.print-all-mode table.roster td.rc{height:11px;font-size:6.5px}
+    body.print-all-mode table.roster tfoot td{font-size:5.5px;height:11px}
+    body.print-all-mode table.roster tfoot td.low{font-size:6.5px}
   }
 </style>
 
@@ -374,6 +417,7 @@
       <button class="gate-role" data-role="office"><span class="gr-ico">🗂️</span><span class="gr-lbl">事務</span><span class="gr-sub">勤務表の作成</span></button>
       <button class="gate-role" data-role="nursing"><span class="gr-ico">🩺</span><span class="gr-lbl">看護</span><span class="gr-sub">勤務表の作成</span></button>
       <button class="gate-role" data-role="kitchen"><span class="gr-ico">🍳</span><span class="gr-lbl">栄養士・厨房</span><span class="gr-sub">勤務表の作成</span></button>
+      <button class="gate-role" data-role="rehab"><span class="gr-ico">🦵</span><span class="gr-lbl">リハビリ</span><span class="gr-sub">勤務表の作成</span></button>
     </div>
     <div class="gate-pass" id="gatePass" hidden>
       <p class="gate-pass-label" id="gatePassLabel"></p>
@@ -388,39 +432,42 @@
 </div>
 
 <div class="app" id="appRoot" hidden>
-  <header class="top">
-    <div class="brand">
-      <div class="mark">🗓️</div>
-      <div>
-        <h1>役割分担ボード</h1>
-        <div class="sub" id="brandSub">デイサービス 1日の役割分担表</div>
+  <div class="app-shell">
+    <aside class="sidebar no-print">
+      <div class="brand">
+        <div class="mark">🗓️</div>
+        <div>
+          <h1>役割分担ボード</h1>
+        </div>
       </div>
-    </div>
-    <div class="tabs no-print" role="tablist">
-      <button class="tab" id="tabBoard" role="tab" aria-selected="true"><span>📋</span>役割分担</button>
-      <button class="tab" id="tabRoster" role="tab" aria-selected="false"><span>📅</span>勤務表</button>
-      <button class="tab" id="tabSettings" role="tab" aria-selected="false"><span>⚙️</span>設定</button>
-    </div>
-    <div class="field">
-      <label for="facility">事業所名</label>
-      <input type="text" id="facility" placeholder="○○デイサービスセンター">
-    </div>
-  </header>
+      <nav class="tabs" role="tablist">
+        <button class="tab" id="tabBoard" role="tab" aria-selected="true"><span>📋</span>役割分担</button>
+        <button class="tab" id="tabRoster" role="tab" aria-selected="false"><span>📅</span>勤務表</button>
+        <button class="tab" id="tabSettings" role="tab" aria-selected="false"><span>⚙️</span>設定</button>
+      </nav>
+      <div class="side-spacer"></div>
+      <div class="side-session" id="sessionBar">
+        <label class="fac-switch" id="facSwitch" hidden>部署
+          <select id="facSwitchSel"></select>
+        </label>
+        <span class="fac-badge" id="facBadge" hidden></span>
+        <button class="btn ghost sm" id="btnPrintAll" hidden title="全部署の勤務表を1つにまとめて印刷">🖨 全部署まとめて印刷</button>
+        <button class="btn ghost sm" id="btnLogout">ログアウト</button>
+      </div>
+    </aside>
 
-  <div class="toolbar no-print" style="margin-top:-4px" id="sessionBar">
-    <label class="fac-switch" id="facSwitch" hidden>部署
-      <select id="facSwitchSel"></select>
-    </label>
-    <span class="fac-badge" id="facBadge" hidden></span>
-    <span class="sync-status" id="syncStatus" data-state="off"></span>
-    <button class="btn ghost sm" id="btnSyncNow" title="最新の状態を取得">🔄 今すぐ同期</button>
-    <button class="btn ghost sm" id="btnPrintAll" hidden title="全部署の勤務表を1つにまとめて印刷">🖨 全部署まとめて印刷</button>
-    <span class="spacer" style="flex:1"></span>
-    <button class="btn ghost sm" id="btnLogout">ログアウト</button>
-  </div>
-  <div id="allDeptPrint"></div>
+    <main class="main">
+      <header class="top">
+        <div class="brand brand-main">
+          <div class="mark">🗓️</div>
+          <div>
+            <h1>役割分担ボード</h1>
+            <div class="sub" id="brandSub">デイサービス 1日の役割分担表</div>
+          </div>
+        </div>
+      </header>
 
-  <!-- ============ BOARD VIEW ============ -->
+      <!-- ============ BOARD VIEW ============ -->
   <div id="viewBoard">
     <div class="toolbar no-print">
       <div class="field">
@@ -558,7 +605,10 @@
       </div>
     </div>
   </div>
+    </main>
+  </div>
 </div>
+<div id="allDeptPrint"></div>
 
 <!-- Confirm modal（Artifactのサンドボックスでは window.confirm が使えないため自前で用意） -->
 <div class="overlay" id="confirmOverlay"><div class="modal" style="width:min(360px,100%)">
@@ -709,9 +759,9 @@ const K={
   get statusEnabled(){return `yakuwari:${FSCOPE}:statusEnabled`}, // 勤務記号は共有だが「この部署で使うか」は部署ごと
   theme:"yakuwari:theme" // 表示テーマも施設共通
 };
-const FACILITY_NAME={day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房"};
+const FACILITY_NAME={day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ"};
 const BOARD_FACILITIES=["day","home"]; // 役割分担ボードを使う部署（それ以外は勤務表のみ）
-const ALL_FACILITIES=["day","home","office","nursing","kitchen"];
+const ALL_FACILITIES=["day","home","office","nursing","kitchen","rehab"];
 
 /* ---------- defaults ---------- */
 const STAFF_COLORS=["#3E7CB1","#C7803E","#5B9E7A","#8E6FB0","#C25E6E","#C9A227","#6E8FA6","#4C8C8C","#B2632F","#7C9A46"];
@@ -787,7 +837,8 @@ const DEF_STATUS_ENABLED={
   home:["日","早","遅","夜","公","有","希","欠"],
   office:["出","公","有","希","欠"],
   nursing:["出","公","有","希","欠"],
-  kitchen:["出","公","有","希","欠"]
+  kitchen:["出","公","有","希","欠"],
+  rehab:["出","公","有","希","欠"]
 };
 
 /* ---------- storage（ローカル保存＋Googleスプレッドシート同期） ---------- */
@@ -899,7 +950,7 @@ document.addEventListener('visibilitychange',()=>{
 /* ---------- state ---------- */
 const S={
   tab:"board", date:todayISO(), ym:todayISO().slice(0,7),
-  staff:[], status:[], times:[], tasks:[], types:[], roles:[], facility:"", minStaff:3,
+  staff:[], status:[], times:[], tasks:[], types:[], roles:[], minStaff:3,
   day:{selected:[],assign:{}}, roster:{}, rauto:{}, rmeta:{offDows:[],offDates:[]}
 };
 function todayISO(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
@@ -912,7 +963,6 @@ function loadMasters(){
   S.staff=jget(K.staff,null); S.status=jget(K.status,null);
   S.times=jget(K.times,null); S.tasks=jget(K.tasks,null); S.types=jget(K.types,null); S.roles=jget(K.roles,null);
   S.statusEnabled=jget(K.statusEnabled,null);
-  S.facility=(jget(K.meta,{}).facility)||"";
   const mn=jget(K.meta,{}).minStaff; S.minStaff=(mn==null?3:mn);
   let seeded=jget(K.meta,{}).seeded;
   if(!S.status) S.status=JSON.parse(JSON.stringify(DEF_STATUS));
@@ -973,7 +1023,7 @@ function offCount(sid){
   for(let d=1;d<=nd;d++){ if(effOf(md,S.ym,sid,d,used).rest)n++; }
   return n;
 }
-const saveMeta=()=>jset(K.meta,{...jget(K.meta,{}),facility:S.facility,minStaff:S.minStaff});
+const saveMeta=()=>jset(K.meta,{...jget(K.meta,{}),minStaff:S.minStaff});
 const staffById=id=>S.staff.find(s=>s.id===id);
 const taskById=id=>S.tasks.find(t=>t.id===id);
 const statusByCode=c=>S.status.find(s=>s.code===c);
@@ -1131,7 +1181,7 @@ function renderLegend(){
     s.innerHTML=`<span class="sw" style="background:${tint(t.color,.18)};border-color:${t.color}"></span><span></span>`;
     s.querySelector('span:last-child').textContent=t.name;l.appendChild(s);});
 }
-function renderBoardAll(){$("#facility").value=S.facility;$("#date").value=S.date;renderRosterPick();renderBoard();renderLegend();}
+function renderBoardAll(){$("#date").value=S.date;renderRosterPick();renderBoard();renderLegend();}
 
 /* assign modal */
 let assignCtx=null;
@@ -1508,7 +1558,6 @@ $("#stgTask").onclick=()=>{renderTaskList();openModal("#taskOverlay");};
 $("#stgRoles").onclick=openRoles;
 
 /* ================= toolbar wiring ================= */
-$("#facility").oninput=e=>{S.facility=e.target.value;saveMeta();};
 $("#date").onchange=e=>{loadDay(e.target.value);renderBoardAll();};
 $("#month").onchange=e=>{loadRoster(e.target.value);renderRoster();};
 $("#btnSync").onclick=()=>{
@@ -1639,14 +1688,14 @@ async function printAllDepartments(){
       loadRoster(origYm);
       renderRoster();
       const tableHTML=$("#rosterTable").outerHTML;
-      sections.push({label:FACILITY_NAME[scope],facility:S.facility||"",tableHTML});
+      sections.push({label:FACILITY_NAME[scope],tableHTML});
     }
     FSCOPE=origScope;
     loadMasters();loadRoster(origYm);
     if(origTab==="roster")renderRoster();
     $("#allDeptPrint").innerHTML=sections.map(s=>`
       <div class="print-dept">
-        <h2>${escapeHtml(s.label)}${s.facility?`　${escapeHtml(s.facility)}`:""}　（${origYm.replace("-","年")}月）</h2>
+        <h2>${escapeHtml(s.label)}　（${origYm.replace("-","年")}月）</h2>
         ${s.tableHTML}
       </div>`).join("");
     document.body.classList.add('print-all-mode');
@@ -1677,8 +1726,8 @@ $("#btnTheme").onclick=$("#btnTheme2").onclick=toggleTheme;
 
 /* ================= ログイン（管理者／デイサービス／訪問介護） ================= */
 const GK={pass:"yakuwari:gate:passcodes"};
-const DEF_PASS={admin:"1234",day:"0000",home:"1111",office:"2222",nursing:"3333",kitchen:"4444"};
-const ROLE_LABEL={admin:"管理者",day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房"};
+const DEF_PASS={admin:"1234",day:"0000",home:"1111",office:"2222",nursing:"3333",kitchen:"4444",rehab:"5555"};
+const ROLE_LABEL={admin:"管理者",day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ"};
 function loadPasscodes(){const saved=jget(GK.pass,null); return {...DEF_PASS,...(saved||{})};} // 新しい部署が増えても既定値で補完
 function savePasscodes(p){jset(GK.pass,p);}
 let ROLE=null, pendingRole=null;
@@ -1752,8 +1801,7 @@ async function attemptLogin(){
 $("#gateEnter").onclick=attemptLogin;
 $("#gatePassInput").addEventListener('keydown',e=>{if(e.key==="Enter")attemptLogin();});
 
-const FACILITY_ICON={day:"📋",home:"🚶",office:"🗂️",nursing:"🩺",kitchen:"🍳"};
-const FACILITY_PLACEHOLDER={day:"○○デイサービスセンター",home:"○○訪問介護ステーション",office:"○○事務局",nursing:"○○看護室",kitchen:"○○栄養課・厨房"};
+const FACILITY_ICON={day:"📋",home:"🚶",office:"🗂️",nursing:"🩺",kitchen:"🍳",rehab:"🦵"};
 function updateFacilityUI(){
   const isAdmin=ROLE==="admin";
   $("#facSwitch").hidden=!isAdmin;
@@ -1770,7 +1818,6 @@ function updateFacilityUI(){
     $("#facBadge").textContent=FACILITY_ICON[FSCOPE]+" "+FACILITY_NAME[FSCOPE];
   }
   $("#grpAccess").hidden=!isAdmin;
-  $("#facility").placeholder = FACILITY_PLACEHOLDER[FSCOPE]||"";
   // 役割分担ボードを使わない部署（事務・看護・栄養士/厨房）は勤務表のみ
   const usesBoard=BOARD_FACILITIES.includes(FSCOPE);
   $("#tabBoard").hidden=!usesBoard;
@@ -1789,12 +1836,6 @@ $("#btnLogout").onclick=()=>{
     sessDel("yakuwari:gate:role"); sessDel("yakuwari:gate:facility");
     ROLE=null; $("#appRoot").hidden=true; $("#gate").hidden=false; showGateRoles();
   },"ログアウト");
-};
-$("#btnSyncNow").onclick=async ()=>{
-  const changed=await syncPull();
-  if(S.tab==="board"){loadDay(S.date);renderBoardAll();}
-  else if(S.tab==="roster"){loadRoster(S.ym);renderRoster();}
-  toast(changed?"最新のデータに更新しました":"変更はありませんでした");
 };
 
 function renderPassList(){
