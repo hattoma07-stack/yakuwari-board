@@ -820,10 +820,10 @@ const DEF_TYPES=[{id:"ty_sey",name:"正職員",off:9},{id:"ty_part",name:"パー
 // 職種別の最低出勤人数を管理する部署（それ以外の部署は従来どおり合計人数のみ）
 const JOBS_BY_DEPT={day:[
   {id:"care",name:"介護職員",short:"介護"},
-  {id:"counselor",name:"生活相談員",short:"相談員"},
-  {id:"nurse",name:"看護職員（委託）",short:"看護"},
-  {id:"ft",name:"機能訓練指導員",short:"機能訓練"},
-  {id:"driver",name:"送迎職員",short:"送迎"}]};
+  {id:"counselor",name:"生活相談員",short:"生活相談員"},
+  {id:"nurse",name:"委託看護職員",short:"委託看護職員"},
+  {id:"ft",name:"機能訓練指導員",short:"機能訓練指導員"},
+  {id:"driver",name:"送迎職員",short:"送迎職員"}]};
 const DEF_REQ={day:{care:8,counselor:1,nurse:1,ft:1,driver:3}};
 const jobsOf=()=>JOBS_BY_DEPT[FSCOPE]||[];
 const DEF_ROLES=[
@@ -1267,15 +1267,16 @@ function renderRoster(){
   });
   bodyH+='</tbody>';
   const minS=Number(S.minStaff)||0;
-  const footRow=(label,min,pred)=>{
-    let r=`<tr><td class="rname">${label}${min?`<span style="font-weight:400;color:var(--ink-soft)">（最低${min}）</span>`:''}</td>`;
+  const footRow=(label,min,pred,note)=>{
+    let r=`<tr><td class="rname">${label}${note&&min?`<span style="font-weight:400;color:var(--ink-soft)">（最低${min}）</span>`:''}</td>`;
     for(let d=1;d<=nd;d++){let n=0;S.staff.forEach(s=>{if(pred(s)&&eff(s.id,d).work)n++;});
       const low=min&&used&&!isSetOff(d)&&n<min;
       r+=`<td class="${clsFor(d)} num${low?' low':''}">${n||''}</td>`;}
     return r+'<td class="sumcol s-work"></td><td class="sumcol s-off"></td></tr>';
   };
-  let foot='<tfoot>'+footRow('出勤数',minS,()=>true);
-  jobsOf().forEach(j=>{foot+=footRow(escapeHtml(j.short),Number(S.req[j.id])||0,s=>s.job===j.id);});
+  const jobsRows=jobsOf();
+  let foot='<tfoot>'+(jobsRows.length?'':footRow('出勤数',minS,()=>true,true));
+  jobsRows.forEach(j=>{foot+=footRow(escapeHtml(j.short),Number(S.req[j.id])||0,s=>s.job===j.id,false);});
   foot+='</tfoot>';
   T.innerHTML=`<colgroup>${cols}</colgroup>`+head+bodyH+foot;
   $$("td.rc",T).forEach(td=>{td.onclick=()=>{
