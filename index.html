@@ -661,6 +661,11 @@
       <input type="number" id="minStaffIn" min="0" max="99" style="width:80px;font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:8px;padding:7px 9px">
       <span style="font-size:13px;color:var(--ink-soft)">人以上</span>
     </div>
+    <div id="jobReqBox" hidden>
+      <div class="mlabel" style="margin-top:14px">職種ごとの最低出勤人数（勤務表の下に職種別の人数を表示し、不足日を赤く表示。自動作成でも下回らないよう公休を配置）</div>
+      <div class="edit-list" id="jobReqList"></div>
+      <p style="font-size:12px;color:var(--ink-soft);margin:6px 0 0">※ 職種はスタッフ台帳で各スタッフに設定します。生活相談員は介護職員の人数には含まれません。</p>
+    </div>
     <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
     <div class="mlabel">② 雇用形態ごとの「月の休日数」の既定値（例：正職員＝9）</div>
     <div class="edit-list" id="typesList"></div>
@@ -812,6 +817,15 @@ const DEF_TIMES_HOME=[ // 訪問介護は24時間体制のため終日カバー
   {id:uid(),time:"16:00",phase:"夕方の訪問"},{id:uid(),time:"18:00",phase:"夜の訪問"},
   {id:uid(),time:"20:00",phase:"夜間巡回"},{id:uid(),time:"22:00",phase:"夜間巡回"}];
 const DEF_TYPES=[{id:"ty_sey",name:"正職員",off:9},{id:"ty_part",name:"パート",off:10}];
+// 職種別の最低出勤人数を管理する部署（それ以外の部署は従来どおり合計人数のみ）
+const JOBS_BY_DEPT={day:[
+  {id:"care",name:"介護職員",short:"介護"},
+  {id:"counselor",name:"生活相談員",short:"相談員"},
+  {id:"nurse",name:"看護職員（委託）",short:"看護"},
+  {id:"ft",name:"機能訓練指導員",short:"機能訓練"},
+  {id:"driver",name:"送迎職員",short:"送迎"}]};
+const DEF_REQ={day:{care:8,counselor:1,nurse:1,ft:1,driver:3}};
+const jobsOf=()=>JOBS_BY_DEPT[FSCOPE]||[];
 const DEF_ROLES=[
   {id:"r_leader",name:"リーダー",leader:true,cells:{}},
   {id:"r_a",name:"役割A",leader:false,cells:{}},
@@ -950,7 +964,7 @@ document.addEventListener('visibilitychange',()=>{
 /* ---------- state ---------- */
 const S={
   tab:"board", date:todayISO(), ym:todayISO().slice(0,7),
-  staff:[], status:[], times:[], tasks:[], types:[], roles:[], minStaff:3,
+  staff:[], status:[], times:[], tasks:[], types:[], roles:[], minStaff:3, req:{},
   day:{selected:[],assign:{}}, roster:{}, rauto:{}, rmeta:{offDows:[],offDates:[]}
 };
 function todayISO(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
@@ -964,6 +978,7 @@ function loadMasters(){
   S.times=jget(K.times,null); S.tasks=jget(K.tasks,null); S.types=jget(K.types,null); S.roles=jget(K.roles,null);
   S.statusEnabled=jget(K.statusEnabled,null);
   const mn=jget(K.meta,{}).minStaff; S.minStaff=(mn==null?3:mn);
+  S.req=jget(K.meta,{}).req||JSON.parse(JSON.stringify(DEF_REQ[FSCOPE]||{}));
   let seeded=jget(K.meta,{}).seeded;
   if(!S.status) S.status=JSON.parse(JSON.stringify(DEF_STATUS));
   if(!S.statusEnabled) S.statusEnabled=(DEF_STATUS_ENABLED[FSCOPE]||S.status.map(s=>s.code)).slice();
@@ -976,7 +991,7 @@ function loadMasters(){
     seeded=false;
   }
   // migrate: ensure typeId / hours / task duration
-  S.staff.forEach(s=>{if(!s.typeId)s.typeId=S.types[0].id; if(s.off===undefined)s.off=null; if(s.hours===undefined)s.hours=null;});
+  S.staff.forEach(s=>{if(!s.typeId)s.typeId=S.types[0].id; if(s.off===undefined)s.off=null; if(s.hours===undefined)s.hours=null; if(s.job===undefined)s.job="";});
   S.tasks.forEach(t=>{if(!t.dur)t.dur=30;});
   saveStaff();jset(K.status,S.status);jset(K.times,S.times);jset(K.tasks,S.tasks);jset(K.types,S.types);jset(K.roles,S.roles);
   return seeded;
@@ -1023,7 +1038,7 @@ function offCount(sid){
   for(let d=1;d<=nd;d++){ if(effOf(md,S.ym,sid,d,used).rest)n++; }
   return n;
 }
-const saveMeta=()=>jset(K.meta,{...jget(K.meta,{}),minStaff:S.minStaff});
+const saveMeta=()=>jset(K.meta,{...jget(K.meta,{}),minStaff:S.minStaff,req:S.req});
 const staffById=id=>S.staff.find(s=>s.id===id);
 const taskById=id=>S.tasks.find(t=>t.id===id);
 const statusByCode=c=>S.status.find(s=>s.code===c);
@@ -1252,11 +1267,16 @@ function renderRoster(){
   });
   bodyH+='</tbody>';
   const minS=Number(S.minStaff)||0;
-  let foot=`<tfoot><tr><td class="rname">出勤数${minS?`<span style="font-weight:400;color:var(--ink-soft)">（最低${minS}）</span>`:''}</td>`;
-  for(let d=1;d<=nd;d++){let n=0;S.staff.forEach(s=>{if(eff(s.id,d).work)n++;});
-    const low=minS&&used&&!isSetOff(d)&&n<minS;
-    foot+=`<td class="${clsFor(d)} num${low?' low':''}">${n||''}</td>`;}
-  foot+='<td class="sumcol s-work"></td><td class="sumcol s-off"></td></tr></tfoot>';
+  const footRow=(label,min,pred)=>{
+    let r=`<tr><td class="rname">${label}${min?`<span style="font-weight:400;color:var(--ink-soft)">（最低${min}）</span>`:''}</td>`;
+    for(let d=1;d<=nd;d++){let n=0;S.staff.forEach(s=>{if(pred(s)&&eff(s.id,d).work)n++;});
+      const low=min&&used&&!isSetOff(d)&&n<min;
+      r+=`<td class="${clsFor(d)} num${low?' low':''}">${n||''}</td>`;}
+    return r+'<td class="sumcol s-work"></td><td class="sumcol s-off"></td></tr>';
+  };
+  let foot='<tfoot>'+footRow('出勤数',minS,()=>true);
+  jobsOf().forEach(j=>{foot+=footRow(escapeHtml(j.short),Number(S.req[j.id])||0,s=>s.job===j.id);});
+  foot+='</tfoot>';
   T.innerHTML=`<colgroup>${cols}</colgroup>`+head+bodyH+foot;
   $$("td.rc",T).forEach(td=>{td.onclick=()=>{
     const sid=td.dataset.sid,day=+td.dataset.day;if(!S.roster[sid])S.roster[sid]={};
@@ -1295,6 +1315,9 @@ function renderStaffList(){
         <input type="text" class="nm-in" placeholder="スタッフ名" value="">
         <button class="del" title="削除">🗑</button>
       </div>
+      ${jobsOf().length?`<div class="line2">
+        <div class="fl" style="flex:1"><span>職種</span><div class="seg jobseg">${[{id:"",name:"未設定"}].concat(jobsOf()).map(j=>`<button class="segbtn" data-job="${j.id}" aria-pressed="${(s.job||"")===j.id}">${escapeHtml(j.name)}</button>`).join("")}</div></div>
+      </div>`:""}
       <div class="line2">
         <div class="fl"><span>雇用形態</span><div class="seg tyseg">${segs}</div></div>
         <div class="fl"><span>月の休日数（個別）</span>
@@ -1307,6 +1330,9 @@ function renderStaffList(){
     card.querySelector('.nm-in').value=s.name;
     card.querySelector('input[type=color]').oninput=e=>{s.color=e.target.value;saveStaff();refreshAll();};
     card.querySelector('.nm-in').oninput=e=>{s.name=e.target.value;saveStaff();refreshAll();};
+    card.querySelectorAll('.jobseg .segbtn').forEach(b=>b.onclick=()=>{
+      s.job=b.dataset.job;saveStaff();renderStaffList();
+      if(S.tab==="roster")renderRoster();else refreshAll();});
     card.querySelectorAll('.tyseg .segbtn').forEach(b=>b.onclick=()=>{
       s.typeId=b.dataset.ty;saveStaff();renderStaffList();
       if(S.tab==="roster")renderRoster();else refreshAll();});
@@ -1326,7 +1352,7 @@ function renderStaffList(){
 }
 function addStaffMaster(){
   const n=$("#newStaffName").value.trim();if(!n)return;
-  const s={id:uid(),name:n,color:STAFF_COLORS[S.staff.length%STAFF_COLORS.length]};
+  const s={id:uid(),name:n,color:STAFF_COLORS[S.staff.length%STAFF_COLORS.length],typeId:S.types[0].id,off:null,hours:null,job:""};
   S.staff.push(s);S.day.selected.push(s.id);saveStaff();saveDay();
   $("#newStaffName").value="";renderStaffList();refreshAll();$("#newStaffName").focus();
 }
@@ -1524,7 +1550,7 @@ function closeModal(sel){
 }
 $$(".overlay").forEach(o=>o.addEventListener('click',e=>{if(e.target===o||e.target.hasAttribute('data-close'))closeModal('#'+o.id);}));
 document.addEventListener('keydown',e=>{if(e.key==="Escape")closeModal();});
-let toastT;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2000);}
+let toastT;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),Math.max(2000,m.length*130));}
 
 // Artifactのサンドボックスでは window.confirm が使えないため、自前の確認モーダルで代用
 let confirmCtx=null;
@@ -1577,6 +1603,14 @@ function openSettings(){
   $("#settingsTitle").textContent=`休日・休業日の設定（${y}年${m}月）`;
   const mi=$("#minStaffIn");mi.value=S.minStaff;
   mi.oninput=e=>{S.minStaff=e.target.value===''?0:Number(e.target.value);saveMeta();if(S.tab==="roster")renderRoster();};
+  const jobs=jobsOf();
+  $("#jobReqBox").hidden=!jobs.length;
+  const jl=$("#jobReqList");jl.innerHTML="";
+  jobs.forEach(j=>{const row=document.createElement('div');row.className="edit-row";
+    row.innerHTML=`<span style="width:150px;flex:none;font-weight:700;font-size:13px">${escapeHtml(j.name)}</span>
+      <input type="number" min="0" max="99" style="width:72px" value="${Number(S.req[j.id])||0}"><span style="font-size:12px;color:var(--ink-soft)">名以上</span>`;
+    row.querySelector('input').oninput=e=>{S.req[j.id]=e.target.value===''?0:Number(e.target.value);saveMeta();if(S.tab==="roster")renderRoster();};
+    jl.appendChild(row);});
   renderTypesList();
   renderOffCalendar();
   openModal("#settingsOverlay");
@@ -1634,6 +1668,11 @@ $("#doAuto").onclick=()=>{
   const dayWork={};
   for(let d=1;d<=nd;d++){ let w=0; S.staff.forEach(s=>{const c=S.roster[s.id][d];
     if(c){const st=statusByCode(c); if(!(st&&!st.work))w++;} else w++;}); dayWork[d]=w; }
+  // 職種別の日別出勤数（職種ごとの最低人数を守るため）
+  const jobs=jobsOf(), jreq=S.req||{}, dayJ={};
+  jobs.forEach(j=>{dayJ[j.id]={}; for(let d=1;d<=nd;d++){let w=0;
+    S.staff.forEach(s=>{ if(s.job!==j.id)return; const c=S.roster[s.id][d];
+      if(c){const st=statusByCode(c); if(!(st&&!st.work))w++;} else w++; }); dayJ[j.id][d]=w;}});
   // 4) 不足分の公休を配置（最低出勤人数を絶対の下限に、ラウンドロビンで公平＆分散）
   const warn=[];
   const need={};
@@ -1652,11 +1691,13 @@ $("#doAuto").onclick=()=>{
   while(progress){ progress=false;
     for(const s of S.staff){ if(need[s.id]<=0)continue; const rr=S.roster[s.id]; const wu=weekUsed[s.id];
       let best=-1,bestScore=-Infinity;
+      const jq=s.job?(Number(jreq[s.job])||0):0;
       for(let d=1;d<=nd;d++){ if(rr[d]||dayWork[d]<=min)continue;   // 空欄 かつ 休ませても最低人数を保てる日
+        if(jq&&dayJ[s.job][d]<=jq)continue;                        // 職種ごとの最低人数も保てる日
         const wi=weekIndexOf(d);
         const score=-((wu[wi]||0)*1000)+dayWork[d]*5+nearOff(rr,d); // 1: 休みが少ない週を優先 2: 出勤余力 3: 既存の休みから離す
         if(score>bestScore){bestScore=score;best=d;} }
-      if(best>0){rr[best]=rcode;setAuto(s.id,best,true);dayWork[best]--;need[s.id]--;
+      if(best>0){rr[best]=rcode;setAuto(s.id,best,true);dayWork[best]--;need[s.id]--;if(s.job&&dayJ[s.job])dayJ[s.job][best]--;
         const wi=weekIndexOf(best);wu[wi]=(wu[wi]||0)+1;progress=true;}
     }
   }
@@ -1667,6 +1708,9 @@ $("#doAuto").onclick=()=>{
   const lowDays=[]; for(let d=1;d<=nd;d++){ if(min&&!isSetOff(d)&&dayWork[d]<min)lowDays.push(d); }
   const parts=[];
   if(lowDays.length)parts.push(`最低人数割れ ${lowDays.join("・")}日（希望休を調整）`);
+  jobs.forEach(j=>{const q=Number(jreq[j.id])||0; if(!q)return; const ds=[];
+    for(let d=1;d<=nd;d++){ if(!isSetOff(d)&&dayJ[j.id][d]<q)ds.push(d); }
+    if(ds.length)parts.push(`${j.short}不足 ${ds.length>6?ds.slice(0,6).join("・")+"…":ds.join("・")}日`); });
   if(warn.length)parts.push(`休日数が目標未達 → ${warn.join("、")}`);
   toast(parts.length?`作成しました｜要確認：${parts.join(" ／ ")}`:"休日数に合わせて作成しました");
 };
