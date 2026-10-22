@@ -759,7 +759,7 @@
 <div class="overlay" id="autoOverlay"><div class="modal">
   <div class="modal-head"><h3>空欄を自動で埋める</h3><button class="x" data-close>×</button></div>
   <div class="modal-body">
-    <p style="line-height:1.7;margin:0 0 8px">各スタッフの<b>目標休日数</b>に合わせて作成します。希望休・事業所休業日を差し引いた<b>不足分の公休を、なるべく週2日休みに近づくよう週ごとに分散配置</b>（<b>1日の最低出勤人数を保つ</b>ように調整）し、残りを<b>出勤</b>にします（塗り済みの希望休はそのまま）。</p>
+    <p style="line-height:1.7;margin:0 0 8px">各スタッフの<b>目標休日数</b>に合わせて作成します。希望休・事業所休業日を差し引いた<b>不足分の公休を、なるべく週2日休みに近づくよう週ごとに分散配置</b>（<b>1日の最低出勤人数を保つ</b>ように調整）し、残りを<b>出勤</b>にします（塗り済みの希望休はそのまま）。<b>夜勤の翌日は休み</b>（公休）にします。</p>
     <div class="mlabel" style="margin-top:12px">実行前の状況</div>
     <p id="autoSummary" style="font-size:12.5px;color:var(--ink-soft);line-height:1.7;margin:0"></p>
   </div>
@@ -871,7 +871,7 @@ const DEF_STATUS=[
   {code:"日",label:"日勤",color:"#3E7CB1",work:true},
   {code:"早",label:"早番",color:"#4A7FB5",work:true},
   {code:"遅",label:"遅番",color:"#C9722E",work:true},
-  {code:"夜",label:"夜勤",color:"#4C4C8E",work:true},
+  {code:"夜",label:"夜勤",color:"#4C4C8E",work:true,night:true},
   {code:"半",label:"半休",color:"#C9A227",work:true,half:true},
   {code:"研",label:"研修",color:"#8E6FB0",work:true},
   {code:"公",label:"公休",color:"#9AA3A0",work:false},
@@ -1014,6 +1014,7 @@ function loadMasters(){
   S.req=jget(K.meta,{}).req||JSON.parse(JSON.stringify(DEF_REQ[FSCOPE]||{}));
   let seeded=jget(K.meta,{}).seeded;
   if(!S.status) S.status=JSON.parse(JSON.stringify(DEF_STATUS));
+  S.status.forEach(st=>{if(st.night===undefined)st.night=/夜/.test(st.label||st.code||"");}); // 夜勤の記号（翌日は休み）
   S.status.forEach(st=>{if(st.half===undefined)st.half=/^半/.test(st.label||st.code||"");}); // 「半休」「半有」など半日扱いの記号
   if(!S.statusEnabled) S.statusEnabled=(DEF_STATUS_ENABLED[FSCOPE]||S.status.map(s=>s.code)).slice();
   if(!S.times) S.times=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_TIMES_HOME:DEF_TIMES));
@@ -1500,6 +1501,7 @@ function renderStatusList(){
     row.innerHTML=`<input type="color" value="${st.color}"><input type="text" class="code" maxlength="2" value=""><input type="text" value="">
       <label class="wk"><input type="checkbox" class="wk-in" ${st.work?"checked":""}>出勤</label>
       <label class="wk"><input type="checkbox" class="half-in" ${st.half?"checked":""}>半日(0.5)</label>
+      <label class="wk"><input type="checkbox" class="night-in" ${st.night?"checked":""}>夜勤(翌日休)</label>
       <label class="wk use-in-dept"><input type="checkbox" class="use-in" ${on?"checked":""}>${escapeHtml(FACILITY_NAME[FSCOPE])}で使う</label>
       <button class="del" title="削除">🗑</button>`;
     row.children[1].value=st.code;row.children[2].value=st.label;
@@ -1508,6 +1510,7 @@ function renderStatusList(){
     row.children[2].oninput=e=>{st.label=e.target.value;jset(K.status,S.status);renderRoster();};
     row.querySelector('.wk-in').onchange=e=>{st.work=e.target.checked;jset(K.status,S.status);renderRoster();};
     row.querySelector('.half-in').onchange=e=>{st.half=e.target.checked;jset(K.status,S.status);renderRoster();};
+    row.querySelector('.night-in').onchange=e=>{st.night=e.target.checked;jset(K.status,S.status);};
     row.querySelector('.use-in').onchange=e=>{
       S.statusEnabled=(S.statusEnabled||[]).filter(c=>c!==st.code);
       if(e.target.checked)S.statusEnabled.push(st.code);
@@ -1517,7 +1520,7 @@ function renderStatusList(){
     w.appendChild(row);});
 }
 $("#addStatus").onclick=()=>{
-  const st={code:"新",label:"新規",color:"#6E8FA6",work:false,half:false};
+  const st={code:"新",label:"新規",color:"#6E8FA6",work:false,half:false,night:false};
   S.status.push(st);jset(K.status,S.status);
   if(!S.statusEnabled.includes(st.code))S.statusEnabled.push(st.code); // 追加した部署では自動的に使う設定に
   saveStatusEnabled();renderStatusList();renderRoster();
@@ -1749,6 +1752,18 @@ $("#doAuto").onclick=()=>{
   S.staff.forEach(s=>{ if(!S.roster[s.id])S.roster[s.id]={};const rr=S.roster[s.id];
     for(let d=1;d<=nd;d++){ if(!rr[d]&&isSetOff(d)){rr[d]=rcode;setAuto(s.id,d,true);} } });
   const wOfCode=c=>{ if(!c)return 1; const st=statusByCode(c); return st?(st.half?0.5:(st.work?1:0)):1; }; // 空欄=出勤候補1・半日=0.5
+  // 2b) 夜勤の翌日は休み（夜勤の記号は手入力のもの。翌日が空欄なら公休にする。前月末の夜勤は当月1日を休みに）
+  const isNight=c=>{const st=c&&statusByCode(c);return !!(st&&st.night);};
+  const isRestC=c=>{const st=c&&statusByCode(c);return !!(st&&!st.work);};
+  const nightWarn=[];
+  { const[py,pm]=S.ym.split("-").map(Number); const pd=new Date(py,pm-2,1);
+    const prevYm=pd.getFullYear()+"-"+String(pd.getMonth()+1).padStart(2,"0"), prevLast=daysInMonth(prevYm);
+    const prevR=jget(K.roster+prevYm,{})||{};
+    S.staff.forEach(s=>{ const rr=S.roster[s.id];
+      if(isNight((prevR[s.id]||{})[prevLast])){ if(!rr[1]){rr[1]=rcode;setAuto(s.id,1,true);} else if(!isRestC(rr[1])&&!isNight(rr[1]))nightWarn.push(`${s.name} 1日`); }
+      for(let d=1;d<nd;d++){ if(!isNight(rr[d]))continue;
+        if(!rr[d+1]){rr[d+1]=rcode;setAuto(s.id,d+1,true);}
+        else if(!isRestC(rr[d+1])&&!isNight(rr[d+1]))nightWarn.push(`${s.name} ${d+1}日`); } }); }
   // 3) 現時点の日別出勤数（空欄＝出勤候補として数える）
   const dayWork={};
   for(let d=1;d<=nd;d++){ let w=0; S.staff.forEach(s=>{const c=S.roster[s.id][d];
@@ -1793,6 +1808,7 @@ $("#doAuto").onclick=()=>{
   // 5) 通知（最低人数割れ＝手入力希望休が原因の日／休日数が目標に届かない人）
   const lowDays=[]; for(let d=1;d<=nd;d++){ if(min&&!isSetOff(d)&&dayWork[d]<min)lowDays.push(d); }
   const parts=[];
+  if(nightWarn.length)parts.push(`夜勤明けが休みになっていません → ${nightWarn.slice(0,5).join('、')}${nightWarn.length>5?'…':''}`);
   if(lowDays.length)parts.push(`最低人数割れ ${lowDays.join("・")}日（希望休を調整）`);
   jobs.forEach(j=>{const q=Number(jreq[j.id])||0; if(!q)return; const ds=[];
     for(let d=1;d<=nd;d++){ if(!isSetOff(d)&&dayJ[j.id][d]<q)ds.push(d); }
