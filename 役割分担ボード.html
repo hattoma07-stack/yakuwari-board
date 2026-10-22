@@ -1051,10 +1051,12 @@ function typeName(s){const t=typeById(s.typeId);return t?t.name:"";}
 const AM_DEF={s:"08:00",e:"10:00"}, PM_DEF={s:"16:00",e:"18:00"};
 function inRange(t,r){return !!r && t>=r.s && t<=r.e;}
 function worksAt(s,t){ if(!s.hours) return true; return inRange(t,s.hours.am)||inRange(t,s.hours.pm); }
-function hoursPreset(s){ if(!s.hours)return"full"; const a=!!s.hours.am,p=!!s.hours.pm; return a&&p?"both":a?"am":p?"pm":"full"; }
+function hoursPreset(s){ if(s.nightOnly)return"night"; if(!s.hours)return"full"; const a=!!s.hours.am,p=!!s.hours.pm; return a&&p?"both":a?"am":p?"pm":"full"; }
 function hoursLabel(s){ if(!s.hours)return"終日"; const a=s.hours.am,p=s.hours.pm;
   const seg=[]; if(a)seg.push(`朝 ${a.s}–${a.e}`); if(p)seg.push(`夕 ${p.s}–${p.e}`); return seg.join(" / ")||"終日"; }
 function setHoursPreset(s,p){
+  s.nightOnly=(p==="night"); // 夜勤のみ：夜勤だけに入る（自動作成の対象。夜勤が可能も自動で有効）
+  if(p==="night"){s.canNight=true;s.hours=null;return;}
   const cur=s.hours||{}; const am=cur.am?{...cur.am}:{...AM_DEF}, pm=cur.pm?{...cur.pm}:{...PM_DEF};
   if(p==="full")s.hours=null; else if(p==="both")s.hours={am,pm};
   else if(p==="am")s.hours={am,pm:null}; else if(p==="pm")s.hours={am:null,pm};
@@ -1392,7 +1394,7 @@ function renderStaffList(){
     const segs=S.types.map(t=>`<button class="segbtn" data-ty="${t.id}" aria-pressed="${s.typeId===t.id}">${escapeHtml(t.name)}</button>`).join("");
     const tdef=(typeById(s.typeId)||{}).off;
     const preset=hoursPreset(s);
-    const hbtns=[["full","終日"],["both","朝夕"],["am","朝のみ"],["pm","夕のみ"]]
+    const hbtns=[["full","終日"],["both","朝夕"],["am","朝のみ"],["pm","夕のみ"]].concat(nightDeptOn()?[["night","夜勤のみ"]]:[])
       .map(([v,l])=>`<button class="segbtn" data-h="${v}" aria-pressed="${preset===v}">${l}</button>`).join("");
     const bandRow=(k,l,b)=>b?`<div class="hrow" data-band="${k}"><span>${l}</span><input type="time" class="hs" value="${b.s}"><span>–</span><input type="time" class="he" value="${b.e}"></div>`:"";
     const hdetail=s.hours?`<div class="hrows">${bandRow('am','朝',s.hours.am)}${bandRow('pm','夕',s.hours.pm)}</div>`:"";
@@ -1410,7 +1412,6 @@ function renderStaffList(){
       </div>`:""}
       ${nightDeptOn()?`<div class="line2">
         <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="night-can" ${s.canNight?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">夜勤が可能（自動作成で夜勤を割り振る対象になります）</label>
-        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;margin-top:6px"><input type="checkbox" class="night-only" ${s.nightOnly?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">夜勤のみ（夜勤だけに入り、夜勤以外の日は休みにします）</label>
       </div>`:""}
       <div class="line2">
         <div class="fl"><span>雇用形態</span><div class="seg tyseg">${segs}</div></div>
@@ -1425,9 +1426,7 @@ function renderStaffList(){
     card.querySelector('input[type=color]').oninput=e=>{s.color=e.target.value;saveStaff();refreshAll();};
     card.querySelector('.nm-in').oninput=e=>{s.name=e.target.value;saveStaff();refreshAll();};
     const nchk=card.querySelector('.night-can');
-    if(nchk){ nchk.onchange=e=>{s.canNight=e.target.checked;if(!s.canNight)s.nightOnly=false;saveStaff();renderStaffList();};
-      const noly=card.querySelector('.night-only');
-      noly.onchange=e=>{s.nightOnly=e.target.checked;if(s.nightOnly)s.canNight=true;saveStaff();renderStaffList();}; }
+    if(nchk){ nchk.onchange=e=>{s.canNight=e.target.checked;if(!s.canNight)s.nightOnly=false;saveStaff();renderStaffList();}; }
     const dchk=card.querySelector('.drive-in');
     if(dchk)dchk.onchange=e=>{s.canDrive=e.target.checked;saveStaff();if(S.tab==="roster")renderRoster();else refreshAll();};
     card.querySelectorAll('.jobseg .segbtn').forEach(b=>b.onclick=()=>{
