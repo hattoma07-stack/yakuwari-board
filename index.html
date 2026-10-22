@@ -247,6 +247,9 @@
   table.roster td.rc.auto{opacity:.5}
   table.roster td.sumcell{font-weight:700;font-size:13px;background:var(--surface-2);color:var(--ink)}
   table.roster td.sumcell.s-work{color:var(--accent-ink)}
+  table.roster .sn{min-width:40px;width:40px;position:static!important}
+  table.roster td.sumcell.sn-total.full{color:var(--accent-ink)}
+  table.roster td.sumcell.sn-total.short{color:var(--alert);background:var(--alert-soft)}
   table.roster tfoot td{background:var(--surface-2);font-weight:700;font-size:11.5px;color:var(--ink-soft);height:26px}
   table.roster tfoot td.low{background:var(--alert-soft);color:var(--alert);font-size:13px}
   table.roster tfoot .rname{color:var(--ink-soft)}
@@ -398,6 +401,7 @@
     body.print-all-mode table.roster .rname{font-size:6.5px;min-width:34px;width:34px;padding:1px}
     body.print-all-mode table.roster .sumcol,body.print-all-mode table.roster td.sumcell{min-width:20px;width:20px}
     body.print-all-mode table.roster .s-work{right:20px}
+    body.print-all-mode table.roster .sn{min-width:16px;width:16px;font-size:6.5px}
     body.print-all-mode table.roster td.sumcell.s-off,body.print-all-mode table.roster td.sumcell.s-off .cnt{font-size:6.5px}
     body.print-all-mode table.roster td.rc{height:11px;font-size:6.5px}
     body.print-all-mode table.roster tfoot td{font-size:5.5px;height:11px}
@@ -828,6 +832,11 @@ const JOBS_BY_DEPT={day:[
 const DEF_REQ={day:{care:8,counselor:1,nurse:1,ft:1,driver:3}};
 const jobsOf=()=>JOBS_BY_DEPT[FSCOPE]||[];
 const hasDriveJob=()=>jobsOf().some(j=>j.drive);
+// 勤務表の右側に出す「記号ごとの日数」の列（指定した部署のみ）。合計が月の日数と一致するか確認できる
+const SUMCOLS_BY_DEPT={home:[
+  {label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"夜",codes:["夜"]},
+  {label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]};
+const sumColsOf=()=>SUMCOLS_BY_DEPT[FSCOPE]||null;
 // 送迎職員は「職種」ではなく、台帳の「送迎が可能」チェックで数える（兼任できる）。他の職種は職種の選択で数える
 const inJob=(j,s)=>j.drive?!!s.canDrive:s.job===j.id;
 const DEF_ROLES=[
@@ -1039,6 +1048,7 @@ function effOf(md,ym,sid,day,used){
   return {code:'',color:'',work:used,rest:false,w:used?1:0,r:0,auto:false};
 }
 const memMd=()=>({r:S.roster,ra:S.rauto,rm:S.rmeta});
+const SN_W=40;
 const fmtN=n=>Number.isInteger(n)?String(n):n.toFixed(1);
 // その月の各スタッフの「休み日数」
 function offCount(sid){
@@ -1259,19 +1269,26 @@ function renderRoster(){
   const eff=(sid,d)=>effOf(md,S.ym,sid,d,used);
   let cols='<col>';
   for(let d=1;d<=nd;d++)cols+=`<col class="${clsFor(d)}">`;
-  cols+='<col><col>';
+  const sc=sumColsOf();
+  cols+=sc?'<col>'.repeat(sc.length+1):'<col><col>';
   let head='<thead><tr><th class="rname">スタッフ</th>';
   for(let d=1;d<=nd;d++){const w=dow(S.ym,d);head+=`<th class="dcol ${clsFor(d)}"><div class="dow">${DOW[w]}</div><div class="dn num">${d}</div>${isSetOff(d)?'<div class="rest">休</div>':''}</th>`;}
-  head+='<th class="sumcol s-work">出勤</th><th class="sumcol s-off">休/目標</th></tr></thead>';
+  const scR=i=>`right:${(sc.length-i)*SN_W}px`; // 右端から順に固定表示
+  if(sc){ sc.forEach((c,i)=>{head+=`<th class="sumcol sn" style="${scR(i)}">${c.label}</th>`;});
+    head+=`<th class="sumcol sn sn-total" style="right:0" title="${nd}日（月の日数）と一致すれば正常">合計</th></tr></thead>`; }
+  else head+='<th class="sumcol s-work">出勤</th><th class="sumcol s-off">休/目標</th></tr></thead>';
   let bodyH='<tbody>';
   S.staff.forEach(s=>{
-    let work=0;
+    let work=0; const cnt=sc?sc.map(()=>0):null;
     bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}</td>`;
-    for(let d=1;d<=nd;d++){const e=eff(s.id,d);work+=e.w;
+    for(let d=1;d<=nd;d++){const e=eff(s.id,d);work+=e.w; if(sc){const k=sc.findIndex(c=>c.codes.includes(e.code));if(k>=0)cnt[k]+=1;}
       const hs=e.code&&statusByCode(e.code),hv=(S.rhalf[s.id]||{})[d],hm=(hs&&hs.half&&hv)?`<span class="hm">${hv==='pm'?'後':'前'}</span>`:'';
       bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${e.code}${hm}</td>`;}
     const off=offCount(s.id),tgt=staffTarget(s);
     const cls=off<tgt?'under':off>tgt?'over':'ok';
+    if(sc){ const tot=cnt.reduce((a,b)=>a+b,0);
+      cnt.forEach((n,i)=>{bodyH+=`<td class="sumcell sn num" style="${scR(i)}">${n||''}</td>`;});
+      bodyH+=`<td class="sumcell sn sn-total num${tot<nd?' short':' full'}" style="right:0" title="${tot<nd?`月の日数（${nd}日）に${nd-tot}日足りません`:'月の日数と一致'}">${tot}</td></tr>`; return; }
     bodyH+=`<td class="sumcell s-work num">${fmtN(work)}</td><td class="sumcell s-off num ${cls}"><span class="cnt">${fmtN(off)}</span>/${tgt}</td></tr>`;
   });
   bodyH+='</tbody>';
@@ -1281,7 +1298,7 @@ function renderRoster(){
     for(let d=1;d<=nd;d++){let n=0;S.staff.forEach(s=>{if(pred(s))n+=eff(s.id,d).w;});
       const low=min&&used&&!isSetOff(d)&&n<min;
       r+=`<td class="${clsFor(d)} num${low?' low':''}">${n?fmtN(n):''}</td>`;}
-    return r+'<td class="sumcol s-work"></td><td class="sumcol s-off"></td></tr>';
+    return r+(sc?'<td class="sumcol sn"></td>'.repeat(sc.length+1):'<td class="sumcol s-work"></td><td class="sumcol s-off"></td>')+'</tr>';
   };
   const jobsRows=jobsOf();
   let foot='<tfoot>'+(jobsRows.length?'':footRow('出勤数',minS,()=>true,true));
