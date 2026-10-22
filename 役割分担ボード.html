@@ -1303,7 +1303,7 @@ function renderRoster(){
     return r+(sc?'<td class="sumcol sn"></td>'.repeat(sc.length+1):'<td class="sumcol s-work"></td><td class="sumcol s-off"></td>')+'</tr>';
   };
   const jobsRows=jobsOf();
-  let foot='<tfoot>'+(jobsRows.length?'':footRow('出勤数',minS,()=>true,true));
+  let foot='<tfoot>'+(jobsRows.length||SHIFTROWS_BY_DEPT[FSCOPE]?'':footRow('出勤数',minS,()=>true,true));
   jobsRows.forEach(j=>{foot+=footRow(escapeHtml(j.short),Number(S.req[j.id])||0,s=>inJob(j,s),false);});
   (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st?escapeHtml(st.label.replace(c,'')):''),0,()=>true,false,c);});
   foot+='</tfoot>';
