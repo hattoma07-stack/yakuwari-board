@@ -251,11 +251,14 @@
   .rwrap2 .rtable-wrap{flex:1;min-width:0}
   .rtotal{flex:none;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
   .rtotal[hidden]{display:none}
-  table.rtot{border-collapse:collapse;width:64px}
+  table.rtot{border-collapse:collapse}
+  table.rtot th,table.rtot td{min-width:40px}
+  table.rtot .rt-total{border-left:2px solid var(--line-strong)}
   table.rtot th,table.rtot td{border:1px solid var(--line);text-align:center;padding:0}
   table.rtot th{background:var(--surface-2);font-size:12px;padding:4px 2px;vertical-align:middle}
   table.rtot .rt-sub{font-size:9.5px;font-weight:700;color:var(--ink-soft)}
-  table.rtot td{font-weight:700;font-size:14px;color:var(--accent-ink)}
+  table.rtot td{font-weight:700;font-size:14px;color:var(--ink)}
+  table.rtot td.full{color:var(--accent-ink)}
   table.rtot td.short{color:var(--alert);background:var(--alert-soft)}
   table.roster .sn{min-width:40px;width:40px;position:static!important}
   table.roster td.sumcell.sn-total.full{color:var(--accent-ink)}
@@ -1287,16 +1290,18 @@ function renderRoster(){
   let cols='<col>';
   for(let d=1;d<=nd;d++)cols+=`<col class="${clsFor(d)}">`;
   const sc=sumColsOf();
-  const nTot=sc&&!SUMTOTAL_BOX[FSCOPE]?1:0, nShow=sc?sc.filter(c=>!c.blank).length+nTot:2; // 表示する集計列の数（空白指定の列は出さない）
+  const boxMode=!!(sc&&SUMTOTAL_BOX[FSCOPE]); // 集計（記号別日数＋合計）を表の外の別枠に出す
+  const nTot=sc&&!boxMode?1:0, nShow=boxMode?0:sc?sc.filter(c=>!c.blank).length+nTot:2; // 表示する集計列の数（空白指定の列は出さない）
   cols+='<col>'.repeat(nShow);
   let head='<thead><tr><th class="rname">スタッフ</th>';
   for(let d=1;d<=nd;d++){const w=dow(S.ym,d);head+=`<th class="dcol ${clsFor(d)}"><div class="dow">${DOW[w]}</div><div class="dn num">${d}</div>${isSetOff(d)?'<div class="rest">休</div>':''}</th>`;}
   const scR=i=>`right:${(sc.length-i)*SN_W}px`; // 右端から順に固定表示
-  if(sc){ sc.forEach((c,i)=>{if(!c.blank)head+=`<th class="sumcol sn" style="${scR(i)}">${c.label}</th>`;});
+  if(boxMode){ head+='</tr></thead>'; }
+  else if(sc){ sc.forEach((c,i)=>{if(!c.blank)head+=`<th class="sumcol sn" style="${scR(i)}">${c.label}</th>`;});
     if(nTot)head+=`<th class="sumcol sn sn-total" style="right:0" title="${nd}日（月の日数）と一致すれば正常">合計</th>`;
     head+='</tr></thead>'; }
   else head+='<th class="sumcol s-work">出勤</th><th class="sumcol s-off">休/目標</th></tr></thead>';
-  let bodyH='<tbody>'; const totals=[];
+  let bodyH='<tbody>'; const boxRows=[];
   S.staff.forEach(s=>{
     let work=0; const cnt=sc?sc.map(()=>0):null;
     bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}</td>`;
@@ -1305,7 +1310,8 @@ function renderRoster(){
       bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${e.code}${hm}</td>`;}
     const off=offCount(s.id),tgt=staffTarget(s);
     const cls=off<tgt?'under':off>tgt?'over':'ok';
-    if(sc){ const tot=cnt.reduce((a,b)=>a+b,0); totals.push(tot);
+    if(sc){ const tot=cnt.reduce((a,b)=>a+b,0); boxRows.push({cnt,tot});
+      if(boxMode){ bodyH+='</tr>'; return; }
       cnt.forEach((n,i)=>{if(!sc[i].blank)bodyH+=`<td class="sumcell sn num" style="${scR(i)}">${n||''}</td>`;});
       if(!nTot) bodyH+='</tr>';
       else bodyH+=`<td class="sumcell sn sn-total num${tot<nd?' short':' full'}" style="right:0" title="${tot<nd?`月の日数（${nd}日）に${nd-tot}日足りません`:'月の日数と一致'}">${tot}</td></tr>`;
@@ -1329,10 +1335,13 @@ function renderRoster(){
   T.innerHTML=`<colgroup>${cols}</colgroup>`+head+bodyH+foot;
   // 合計の別枠（月の日数に達していなければ赤字）。表の各行と高さをそろえる
   const rt=$("#rtotal");
-  if(sc&&SUMTOTAL_BOX[FSCOPE]){
+  if(boxMode){
     rt.hidden=false;
-    rt.innerHTML=`<table class="rtot"><thead><tr><th title="月の日数（${nd}日）と一致すれば正常">合計<div class="rt-sub">月${nd}日</div></th></tr></thead><tbody>`+
-      totals.map(t=>`<tr><td class="num ${t<nd?'short':'full'}" title="${t<nd?`月の日数（${nd}日）に${nd-t}日足りません`:'月の日数と一致'}">${t}</td></tr>`).join("")+`</tbody></table>`;
+    const cs=sc.map((c,i)=>({c,i})).filter(x=>!x.c.blank);
+    rt.innerHTML=`<table class="rtot"><thead><tr>`+cs.map(x=>`<th>${x.c.label}</th>`).join("")+
+      `<th class="rt-total" title="月の日数（${nd}日）と一致すれば正常">合計<div class="rt-sub">月${nd}日</div></th></tr></thead><tbody>`+
+      boxRows.map(r=>`<tr>`+cs.map(x=>`<td class="num">${r.cnt[x.i]||''}</td>`).join("")+
+        `<td class="num rt-total ${r.tot<nd?'short':'full'}" title="${r.tot<nd?`月の日数（${nd}日）に${nd-r.tot}日足りません`:'月の日数と一致'}">${r.tot}</td></tr>`).join("")+`</tbody></table>`;
     const mr=[...T.querySelectorAll('thead tr, tbody tr')], sr=[...rt.querySelectorAll('thead tr, tbody tr')];
     mr.forEach((r,i)=>{if(sr[i])sr[i].style.height=r.getBoundingClientRect().height+'px';});
   } else { rt.hidden=true; rt.innerHTML=""; }
