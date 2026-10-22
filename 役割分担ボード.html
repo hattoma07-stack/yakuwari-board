@@ -835,7 +835,9 @@ const hasDriveJob=()=>jobsOf().some(j=>j.drive);
 // 勤務表の右側に出す「記号ごとの日数」の列（指定した部署のみ）。合計が月の日数と一致するか確認できる
 const SUMCOLS_BY_DEPT={home:[
   {label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"夜",codes:["夜"]},
-  {label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]};
+  {label:"休",codes:["公","希"],blank:true},{label:"有",codes:["有"],blank:true}]};
+// 合計の列は値を出さない（月の日数との照合・赤字表示は行わない）
+const SUMTOTAL_BLANK={home:true};
 const sumColsOf=()=>SUMCOLS_BY_DEPT[FSCOPE]||null;
 // 勤務表の下に出す「日ごとの記号別スタッフ数」の行（指定した部署のみ）
 const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"]};
@@ -1289,8 +1291,10 @@ function renderRoster(){
     const off=offCount(s.id),tgt=staffTarget(s);
     const cls=off<tgt?'under':off>tgt?'over':'ok';
     if(sc){ const tot=cnt.reduce((a,b)=>a+b,0);
-      cnt.forEach((n,i)=>{bodyH+=`<td class="sumcell sn num" style="${scR(i)}">${n||''}</td>`;});
-      bodyH+=`<td class="sumcell sn sn-total num${tot<nd?' short':' full'}" style="right:0" title="${tot<nd?`月の日数（${nd}日）に${nd-tot}日足りません`:'月の日数と一致'}">${tot}</td></tr>`; return; }
+      cnt.forEach((n,i)=>{bodyH+=`<td class="sumcell sn num" style="${scR(i)}">${sc[i].blank?'':(n||'')}</td>`;});
+      if(SUMTOTAL_BLANK[FSCOPE]) bodyH+=`<td class="sumcell sn sn-total num" style="right:0"></td></tr>`;
+      else bodyH+=`<td class="sumcell sn sn-total num${tot<nd?' short':' full'}" style="right:0" title="${tot<nd?`月の日数（${nd}日）に${nd-tot}日足りません`:'月の日数と一致'}">${tot}</td></tr>`;
+      return; }
     bodyH+=`<td class="sumcell s-work num">${fmtN(work)}</td><td class="sumcell s-off num ${cls}"><span class="cnt">${fmtN(off)}</span>/${tgt}</td></tr>`;
   });
   bodyH+='</tbody>';
