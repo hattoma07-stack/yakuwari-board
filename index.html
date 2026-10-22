@@ -837,6 +837,8 @@ const SUMCOLS_BY_DEPT={home:[
   {label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"夜",codes:["夜"]},
   {label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]};
 const sumColsOf=()=>SUMCOLS_BY_DEPT[FSCOPE]||null;
+// 勤務表の下に出す「日ごとの記号別スタッフ数」の行（指定した部署のみ）
+const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"]};
 // 送迎職員は「職種」ではなく、台帳の「送迎が可能」チェックで数える（兼任できる）。他の職種は職種の選択で数える
 const inJob=(j,s)=>j.drive?!!s.canDrive:s.job===j.id;
 const DEF_ROLES=[
@@ -1293,9 +1295,9 @@ function renderRoster(){
   });
   bodyH+='</tbody>';
   const minS=Number(S.minStaff)||0;
-  const footRow=(label,min,pred,note)=>{
+  const footRow=(label,min,pred,note,code)=>{
     let r=`<tr><td class="rname">${label}${note&&min?`<span style="font-weight:400;color:var(--ink-soft)">（最低${min}）</span>`:''}</td>`;
-    for(let d=1;d<=nd;d++){let n=0;S.staff.forEach(s=>{if(pred(s))n+=eff(s.id,d).w;});
+    for(let d=1;d<=nd;d++){let n=0;S.staff.forEach(s=>{if(pred(s)){const e=eff(s.id,d);n+=code?(e.code===code?1:0):e.w;}});
       const low=min&&used&&!isSetOff(d)&&n<min;
       r+=`<td class="${clsFor(d)} num${low?' low':''}">${n?fmtN(n):''}</td>`;}
     return r+(sc?'<td class="sumcol sn"></td>'.repeat(sc.length+1):'<td class="sumcol s-work"></td><td class="sumcol s-off"></td>')+'</tr>';
@@ -1303,6 +1305,7 @@ function renderRoster(){
   const jobsRows=jobsOf();
   let foot='<tfoot>'+(jobsRows.length?'':footRow('出勤数',minS,()=>true,true));
   jobsRows.forEach(j=>{foot+=footRow(escapeHtml(j.short),Number(S.req[j.id])||0,s=>inJob(j,s),false);});
+  (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st?escapeHtml(st.label.replace(c,'')):''),0,()=>true,false,c);});
   foot+='</tfoot>';
   T.innerHTML=`<colgroup>${cols}</colgroup>`+head+bodyH+foot;
   $$("td.rc",T).forEach(td=>{td.onclick=()=>{
