@@ -237,6 +237,7 @@
   table.roster td.sumcell.s-off.ok{color:var(--accent-ink)}
   table.roster td.sumcell.s-off.over{color:var(--warn)}
   table.roster td.rc{cursor:pointer;height:34px;font-weight:700;font-size:14px}
+  table.roster td.rc .hm{display:block;font-size:8px;line-height:1;margin-top:1px}
   table.roster td.rc:hover{outline:2px solid var(--accent);outline-offset:-2px}
   table.roster col.sat,table.roster td.sat{background:var(--sat)}
   table.roster col.sun,table.roster td.sun{background:var(--sun)}
@@ -532,7 +533,7 @@
       <table class="roster" id="rosterTable"></table>
     </div>
     <div class="rlegend" id="rlegend"></div>
-    <p class="hint no-print">希望休を塗る →「休日数に合わせて自動作成」で、なるべく週2日休みになるよう不足分の公休を配置し残りを出勤に。右端の「休/目標」で過不足を確認できます。</p>
+    <p class="hint no-print">希望休を塗る →「休日数に合わせて自動作成」で、なるべく週2日休みになるよう不足分の公休を配置し残りを出勤に。右端の「休/目標」で過不足を確認できます。半日の記号（半休・半有）は、マスをタップするたびに「前（AM）→後（PM）→消す」と切り替わり、0.5日分として数えます。</p>
   </div>
 
   <!-- ============ SETTINGS VIEW ============ -->
@@ -760,7 +761,7 @@ const K={
   get types(){return `yakuwari:${FSCOPE}:types`}, get meta(){return `yakuwari:${FSCOPE}:meta`},
   get tpl(){return `yakuwari:${FSCOPE}:templates`}, get roles(){return `yakuwari:${FSCOPE}:roles`},
   get day(){return `yakuwari:${FSCOPE}:day:`}, get roster(){return `yakuwari:${FSCOPE}:roster:`},
-  get rmeta(){return `yakuwari:${FSCOPE}:rmeta:`}, get rauto(){return `yakuwari:${FSCOPE}:rauto:`},
+  get rmeta(){return `yakuwari:${FSCOPE}:rmeta:`}, get rauto(){return `yakuwari:${FSCOPE}:rauto:`}, get rhalf(){return `yakuwari:${FSCOPE}:rhalf:`},
   get statusEnabled(){return `yakuwari:${FSCOPE}:statusEnabled`}, // 勤務記号は共有だが「この部署で使うか」は部署ごと
   theme:"yakuwari:theme" // 表示テーマも施設共通
 };
@@ -842,7 +843,7 @@ const DEF_STATUS=[
   {code:"早",label:"早番",color:"#4A7FB5",work:true},
   {code:"遅",label:"遅番",color:"#C9722E",work:true},
   {code:"夜",label:"夜勤",color:"#4C4C8E",work:true},
-  {code:"半",label:"半休",color:"#C9A227",work:true},
+  {code:"半",label:"半休",color:"#C9A227",work:true,half:true},
   {code:"研",label:"研修",color:"#8E6FB0",work:true},
   {code:"公",label:"公休",color:"#9AA3A0",work:false},
   {code:"有",label:"有休",color:"#4A9E8F",work:false},
@@ -968,7 +969,7 @@ document.addEventListener('visibilitychange',()=>{
 const S={
   tab:"board", date:todayISO(), ym:todayISO().slice(0,7),
   staff:[], status:[], times:[], tasks:[], types:[], roles:[], minStaff:3, req:{},
-  day:{selected:[],assign:{}}, roster:{}, rauto:{}, rmeta:{offDows:[],offDates:[]}
+  day:{selected:[],assign:{}}, roster:{}, rauto:{}, rhalf:{}, rmeta:{offDows:[],offDates:[]}
 };
 function todayISO(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
 function daysInMonth(ym){const[y,m]=ym.split("-").map(Number);return new Date(y,m,0).getDate();}
@@ -984,6 +985,7 @@ function loadMasters(){
   S.req=jget(K.meta,{}).req||JSON.parse(JSON.stringify(DEF_REQ[FSCOPE]||{}));
   let seeded=jget(K.meta,{}).seeded;
   if(!S.status) S.status=JSON.parse(JSON.stringify(DEF_STATUS));
+  S.status.forEach(st=>{if(st.half===undefined)st.half=/^半/.test(st.label||st.code||"");}); // 「半休」「半有」など半日扱いの記号
   if(!S.statusEnabled) S.statusEnabled=(DEF_STATUS_ENABLED[FSCOPE]||S.status.map(s=>s.code)).slice();
   if(!S.times) S.times=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_TIMES_HOME:DEF_TIMES));
   if(!S.tasks) S.tasks=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_TASKS_HOME:DEF_TASKS));
@@ -1027,18 +1029,21 @@ function effOf(md,ym,sid,day,used){
   const cs=closedStatus();
   if(code){
     const st=statusByCode(code);
-    if(off&&auto&&st&&st.work) return {code:cs.code,color:cs.color,work:false,rest:true,auto:true};
+    if(off&&auto&&st&&st.work) return {code:cs.code,color:cs.color,work:false,rest:true,w:0,r:1,auto:true};
     const w=st?st.work:true;
-    return {code,color:st?st.color:'',work:w,rest:st?!st.work:false,auto};
+    // w/r = 出勤・休みを何日分として数えるか（半日の記号は 0.5 日ずつ）
+    const wf=st?(st.half?0.5:(st.work?1:0)):1, rf=st?(st.half?0.5:(st.work?0:1)):0;
+    return {code,color:st?st.color:'',work:w,rest:st?!st.work:false,w:wf,r:rf,auto};
   }
-  if(off) return {code:cs.code,color:cs.color,work:false,rest:true,auto:true};
-  return {code:'',color:'',work:used,rest:false,auto:false};
+  if(off) return {code:cs.code,color:cs.color,work:false,rest:true,w:0,r:1,auto:true};
+  return {code:'',color:'',work:used,rest:false,w:used?1:0,r:0,auto:false};
 }
 const memMd=()=>({r:S.roster,ra:S.rauto,rm:S.rmeta});
+const fmtN=n=>Number.isInteger(n)?String(n):n.toFixed(1);
 // その月の各スタッフの「休み日数」
 function offCount(sid){
   const nd=daysInMonth(S.ym),md=memMd(),used=rmonthUsed();let n=0;
-  for(let d=1;d<=nd;d++){ if(effOf(md,S.ym,sid,d,used).rest)n++; }
+  for(let d=1;d<=nd;d++){ n+=effOf(md,S.ym,sid,d,used).r; }
   return n;
 }
 const saveMeta=()=>jset(K.meta,{...jget(K.meta,{}),minStaff:S.minStaff,req:S.req});
@@ -1102,8 +1107,8 @@ function computeWorking(date){
 function selectedStaff(){return S.staff.filter(s=>S.day.selected.includes(s.id));}
 
 /* ---------- roster ---------- */
-function loadRoster(ym){S.ym=ym;S.roster=jget(K.roster+ym,{});S.rauto=jget(K.rauto+ym,{});S.rmeta=jget(K.rmeta+ym,{offDows:[],offDates:[]});}
-function saveRoster(){jset(K.roster+S.ym,S.roster);jset(K.rauto+S.ym,S.rauto);}
+function loadRoster(ym){S.ym=ym;S.roster=jget(K.roster+ym,{});S.rauto=jget(K.rauto+ym,{});S.rhalf=jget(K.rhalf+ym,{});S.rmeta=jget(K.rmeta+ym,{offDows:[],offDates:[]});}
+function saveRoster(){jset(K.roster+S.ym,S.roster);jset(K.rauto+S.ym,S.rauto);jset(K.rhalf+S.ym,S.rhalf);}
 function saveRmeta(){jset(K.rmeta+S.ym,S.rmeta);}
 function isAuto(sid,day){return !!(S.rauto[sid]||{})[day];}
 function setAuto(sid,day,on){if(!S.rauto[sid])S.rauto[sid]={};if(on)S.rauto[sid][day]=1;else delete S.rauto[sid][day];}
@@ -1262,19 +1267,20 @@ function renderRoster(){
   S.staff.forEach(s=>{
     let work=0;
     bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}</td>`;
-    for(let d=1;d<=nd;d++){const e=eff(s.id,d);if(e.work)work++;
-      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${e.code}</td>`;}
+    for(let d=1;d<=nd;d++){const e=eff(s.id,d);work+=e.w;
+      const hs=e.code&&statusByCode(e.code),hv=(S.rhalf[s.id]||{})[d],hm=(hs&&hs.half&&hv)?`<span class="hm">${hv==='pm'?'後':'前'}</span>`:'';
+      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${e.code}${hm}</td>`;}
     const off=offCount(s.id),tgt=staffTarget(s);
     const cls=off<tgt?'under':off>tgt?'over':'ok';
-    bodyH+=`<td class="sumcell s-work num">${work}</td><td class="sumcell s-off num ${cls}"><span class="cnt">${off}</span>/${tgt}</td></tr>`;
+    bodyH+=`<td class="sumcell s-work num">${fmtN(work)}</td><td class="sumcell s-off num ${cls}"><span class="cnt">${fmtN(off)}</span>/${tgt}</td></tr>`;
   });
   bodyH+='</tbody>';
   const minS=Number(S.minStaff)||0;
   const footRow=(label,min,pred,note)=>{
     let r=`<tr><td class="rname">${label}${note&&min?`<span style="font-weight:400;color:var(--ink-soft)">（最低${min}）</span>`:''}</td>`;
-    for(let d=1;d<=nd;d++){let n=0;S.staff.forEach(s=>{if(pred(s)&&eff(s.id,d).work)n++;});
+    for(let d=1;d<=nd;d++){let n=0;S.staff.forEach(s=>{if(pred(s))n+=eff(s.id,d).w;});
       const low=min&&used&&!isSetOff(d)&&n<min;
-      r+=`<td class="${clsFor(d)} num${low?' low':''}">${n||''}</td>`;}
+      r+=`<td class="${clsFor(d)} num${low?' low':''}">${n?fmtN(n):''}</td>`;}
     return r+'<td class="sumcol s-work"></td><td class="sumcol s-off"></td></tr>';
   };
   const jobsRows=jobsOf();
@@ -1284,7 +1290,17 @@ function renderRoster(){
   T.innerHTML=`<colgroup>${cols}</colgroup>`+head+bodyH+foot;
   $$("td.rc",T).forEach(td=>{td.onclick=()=>{
     const sid=td.dataset.sid,day=+td.dataset.day;if(!S.roster[sid])S.roster[sid]={};
-    if(brush===""||S.roster[sid][day]===brush)delete S.roster[sid][day];else S.roster[sid][day]=brush;
+    if(!S.rhalf[sid])S.rhalf[sid]={};
+    const bst=brush&&statusByCode(brush);
+    if(bst&&bst.half){ // 半日の記号：タップするたびに 前(AM)→後(PM)→消す
+      if(S.roster[sid][day]===brush){
+        if(S.rhalf[sid][day]==="pm"){delete S.roster[sid][day];delete S.rhalf[sid][day];}
+        else S.rhalf[sid][day]="pm";
+      } else {S.roster[sid][day]=brush;S.rhalf[sid][day]="am";}
+    } else {
+      if(brush===""||S.roster[sid][day]===brush)delete S.roster[sid][day];else S.roster[sid][day]=brush;
+      delete S.rhalf[sid][day];
+    }
     setAuto(sid,day,false); // 手入力は自動印を外す（自動作成の作り直し対象外に）
     saveRoster();renderRoster();
   };});
@@ -1296,7 +1312,7 @@ function renderRLegend(){
   Object.values(S.roster||{}).forEach(rr=>Object.values(rr).forEach(c=>c&&usedCodes.add(c)));
   const list=S.status.filter(st=>isStatusEnabled(st.code)||usedCodes.has(st.code));
   list.forEach(st=>{const e=document.createElement('span');e.className="rl";
-    e.innerHTML=`<span class="chip" style="background:${st.color}">${st.code}</span>${st.label}${st.work?'<span style="color:var(--ink-faint);font-size:11px">(出勤)</span>':''}`;
+    e.innerHTML=`<span class="chip" style="background:${st.color}">${st.code}</span>${st.label}${st.half?'<span style="color:var(--ink-faint);font-size:11px">(0.5日)</span>':st.work?'<span style="color:var(--ink-faint);font-size:11px">(出勤)</span>':''}`;
     l.appendChild(e);});
 }
 function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -1426,6 +1442,7 @@ function renderStatusList(){
     const on=isStatusEnabled(st.code);
     row.innerHTML=`<input type="color" value="${st.color}"><input type="text" class="code" maxlength="2" value=""><input type="text" value="">
       <label class="wk"><input type="checkbox" class="wk-in" ${st.work?"checked":""}>出勤</label>
+      <label class="wk"><input type="checkbox" class="half-in" ${st.half?"checked":""}>半日(0.5)</label>
       <label class="wk use-in-dept"><input type="checkbox" class="use-in" ${on?"checked":""}>${escapeHtml(FACILITY_NAME[FSCOPE])}で使う</label>
       <button class="del" title="削除">🗑</button>`;
     row.children[1].value=st.code;row.children[2].value=st.label;
@@ -1433,6 +1450,7 @@ function renderStatusList(){
     row.children[1].oninput=e=>{st.code=e.target.value;jset(K.status,S.status);renderRoster();};
     row.children[2].oninput=e=>{st.label=e.target.value;jset(K.status,S.status);renderRoster();};
     row.querySelector('.wk-in').onchange=e=>{st.work=e.target.checked;jset(K.status,S.status);renderRoster();};
+    row.querySelector('.half-in').onchange=e=>{st.half=e.target.checked;jset(K.status,S.status);renderRoster();};
     row.querySelector('.use-in').onchange=e=>{
       S.statusEnabled=(S.statusEnabled||[]).filter(c=>c!==st.code);
       if(e.target.checked)S.statusEnabled.push(st.code);
@@ -1442,7 +1460,7 @@ function renderStatusList(){
     w.appendChild(row);});
 }
 $("#addStatus").onclick=()=>{
-  const st={code:"新",label:"新規",color:"#6E8FA6",work:false};
+  const st={code:"新",label:"新規",color:"#6E8FA6",work:false,half:false};
   S.status.push(st);jset(K.status,S.status);
   if(!S.statusEnabled.includes(st.code))S.statusEnabled.push(st.code); // 追加した部署では自動的に使う設定に
   saveStatusEnabled();renderStatusList();renderRoster();
@@ -1654,8 +1672,8 @@ $("#btnSettings").onclick=openSettings;
 // ---- 休日数に合わせて自動作成 ----
 function openAuto(){
   const lines=S.staff.map(s=>{const off=offCount(s.id),tgt=staffTarget(s);const need=tgt-off;
-    const mark=need>0?`あと公休${need}日`:need<0?`目標超過 ${-need}日`:`充足`;
-    return `${s.name}（${typeName(s)}）：現在 休${off}/目標${tgt} → ${mark}`;}).join("<br>");
+    const mark=need>0?`あと公休${fmtN(need)}日`:need<0?`目標超過 ${fmtN(-need)}日`:`充足`;
+    return `${s.name}（${typeName(s)}）：現在 休${fmtN(off)}/目標${tgt} → ${mark}`;}).join("<br>");
   $("#autoSummary").innerHTML=lines;
   openModal("#autoOverlay");
 }
@@ -1673,21 +1691,23 @@ $("#doAuto").onclick=()=>{
   // 2) 事業所休業日の空欄 → 公休（自動印）
   S.staff.forEach(s=>{ if(!S.roster[s.id])S.roster[s.id]={};const rr=S.roster[s.id];
     for(let d=1;d<=nd;d++){ if(!rr[d]&&isSetOff(d)){rr[d]=rcode;setAuto(s.id,d,true);} } });
+  const wOfCode=c=>{ if(!c)return 1; const st=statusByCode(c); return st?(st.half?0.5:(st.work?1:0)):1; }; // 空欄=出勤候補1・半日=0.5
   // 3) 現時点の日別出勤数（空欄＝出勤候補として数える）
   const dayWork={};
   for(let d=1;d<=nd;d++){ let w=0; S.staff.forEach(s=>{const c=S.roster[s.id][d];
-    if(c){const st=statusByCode(c); if(!(st&&!st.work))w++;} else w++;}); dayWork[d]=w; }
+    w+=wOfCode(c);}); dayWork[d]=w; }
   // 職種別の日別出勤数（職種ごとの最低人数を守るため）
   const jobs=jobsOf(), jreq=S.req||{}, dayJ={};
   jobs.forEach(j=>{dayJ[j.id]={}; for(let d=1;d<=nd;d++){let w=0;
     S.staff.forEach(s=>{ if(!inJob(j,s))return; const c=S.roster[s.id][d];
-      if(c){const st=statusByCode(c); if(!(st&&!st.work))w++;} else w++; }); dayJ[j.id][d]=w;}});
+      w+=wOfCode(c); }); dayJ[j.id][d]=w;}});
   // 4) 不足分の公休を配置（最低出勤人数を絶対の下限に、ラウンドロビンで公平＆分散）
   const warn=[];
   const need={};
   S.staff.forEach(s=>{const rr=S.roster[s.id];let off=0;
-    for(let d=1;d<=nd;d++){const c=rr[d];const st=c&&statusByCode(c);if(st&&!st.work)off++;}
-    let n=staffTarget(s)-off; if(n<0){warn.push(s.name+"(希望休が目標超過)");n=0;} need[s.id]=n;});
+    for(let d=1;d<=nd;d++){const c=rr[d];const st=c&&statusByCode(c);if(st)off+=st.half?0.5:(!st.work?1:0);}
+    const raw=staffTarget(s)-off; if(raw<0)warn.push(s.name+"(希望休が目標超過)");
+    need[s.id]=Math.max(0,Math.floor(raw+1e-9));});
   const nearOff=(rr,day)=>{let best=99;for(let d=1;d<=nd;d++){const c=rr[d];const st=c&&statusByCode(c);
     if(st&&!st.work){const dist=Math.abs(d-day);if(dist<best)best=dist;}}return best;};
   // 週休2日に近づけるため、カレンダー週（日〜土）ごとの休み数を数え、まだ休みが少ない週を優先
