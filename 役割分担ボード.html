@@ -247,6 +247,16 @@
   table.roster td.rc.auto{opacity:.5}
   table.roster td.sumcell{font-weight:700;font-size:13px;background:var(--surface-2);color:var(--ink)}
   table.roster td.sumcell.s-work{color:var(--accent-ink)}
+  .rwrap2{display:flex;gap:12px;align-items:flex-start}
+  .rwrap2 .rtable-wrap{flex:1;min-width:0}
+  .rtotal{flex:none;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+  .rtotal[hidden]{display:none}
+  table.rtot{border-collapse:collapse;width:64px}
+  table.rtot th,table.rtot td{border:1px solid var(--line);text-align:center;padding:0}
+  table.rtot th{background:var(--surface-2);font-size:12px;padding:4px 2px;vertical-align:middle}
+  table.rtot .rt-sub{font-size:9.5px;font-weight:700;color:var(--ink-soft)}
+  table.rtot td{font-weight:700;font-size:14px;color:var(--accent-ink)}
+  table.rtot td.short{color:var(--alert);background:var(--alert-soft)}
   table.roster .sn{min-width:40px;width:40px;position:static!important}
   table.roster td.sumcell.sn-total.full{color:var(--accent-ink)}
   table.roster td.sumcell.sn-total.short{color:var(--alert);background:var(--alert-soft)}
@@ -533,8 +543,11 @@
       <div id="brushes"></div>
     </div>
 
-    <div class="rtable-wrap">
-      <table class="roster" id="rosterTable"></table>
+    <div class="rwrap2">
+      <div class="rtable-wrap">
+        <table class="roster" id="rosterTable"></table>
+      </div>
+      <div class="rtotal no-print" id="rtotal" hidden></div>
     </div>
     <div class="rlegend" id="rlegend"></div>
     <p class="hint no-print">希望休を塗る →「休日数に合わせて自動作成」で、なるべく週2日休みになるよう不足分の公休を配置し残りを出勤に。右端の「休/目標」で過不足を確認できます。半日の記号（半休・半有）は、マスをタップするたびに「前（AM）→後（PM）→消す」と切り替わり、0.5日分として数えます。</p>
@@ -837,7 +850,7 @@ const SUMCOLS_BY_DEPT={home:[
   {label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"夜",codes:["夜"]},
   {label:"休",codes:["公","希"],blank:true},{label:"有",codes:["有"],blank:true}]};
 // 合計の列は値を出さない（月の日数との照合・赤字表示は行わない）
-const SUMTOTAL_BLANK={home:true};
+const SUMTOTAL_BOX={home:true}; // 合計は表の外の別枠（右側）に出す
 const sumColsOf=()=>SUMCOLS_BY_DEPT[FSCOPE]||null;
 // 勤務表の下に出す「日ごとの記号別スタッフ数」の行（指定した部署のみ）
 const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"]};
@@ -1274,7 +1287,7 @@ function renderRoster(){
   let cols='<col>';
   for(let d=1;d<=nd;d++)cols+=`<col class="${clsFor(d)}">`;
   const sc=sumColsOf();
-  const nTot=sc&&!SUMTOTAL_BLANK[FSCOPE]?1:0, nShow=sc?sc.filter(c=>!c.blank).length+nTot:2; // 表示する集計列の数（空白指定の列は出さない）
+  const nTot=sc&&!SUMTOTAL_BOX[FSCOPE]?1:0, nShow=sc?sc.filter(c=>!c.blank).length+nTot:2; // 表示する集計列の数（空白指定の列は出さない）
   cols+='<col>'.repeat(nShow);
   let head='<thead><tr><th class="rname">スタッフ</th>';
   for(let d=1;d<=nd;d++){const w=dow(S.ym,d);head+=`<th class="dcol ${clsFor(d)}"><div class="dow">${DOW[w]}</div><div class="dn num">${d}</div>${isSetOff(d)?'<div class="rest">休</div>':''}</th>`;}
@@ -1283,7 +1296,7 @@ function renderRoster(){
     if(nTot)head+=`<th class="sumcol sn sn-total" style="right:0" title="${nd}日（月の日数）と一致すれば正常">合計</th>`;
     head+='</tr></thead>'; }
   else head+='<th class="sumcol s-work">出勤</th><th class="sumcol s-off">休/目標</th></tr></thead>';
-  let bodyH='<tbody>';
+  let bodyH='<tbody>'; const totals=[];
   S.staff.forEach(s=>{
     let work=0; const cnt=sc?sc.map(()=>0):null;
     bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}</td>`;
@@ -1292,7 +1305,7 @@ function renderRoster(){
       bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${e.code}${hm}</td>`;}
     const off=offCount(s.id),tgt=staffTarget(s);
     const cls=off<tgt?'under':off>tgt?'over':'ok';
-    if(sc){ const tot=cnt.reduce((a,b)=>a+b,0);
+    if(sc){ const tot=cnt.reduce((a,b)=>a+b,0); totals.push(tot);
       cnt.forEach((n,i)=>{if(!sc[i].blank)bodyH+=`<td class="sumcell sn num" style="${scR(i)}">${n||''}</td>`;});
       if(!nTot) bodyH+='</tr>';
       else bodyH+=`<td class="sumcell sn sn-total num${tot<nd?' short':' full'}" style="right:0" title="${tot<nd?`月の日数（${nd}日）に${nd-tot}日足りません`:'月の日数と一致'}">${tot}</td></tr>`;
@@ -1314,6 +1327,15 @@ function renderRoster(){
   (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st?escapeHtml(st.label.replace(c,'')):''),0,()=>true,false,c);});
   foot+='</tfoot>';
   T.innerHTML=`<colgroup>${cols}</colgroup>`+head+bodyH+foot;
+  // 合計の別枠（月の日数に達していなければ赤字）。表の各行と高さをそろえる
+  const rt=$("#rtotal");
+  if(sc&&SUMTOTAL_BOX[FSCOPE]){
+    rt.hidden=false;
+    rt.innerHTML=`<table class="rtot"><thead><tr><th title="月の日数（${nd}日）と一致すれば正常">合計<div class="rt-sub">月${nd}日</div></th></tr></thead><tbody>`+
+      totals.map(t=>`<tr><td class="num ${t<nd?'short':'full'}" title="${t<nd?`月の日数（${nd}日）に${nd-t}日足りません`:'月の日数と一致'}">${t}</td></tr>`).join("")+`</tbody></table>`;
+    const mr=[...T.querySelectorAll('thead tr, tbody tr')], sr=[...rt.querySelectorAll('thead tr, tbody tr')];
+    mr.forEach((r,i)=>{if(sr[i])sr[i].style.height=r.getBoundingClientRect().height+'px';});
+  } else { rt.hidden=true; rt.innerHTML=""; }
   $$("td.rc",T).forEach(td=>{td.onclick=()=>{
     const sid=td.dataset.sid,day=+td.dataset.day;if(!S.roster[sid])S.roster[sid]={};
     if(!S.rhalf[sid])S.rhalf[sid]={};
