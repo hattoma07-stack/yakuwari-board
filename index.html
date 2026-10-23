@@ -682,6 +682,11 @@
       <input type="number" id="minStaffIn" min="0" max="99" style="width:80px;font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:8px;padding:7px 9px">
       <span style="font-size:13px;color:var(--ink-soft)">人以上</span>
     </div>
+    <div id="shiftReqBox" hidden>
+      <div class="mlabel" style="margin-top:14px">早番・遅番の人数（1日あたり。自動作成で割り振り、残りの出勤者は日勤にします。0なら日勤のみ）</div>
+      <div class="edit-row"><span style="width:60px;flex:none;font-weight:700;font-size:13px">早番</span><input type="number" id="earlyNIn" min="0" max="20" style="width:72px"><span style="font-size:12px;color:var(--ink-soft)">名</span>
+        <span style="width:60px;flex:none;font-weight:700;font-size:13px;margin-left:12px">遅番</span><input type="number" id="lateNIn" min="0" max="20" style="width:72px"><span style="font-size:12px;color:var(--ink-soft)">名</span></div>
+    </div>
     <div id="nightReqBox" hidden>
       <div class="mlabel" style="margin-top:14px">夜勤の人数（1晩あたり。自動作成で、スタッフ台帳で「夜勤が可能」にした人だけに割り振ります。0なら自動では割り振りません）</div>
       <div class="edit-row"><input type="number" id="nightNIn" min="0" max="20" style="width:72px"><span style="font-size:12px;color:var(--ink-soft)">名</span></div>
@@ -855,6 +860,9 @@ const jobsOf=()=>JOBS_BY_DEPT[FSCOPE]||[];
 const NIGHT_DEPTS=["home","nursing"];
 const DEF_NIGHTN={home:1};
 const nightDeptOn=()=>NIGHT_DEPTS.includes(FSCOPE);
+// 早番・遅番の自動振り分けを行う部署と、1日あたりの既定人数（残りは日勤）
+const DEF_SHIFTN={home:{early:2,late:2}};
+const shiftMixOn=()=>!!DEF_SHIFTN[FSCOPE];
 const hasDriveJob=()=>jobsOf().some(j=>j.drive);
 // 勤務表の右側に出す「記号ごとの日数」の列（指定した部署のみ）。合計が月の日数と一致するか確認できる
 const SUMCOLS_BY_DEPT={home:[
@@ -1005,7 +1013,7 @@ document.addEventListener('visibilitychange',()=>{
 /* ---------- state ---------- */
 const S={
   tab:"board", date:todayISO(), ym:todayISO().slice(0,7),
-  staff:[], status:[], times:[], tasks:[], types:[], roles:[], minStaff:3, req:{}, nightN:0,
+  staff:[], status:[], times:[], tasks:[], types:[], roles:[], minStaff:3, req:{}, nightN:0, shiftN:{},
   day:{selected:[],assign:{}}, roster:{}, rauto:{}, rhalf:{}, rmeta:{offDows:[],offDates:[]}
 };
 function todayISO(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
@@ -1019,6 +1027,7 @@ function loadMasters(){
   S.times=jget(K.times,null); S.tasks=jget(K.tasks,null); S.types=jget(K.types,null); S.roles=jget(K.roles,null);
   S.statusEnabled=jget(K.statusEnabled,null);
   const mn=jget(K.meta,{}).minStaff; S.minStaff=(mn==null?3:mn);
+  S.shiftN=jget(K.meta,{}).shiftN||JSON.parse(JSON.stringify(DEF_SHIFTN[FSCOPE]||{}));
   { const nn=jget(K.meta,{}).nightN; S.nightN=(nn==null?(DEF_NIGHTN[FSCOPE]||0):nn); }
   S.req=jget(K.meta,{}).req||JSON.parse(JSON.stringify(DEF_REQ[FSCOPE]||{}));
   let seeded=jget(K.meta,{}).seeded;
@@ -1088,7 +1097,7 @@ function offCount(sid){
   for(let d=1;d<=nd;d++){ n+=effOf(md,S.ym,sid,d,used).r; }
   return n;
 }
-const saveMeta=()=>jset(K.meta,{...jget(K.meta,{}),minStaff:S.minStaff,req:S.req,nightN:S.nightN});
+const saveMeta=()=>jset(K.meta,{...jget(K.meta,{}),minStaff:S.minStaff,req:S.req,nightN:S.nightN,shiftN:S.shiftN});
 const staffById=id=>S.staff.find(s=>s.id===id);
 const taskById=id=>S.tasks.find(t=>t.id===id);
 const statusByCode=c=>S.status.find(s=>s.code===c);
@@ -1709,6 +1718,10 @@ function openSettings(){
   const jobs=jobsOf();
   $("#jobReqBox").hidden=!jobs.length;
   $("#nightReqBox").hidden=!nightDeptOn();
+  $("#shiftReqBox").hidden=!shiftMixOn();
+  const ein=$("#earlyNIn"), lin=$("#lateNIn"); ein.value=Number((S.shiftN||{}).early)||0; lin.value=Number((S.shiftN||{}).late)||0;
+  ein.oninput=e=>{S.shiftN.early=e.target.value===''?0:Number(e.target.value);saveMeta();};
+  lin.oninput=e=>{S.shiftN.late=e.target.value===''?0:Number(e.target.value);saveMeta();};
   const ni=$("#nightNIn"); ni.value=Number(S.nightN)||0;
   ni.oninput=e=>{S.nightN=e.target.value===''?0:Number(e.target.value);saveMeta();};
   const jl=$("#jobReqList");jl.innerHTML="";
@@ -1846,10 +1859,30 @@ $("#doAuto").onclick=()=>{
   }
   S.staff.forEach(s=>{ if(need[s.id]>0)warn.push(`${s.name}(休${staffTarget(s)-need[s.id]}/目標${staffTarget(s)}日)`);
     const rr=S.roster[s.id]; for(let d=1;d<=nd;d++){ if(!rr[d]){rr[d]=s.nightOnly?rcode:wcode;setAuto(s.id,d,true);} } }); // 残り → 出勤（夜勤のみの人は休み）
+  // 6) 早番・遅番の振り分け（自動で出勤にした日だけ。手入力した記号はそのまま。回数が少ない人から。遅番の翌日の早番は避ける）
+  const shortE=[],shortL=[];
+  if(shiftMixOn()&&S.shiftN&&statusByCode("早")&&statusByCode("遅")&&isStatusEnabled("早")&&isStatusEnabled("遅")){
+    const eN=Number(S.shiftN.early)||0, lN=Number(S.shiftN.late)||0;
+    if(eN||lN){
+      const cnt={}; S.staff.forEach(s=>{cnt[s.id]={"早":0,"遅":0};for(let d=1;d<=nd;d++){const c=S.roster[s.id][d];if(c==="早"||c==="遅")cnt[s.id][c]++;}});
+      for(let d=1;d<=nd;d++){
+        const pool=S.staff.filter(s=>S.roster[s.id][d]===wcode&&(S.rauto[s.id]||{})[d]);
+        const have=c=>S.staff.filter(s=>S.roster[s.id][d]===c).length;
+        const pick=(code,need,other)=>{ while(need>0){
+          if(!pool.length){(code==="早"?shortE:shortL).push(d);return;}
+          let best=-1,bs=Infinity;
+          pool.forEach((s,i)=>{ const prev=S.roster[s.id][d-1];
+            const sc=cnt[s.id][code]*10+cnt[s.id][other]+((code==="早"&&prev==="遅")?100:0)+((code==="遅"&&prev==="早")?0:0);
+            if(sc<bs){bs=sc;best=i;} });
+          const st=pool.splice(best,1)[0]; S.roster[st.id][d]=code; cnt[st.id][code]++; need--; } };
+        pick("早",eN-have("早"),"遅"); pick("遅",lN-have("遅"),"早");
+      } } }
   saveRoster();renderRoster();closeModal('#autoOverlay');
   // 5) 通知（最低人数割れ＝手入力希望休が原因の日／休日数が目標に届かない人）
   const lowDays=[]; for(let d=1;d<=nd;d++){ if(min&&!isSetOff(d)&&dayWork[d]<min)lowDays.push(d); }
   const parts=[];
+  if(shortE.length)parts.push(`早番の人数不足 ${shortE.slice(0,6).join('・')}${shortE.length>6?'…':''}日`);
+  if(shortL.length)parts.push(`遅番の人数不足 ${shortL.slice(0,6).join('・')}${shortL.length>6?'…':''}日`);
   if(noNightStaff)parts.push("夜勤が可能なスタッフが未設定です（スタッフ台帳でチェック）");
   else if(nightShort.length)parts.push(`夜勤の人数不足 ${nightShort.slice(0,6).join('・')}${nightShort.length>6?'…':''}日`);
   if(nightWarn.length)parts.push(`夜勤明けが休みになっていません → ${nightWarn.slice(0,5).join('、')}${nightWarn.length>5?'…':''}`);
