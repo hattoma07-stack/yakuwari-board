@@ -235,7 +235,7 @@
   table.roster td.sumcell.s-off .cnt{font-weight:700;font-size:13px}
   table.roster td.sumcell.s-off.under{color:var(--alert)}
   table.roster td.sumcell.s-off.ok{color:var(--accent-ink)}
-  table.roster td.sumcell.s-off.over{color:var(--warn)}
+  table.roster td.sumcell.s-off.over{color:var(--alert)}
   table.roster td.rc{cursor:pointer;height:34px;font-weight:700;font-size:14px}
   table.roster .rname .wt{font-size:10.5px;font-weight:700;color:var(--ink-soft);line-height:1.2;margin-top:1px;white-space:nowrap}
   table.roster td.rc .wish{color:#C62828}
@@ -261,6 +261,7 @@
   table.rtot .rt-sub{font-size:9.5px;font-weight:700;color:var(--ink-soft)}
   table.rtot td{font-weight:700;font-size:14px;color:var(--ink)}
   table.rtot td.full{color:var(--accent-ink)}
+  table.rtot td.bad{color:var(--alert)}
   table.rtot td.short{color:var(--alert);background:var(--alert-soft)}
   table.roster .sn{min-width:40px;width:40px;position:static!important}
   table.roster td.sumcell.sn-total.full{color:var(--accent-ink)}
@@ -1354,7 +1355,7 @@ function renderRoster(){
       bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${hs&&isWishStatus(hs)?'<span class="wish">公</span>':e.code}${hm}</td>`;}
     const off=offCount(s.id),tgt=staffTarget(s);
     const cls=tgt==null?'ok':off<tgt?'under':off>tgt?'over':'ok';
-    if(sc){ const tot=cnt.reduce((a,b)=>a+b,0); boxRows.push({cnt,tot});
+    if(sc){ const tot=cnt.reduce((a,b)=>a+b,0); boxRows.push({cnt,tot,off,tgt});
       if(boxMode){ bodyH+='</tr>'; return; }
       cnt.forEach((n,i)=>{if(!sc[i].blank)bodyH+=`<td class="sumcell sn num" style="${scR(i)}">${n||''}</td>`;});
       if(!nTot) bodyH+='</tr>';
@@ -1385,7 +1386,8 @@ function renderRoster(){
     const cs=sc.map((c,i)=>({c,i})).filter(x=>!x.c.blank);
     rt.innerHTML=`<table class="rtot"><thead><tr>`+cs.map(x=>`<th>${x.c.label}</th>`).join("")+
       `<th class="rt-total" title="月の日数（${nd}日）と一致すれば正常">合計<div class="rt-sub">月${nd}日</div></th></tr></thead><tbody>`+
-      boxRows.map(r=>`<tr>`+cs.map(x=>`<td class="num">${r.cnt[x.i]||''}</td>`).join("")+
+      boxRows.map(r=>`<tr>`+cs.map(x=>{ const isOff=x.c.label==="休"; const bad=isOff&&r.tgt!=null&&Math.abs(r.off-r.tgt)>1e-9; // 休日数が目標に満たない／超える場合は赤
+        return `<td class="num${bad?' bad':''}"${isOff&&r.tgt!=null?` title="休みの合計 ${fmtN(r.off)}日（目標 ${r.tgt}日）"`:''}>${r.cnt[x.i]||''}</td>`; }).join("")+
         `<td class="num rt-total ${r.tot<nd?'short':'full'}" title="${r.tot<nd?`月の日数（${nd}日）に${nd-r.tot}日足りません`:'月の日数と一致'}">${r.tot}</td></tr>`).join("")+`</tbody></table>`;
     const mr=[...T.querySelectorAll('thead tr, tbody tr')], sr=[...rt.querySelectorAll('thead tr, tbody tr')];
     mr.forEach((r,i)=>{if(sr[i])sr[i].style.height=r.getBoundingClientRect().height+'px';});
