@@ -1056,6 +1056,10 @@ const saveRoles=()=>jset(K.roles,S.roles);
 const roleById=id=>S.roles.find(r=>r.id===id);
 const typeById=id=>S.types.find(t=>t.id===id);
 // 月の休日数の目標＝雇用形態の既定。未設定なら null（目標なし）。個人ごとの設定は廃止
+// 勤務時間は00分か30分のみ選べる（既存の値は近い30分に丸めて表示）
+function snapHalfHour(t){ if(!t)return""; const [h,m]=t.split(":").map(Number); let mm=Math.round(m/30)*30, hh=h; if(mm===60){mm=0;hh=(h+1)%24;} return String(hh).padStart(2,"0")+":"+String(mm).padStart(2,"0"); }
+function halfHourOpts(cur){ const c=snapHalfHour(cur); let o=`<option value=""${c?"":" selected"}>--:--</option>`;
+  for(let h=0;h<24;h++)for(const m of ["00","30"]){const v=String(h).padStart(2,"0")+":"+m; o+=`<option value="${v}"${v===c?" selected":""}>${v}</option>`;} return o; }
 const isPartTimeType=t=>!!(t&&/非常勤/.test(t.name||""));
 function staffTarget(s){ const t=typeById(s.typeId); return (t&&t.off!==null&&t.off!==undefined&&t.off!=="")?Number(t.off):null; }
 function typeName(s){const t=typeById(s.typeId);return t?t.name:"";}
@@ -1429,7 +1433,7 @@ function renderStaffList(){
       </div>
       ${isPartTimeType(typeById(s.typeId))?`<div class="line2">
         <div class="fl"><span>勤務時間（非常勤）</span>
-          <div style="display:flex;align-items:center;gap:6px"><input type="time" class="wt-s" value="${(s.workTime||{}).s||''}"><span>–</span><input type="time" class="wt-e" value="${(s.workTime||{}).e||''}"></div></div>
+          <div style="display:flex;align-items:center;gap:6px"><select class="wt-s">${halfHourOpts((s.workTime||{}).s)}</select><span>–</span><select class="wt-e">${halfHourOpts((s.workTime||{}).e)}</select></div></div>
       </div>`:""}
       <div class="line2">
         <div class="fl" style="flex:1"><span>勤務時間帯（ドライバー等）</span><div class="seg hseg">${hbtns}</div></div>
