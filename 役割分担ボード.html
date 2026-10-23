@@ -846,7 +846,7 @@ const DEF_TIMES_HOME=[ // 訪問介護は24時間体制のため終日カバー
   {id:uid(),time:"12:00",phase:"昼の訪問"},{id:uid(),time:"14:00",phase:"午後の訪問"},
   {id:uid(),time:"16:00",phase:"夕方の訪問"},{id:uid(),time:"18:00",phase:"夜の訪問"},
   {id:uid(),time:"20:00",phase:"夜間巡回"},{id:uid(),time:"22:00",phase:"夜間巡回"}];
-const DEF_TYPES=[{id:"ty_sey",name:"正職員",off:9},{id:"ty_part",name:"パート",off:null}];
+const DEF_TYPES=[{id:"ty_sey",name:"正職員",off:9},{id:"ty_part",name:"非常勤",off:null,migNoOff:true,migName:true}];
 // 職種別の最低出勤人数を管理する部署（それ以外の部署は従来どおり合計人数のみ）
 const JOBS_BY_DEPT={day:[
   {id:"care",name:"介護職員",short:"介護職員"},
@@ -1038,7 +1038,8 @@ function loadMasters(){
   if(!S.times) S.times=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_TIMES_HOME:DEF_TIMES));
   if(!S.tasks) S.tasks=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_TASKS_HOME:DEF_TASKS));
   if(!S.types) S.types=JSON.parse(JSON.stringify(DEF_TYPES));
-  S.types.forEach(t=>{ if(!t.migNoOff){ if(t.name==="パート"&&t.off===10)t.off=null; t.migNoOff=true; } }); // パートの休日数の既定は廃止（一度だけ移行）
+  S.types.forEach(t=>{ if(!t.migNoOff){ if(t.name==="パート"&&t.off===10)t.off=null; t.migNoOff=true; } // パートの休日数の既定は廃止（一度だけ移行）
+    if(!t.migName){ if(t.name==="パート")t.name="非常勤"; t.migName=true; } }); // 「パート」→「非常勤」（一度だけ移行）
   if(!S.roles) S.roles=JSON.parse(JSON.stringify(DEF_ROLES));
   if(!S.staff){
     S.staff=["佐藤","鈴木","高橋","田中","渡辺"].map((n,i)=>({id:uid(),name:n,color:STAFF_COLORS[i],typeId:S.types[0].id,off:null}));
