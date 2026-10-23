@@ -283,9 +283,6 @@
   table.roster tfoot td.low{background:var(--alert-soft);color:var(--alert);font-size:13px}
   table.roster tfoot .rname{color:var(--ink-soft)}
 
-  .rlegend{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px;font-size:12px;color:var(--ink-soft);align-items:center}
-  .rlegend .rl{display:inline-flex;align-items:center;gap:6px}
-  .rlegend .rl .chip{width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff}
 
   /* ---------- Modal ---------- */
   .overlay{position:fixed;inset:0;background:rgba(20,26,24,.45);backdrop-filter:blur(2px);display:none;place-items:center;z-index:50;padding:16px}
@@ -575,7 +572,6 @@
       </div>
       <div class="rtotal no-print" id="rtotal" hidden></div>
     </div>
-    <div class="rlegend" id="rlegend"></div>
     <p class="hint no-print">希望休を塗る →「休日数に合わせて自動作成」で、なるべく週2日休みになるよう不足分の公休を配置し残りを出勤に。右端の「休/目標」で過不足を確認できます。非常勤の勤務時間をその日だけ変える場合は、「時間変更」を選んでマスをタップして時間を入力します。半日の記号（半休・半有）は、マスをタップするたびに「前（AM）→後（PM）→消す」と切り替わり、0.5日分として数えます。</p>
   </div>
 
@@ -1482,17 +1478,7 @@ function renderRoster(){
     setAuto(sid,day,false); // 手入力は自動印を外す（自動作成の作り直し対象外に）
     saveRoster();renderRoster();
   };});
-  renderRLegend();
   if($("#brushes"))renderBrushes();
-}
-function renderRLegend(){
-  const l=$("#rlegend");l.innerHTML='<span style="font-weight:700;color:var(--ink-soft)">記号：</span>';
-  const usedCodes=new Set();
-  Object.values(S.roster||{}).forEach(rr=>Object.values(rr).forEach(c=>c&&usedCodes.add(c)));
-  const list=S.status.filter(st=>isStatusEnabled(st.code)||usedCodes.has(st.code));
-  list.forEach(st=>{const e=document.createElement('span');e.className="rl";
-    e.innerHTML=`<span class="chip" style="background:${isWishStatus(st)?WISH_RED:st.color}">${isWishStatus(st)?"公":st.code}</span>${st.label}${st.half?'<span style="color:var(--ink-faint);font-size:11px">(0.5日)</span>':st.work?'<span style="color:var(--ink-faint);font-size:11px">(出勤)</span>':''}`;
-    l.appendChild(e);});
 }
 function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
