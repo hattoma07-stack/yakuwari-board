@@ -456,6 +456,7 @@
       <button class="gate-role" data-role="nursing"><span class="gr-ico">🩺</span><span class="gr-lbl">看護</span><span class="gr-sub">勤務表の作成</span></button>
       <button class="gate-role" data-role="kitchen"><span class="gr-ico">🍳</span><span class="gr-lbl">栄養士・厨房</span><span class="gr-sub">勤務表の作成</span></button>
       <button class="gate-role" data-role="rehab"><span class="gr-ico">🦵</span><span class="gr-lbl">リハビリ</span><span class="gr-sub">勤務表の作成</span></button>
+      <button class="gate-role" data-role="kyotaku"><span class="gr-ico">🏠</span><span class="gr-lbl">居宅支援事業所</span><span class="gr-sub">勤務表の作成</span></button>
     </div>
     <div class="gate-pass" id="gatePass" hidden>
       <p class="gate-pass-label" id="gatePassLabel"></p>
@@ -640,7 +641,7 @@
           <div class="sc-icon">🔑</div>
           <div class="sc-body">
             <h3>パスコードの変更</h3>
-            <p>管理者・デイサービス・訪問介護、各区分のログイン用パスコードを変更します。</p>
+            <p>管理者と各部署（デイサービス・訪問介護・事務・看護・栄養士厨房・リハビリ・居宅支援事業所）のログイン用パスコードを変更します。</p>
           </div>
           <button class="btn" id="stgPass">編集する</button>
         </div>
@@ -824,9 +825,9 @@ const K={
   get statusEnabled(){return `yakuwari:${FSCOPE}:statusEnabled`}, // 勤務記号は共有だが「この部署で使うか」は部署ごと
   theme:"yakuwari:theme" // 表示テーマも施設共通
 };
-const FACILITY_NAME={day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ"};
+const FACILITY_NAME={day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ",kyotaku:"居宅支援事業所"};
 const BOARD_FACILITIES=["day","home"]; // 役割分担ボードを使う部署（それ以外は勤務表のみ）
-const ALL_FACILITIES=["day","home","office","nursing","kitchen","rehab"];
+const ALL_FACILITIES=["day","home","office","nursing","kitchen","rehab","kyotaku"];
 
 /* ---------- defaults ---------- */
 const STAFF_COLORS=["#3E7CB1","#C7803E","#5B9E7A","#8E6FB0","#C25E6E","#C9A227","#6E8FA6","#4C8C8C","#B2632F","#7C9A46"];
@@ -901,13 +902,13 @@ const SUMCOLS_HOME=[
 const SUMCOLS_OFFICE=[{label:"出",codes:["出"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 事務：早番・遅番・夜勤なし
 const SUMCOLS_DAY=[{label:"出",codes:["出","半","研"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // デイサービス：半休・研修は出に含める
 const SUMCOLS_KITCHEN=[{label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 栄養士・厨房：夜勤なし
-const SUMCOLS_BY_DEPT={home:SUMCOLS_HOME,nursing:SUMCOLS_HOME,office:SUMCOLS_OFFICE,day:SUMCOLS_DAY,rehab:SUMCOLS_DAY,kitchen:SUMCOLS_KITCHEN};
+const SUMCOLS_BY_DEPT={home:SUMCOLS_HOME,nursing:SUMCOLS_HOME,office:SUMCOLS_OFFICE,day:SUMCOLS_DAY,rehab:SUMCOLS_DAY,kitchen:SUMCOLS_KITCHEN,kyotaku:SUMCOLS_OFFICE};
 // 合計の列は値を出さない（月の日数との照合・赤字表示は行わない）
-const SUMTOTAL_BOX={home:true,nursing:true,office:true,day:true,rehab:true,kitchen:true}; // 合計は表の外の別枠（右側）に出す
+const SUMTOTAL_BOX={home:true,nursing:true,office:true,day:true,rehab:true,kitchen:true,kyotaku:true}; // 合計は表の外の別枠（右側）に出す
 const sumColsOf=()=>SUMCOLS_BY_DEPT[FSCOPE]||null;
 // 勤務表の下に出す「日ごとの記号別スタッフ数」の行（指定した部署のみ）
-const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"],nursing:["早","日","遅","夜"],office:["出"],rehab:["出"],kitchen:["早","日","遅"]};
-const SHIFTROWS_MIN={office:true,rehab:true}; // この部署は記号別の行に「1日の最低出勤人数」の不足（赤）も出す
+const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"],nursing:["早","日","遅","夜"],office:["出"],rehab:["出"],kitchen:["早","日","遅"],kyotaku:["出"]};
+const SHIFTROWS_MIN={office:true,rehab:true,kyotaku:true}; // この部署は記号別の行に「1日の最低出勤人数」の不足（赤）も出す
 // 送迎職員は「職種」ではなく、台帳の「送迎が可能」チェックで数える（兼任できる）。他の職種は職種の選択で数える
 const inJob=(j,s)=>j.drive?!!s.canDrive:s.job===j.id;
 const DEF_ROLES=[
@@ -936,7 +937,8 @@ const DEF_STATUS_ENABLED={
   office:["出","公","有","希","欠"],
   nursing:["日","早","遅","夜","公","有","希","欠"],
   kitchen:["日","早","遅","公","有","希","欠"],
-  rehab:["出","半","研","公","有","希","欠"]
+  rehab:["出","半","研","公","有","希","欠"],
+  kyotaku:["出","公","有","希","欠"]
 };
 
 /* ---------- storage（ローカル保存＋Googleスプレッドシート同期） ---------- */
@@ -2062,8 +2064,8 @@ $("#btnTheme").onclick=$("#btnTheme2").onclick=toggleTheme;
 
 /* ================= ログイン（管理者／デイサービス／訪問介護） ================= */
 const GK={pass:"yakuwari:gate:passcodes"};
-const DEF_PASS={admin:"1234",day:"0000",home:"1111",office:"2222",nursing:"3333",kitchen:"4444",rehab:"5555"};
-const ROLE_LABEL={admin:"管理者",day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ"};
+const DEF_PASS={admin:"1234",day:"0000",home:"1111",office:"2222",nursing:"3333",kitchen:"4444",rehab:"5555",kyotaku:"6666"};
+const ROLE_LABEL={admin:"管理者",day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ",kyotaku:"居宅支援事業所"};
 function loadPasscodes(){const saved=jget(GK.pass,null); return {...DEF_PASS,...(saved||{})};} // 新しい部署が増えても既定値で補完
 function savePasscodes(p){jset(GK.pass,p);}
 let ROLE=null, pendingRole=null;
@@ -2137,7 +2139,7 @@ async function attemptLogin(){
 $("#gateEnter").onclick=attemptLogin;
 $("#gatePassInput").addEventListener('keydown',e=>{if(e.key==="Enter")attemptLogin();});
 
-const FACILITY_ICON={day:"📋",home:"🚶",office:"🗂️",nursing:"🩺",kitchen:"🍳",rehab:"🦵"};
+const FACILITY_ICON={day:"📋",home:"🚶",office:"🗂️",nursing:"🩺",kitchen:"🍳",rehab:"🦵",kyotaku:"🏠"};
 function updateFacilityUI(){
   const isAdmin=ROLE==="admin";
   $("#facSwitch").hidden=!isAdmin;
