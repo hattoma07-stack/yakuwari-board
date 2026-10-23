@@ -49,7 +49,7 @@
   button{font-family:inherit}
   .num{font-variant-numeric:tabular-nums}
 
-  .app{max-width:1440px;margin:0 auto;padding:16px 18px 90px}
+  .app{max-width:2200px;margin:0 auto;padding:16px 14px 90px}
 
   /* ---------- Login gate ---------- */
   .gate{position:fixed;inset:0;background:var(--ground);display:flex;align-items:center;justify-content:center;
@@ -111,6 +111,16 @@
   .sidebar .brand .mark{width:36px;height:36px;font-size:19px}
   .sidebar .brand h1{font-size:15px}
   .side-spacer{flex:1}
+  .side-toggle{align-self:flex-end;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-soft);border-radius:8px;
+    width:30px;height:26px;cursor:pointer;font-weight:700;line-height:1;margin:-6px -2px -6px 0}
+  .side-toggle:hover{border-color:var(--accent);color:var(--accent-ink)}
+  /* メニューを縮小（アイコンのみ）して、勤務表を広く使う */
+  .sidebar.collapsed{width:58px;padding:12px 8px;gap:12px}
+  .sidebar.collapsed .side-toggle{align-self:center;margin:0}
+  .sidebar.collapsed .brand h1,.sidebar.collapsed .side-session,.sidebar.collapsed .side-spacer{display:none}
+  .sidebar.collapsed .brand{justify-content:center}
+  .sidebar.collapsed .tab{font-size:0;justify-content:center;padding:10px 0;gap:0}
+  .sidebar.collapsed .tab span{font-size:18px}
   .side-session{display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid var(--line)}
   .side-session .btn{width:100%;justify-content:flex-start}
   .side-session .sync-status{font-size:11px;padding:0 2px}
@@ -127,6 +137,8 @@
   .tab:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
   @media (max-width:900px){
+    .side-toggle{display:none}
+    .sidebar.collapsed{width:100%;padding:16px 14px}
     .app-shell{flex-direction:column}
     .sidebar{width:100%;flex-direction:row;flex-wrap:wrap;align-items:center;position:static;gap:10px 16px}
     .sidebar .brand{flex:none}
@@ -222,10 +234,10 @@
   table.roster{border-collapse:collapse;width:100%}
   table.roster th,table.roster td{border:1px solid var(--line);text-align:center;padding:0}
   table.roster thead th{position:sticky;top:0;background:var(--surface-2);z-index:3;font-size:12px;padding:4px 2px}
-  table.roster .rname{position:sticky;left:0;z-index:2;background:var(--surface-2);min-width:88px;width:88px;
-    text-align:left;padding:6px 8px;font-weight:700;font-size:13.5px}
+  table.roster .rname{position:sticky;left:0;z-index:2;background:var(--surface-2);min-width:80px;width:80px;
+    text-align:left;padding:6px 6px;font-weight:700;font-size:13px}
   table.roster thead .rname{z-index:5}
-  table.roster th.dcol{min-width:30px;width:30px}
+  table.roster th.dcol{min-width:26px;width:26px}
   table.roster th.dcol .dow{font-size:9.5px;font-weight:700;color:var(--ink-soft)}
   table.roster th.dcol .dn{font-size:12px;font-weight:700}
   table.roster .sumcol,table.roster td.sumcell{min-width:52px;width:52px;background:var(--surface-2);position:sticky;z-index:2}
@@ -239,7 +251,7 @@
   table.roster td.rc{cursor:pointer;height:34px;font-weight:700;font-size:14px}
   table.roster .rname .wt{font-size:10.5px;font-weight:700;color:var(--ink-soft);line-height:1.2;margin-top:1px;white-space:nowrap}
   table.roster td.rc .wish{color:#C62828}
-  table.roster td.rc .tm{display:block;font-size:8.5px;line-height:1.1;font-weight:700;color:#C62828;white-space:nowrap}
+  table.roster td.rc .tm{display:block;letter-spacing:-.3px;font-size:7.5px;line-height:1.1;font-weight:700;color:#C62828;white-space:nowrap}
   table.roster td.rc .hm{display:block;font-size:8px;line-height:1;margin-top:1px}
   table.roster td.rc:hover{outline:2px solid var(--accent);outline-offset:-2px}
   table.roster col.sat,table.roster td.sat{background:var(--sat)}
@@ -255,7 +267,7 @@
   .rtotal{flex:none;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
   .rtotal[hidden]{display:none}
   table.rtot{border-collapse:collapse}
-  table.rtot th,table.rtot td{min-width:40px}
+  table.rtot th,table.rtot td{min-width:34px}
   table.rtot .rt-total{border-left:2px solid var(--line-strong)}
   table.rtot th,table.rtot td{border:1px solid var(--line);text-align:center;padding:0}
   table.rtot th{background:var(--surface-2);font-size:12px;padding:4px 2px;vertical-align:middle}
@@ -264,7 +276,7 @@
   table.rtot td.full{color:var(--accent-ink)}
   table.rtot td.bad{color:var(--alert)}
   table.rtot td.short{color:var(--alert);background:var(--alert-soft)}
-  table.roster .sn{min-width:40px;width:40px;position:static!important}
+  table.roster .sn{min-width:34px;width:34px;position:static!important}
   table.roster td.sumcell.sn-total.full{color:var(--accent-ink)}
   table.roster td.sumcell.sn-total.short{color:var(--alert);background:var(--alert-soft)}
   table.roster tfoot td{background:var(--surface-2);font-weight:700;font-size:11.5px;color:var(--ink-soft);height:26px}
@@ -459,7 +471,8 @@
 
 <div class="app" id="appRoot" hidden>
   <div class="app-shell">
-    <aside class="sidebar no-print">
+    <aside class="sidebar no-print" id="sidebar">
+      <button class="side-toggle" id="sideToggle" title="メニューを縮小／拡大" aria-label="メニューを縮小／拡大">«</button>
       <div class="brand">
         <div class="mark">🗓️</div>
         <div>
@@ -1156,7 +1169,7 @@ function effOf(md,ym,sid,day,used){
   return {code:'',color:'',work:used,rest:false,w:used?1:0,r:0,auto:false};
 }
 const memMd=()=>({r:S.roster,ra:S.rauto,rm:S.rmeta});
-const SN_W=40;
+const SN_W=34;
 const fmtN=n=>Number.isInteger(n)?String(n):n.toFixed(1);
 // その月の各スタッフの「休み日数」
 function offCount(sid){
@@ -1761,6 +1774,12 @@ $("#confirmYes").onclick=()=>{closeModal("#confirmOverlay");const fn=confirmCtx;
 function refreshAll(){if(S.tab==="board")renderBoardAll();else renderRoster();}
 
 /* ================= tabs ================= */
+/* ---- 左メニューの縮小／拡大（端末ごとに記憶。狭い画面では最初から縮小） ---- */
+function applySidebar(c){ const sb=$("#sidebar"); if(!sb)return; sb.classList.toggle("collapsed",c); $("#sideToggle").textContent=c?"»":"«"; }
+(function(){ let pref=null; try{pref=localStorage.getItem("ui:sidebar");}catch(e){}
+  applySidebar(pref?pref==="collapsed":window.innerWidth<1700);
+  $("#sideToggle").onclick=()=>{ const c=!$("#sidebar").classList.contains("collapsed"); applySidebar(c); try{localStorage.setItem("ui:sidebar",c?"collapsed":"open");}catch(e){} setTimeout(()=>{if(S.tab==="roster")renderRoster();},0); };
+})();
 function setTab(tab){
   S.tab=tab;
   $("#tabBoard").setAttribute('aria-selected',tab==="board");
