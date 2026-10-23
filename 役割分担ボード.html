@@ -239,6 +239,7 @@
   table.roster td.rc{cursor:pointer;height:34px;font-weight:700;font-size:14px}
   table.roster .rname .wt{font-size:10.5px;font-weight:700;color:var(--ink-soft);line-height:1.2;margin-top:1px;white-space:nowrap}
   table.roster td.rc .wish{color:#C62828}
+  table.roster td.rc .tm{display:block;font-size:7.5px;line-height:1.05;margin-top:1px;color:var(--ink-soft);white-space:nowrap}
   table.roster td.rc .hm{display:block;font-size:8px;line-height:1;margin-top:1px}
   table.roster td.rc:hover{outline:2px solid var(--accent);outline-offset:-2px}
   table.roster col.sat,table.roster td.sat{background:var(--sat)}
@@ -416,6 +417,7 @@
     body.print-all-mode table.roster th.dcol .dow{font-size:5px}
     body.print-all-mode table.roster th.dcol .dn{font-size:6.5px}
     body.print-all-mode table.roster th.dcol .rest{font-size:4.5px}
+    body.print-all-mode table.roster td.rc .tm{font-size:4px}
     body.print-all-mode table.roster .rname .wt{font-size:4.5px;white-space:normal}
     body.print-all-mode table.roster .rname{font-size:6.5px;min-width:34px;width:34px;padding:1px}
     body.print-all-mode table.roster .sumcol,body.print-all-mode table.roster td.sumcell{min-width:20px;width:20px}
@@ -559,7 +561,7 @@
       <div class="rtotal no-print" id="rtotal" hidden></div>
     </div>
     <div class="rlegend" id="rlegend"></div>
-    <p class="hint no-print">希望休を塗る →「休日数に合わせて自動作成」で、なるべく週2日休みになるよう不足分の公休を配置し残りを出勤に。右端の「休/目標」で過不足を確認できます。半日の記号（半休・半有）は、マスをタップするたびに「前（AM）→後（PM）→消す」と切り替わり、0.5日分として数えます。</p>
+    <p class="hint no-print">希望休を塗る →「休日数に合わせて自動作成」で、なるべく週2日休みになるよう不足分の公休を配置し残りを出勤に。右端の「休/目標」で過不足を確認できます。非常勤の勤務時間をその日だけ変える場合は、「時間変更」を選んでマスをタップして時間を入力します。半日の記号（半休・半有）は、マスをタップするたびに「前（AM）→後（PM）→消す」と切り替わり、0.5日分として数えます。</p>
   </div>
 
   <!-- ============ SETTINGS VIEW ============ -->
@@ -636,6 +638,16 @@
   </div>
 </div>
 <div id="allDeptPrint"></div>
+
+<!-- 時間変更（その日だけの勤務時間・非常勤） -->
+<div class="overlay" id="timeEditOverlay"><div class="modal" style="width:min(440px,100%)">
+  <div class="modal-head"><h3 id="timeEditTitle">勤務時間の変更</h3><button class="x" data-close>×</button></div>
+  <div class="modal-body">
+    <div class="mlabel">この日だけの勤務時間（通常：<span id="timeEditUsual"></span>）</div>
+    <div id="timeEditSel" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"></div>
+  </div>
+  <div class="modal-foot"><button class="btn" id="timeEditReset">通常に戻す</button><button class="btn primary" id="timeEditSave">決定</button></div>
+</div></div>
 
 <!-- Confirm modal（Artifactのサンドボックスでは window.confirm が使えないため自前で用意） -->
 <div class="overlay" id="confirmOverlay"><div class="modal" style="width:min(360px,100%)">
@@ -795,7 +807,7 @@ const K={
   get types(){return `yakuwari:${FSCOPE}:types`}, get meta(){return `yakuwari:${FSCOPE}:meta`},
   get tpl(){return `yakuwari:${FSCOPE}:templates`}, get roles(){return `yakuwari:${FSCOPE}:roles`},
   get day(){return `yakuwari:${FSCOPE}:day:`}, get roster(){return `yakuwari:${FSCOPE}:roster:`},
-  get rmeta(){return `yakuwari:${FSCOPE}:rmeta:`}, get rauto(){return `yakuwari:${FSCOPE}:rauto:`}, get rhalf(){return `yakuwari:${FSCOPE}:rhalf:`},
+  get rmeta(){return `yakuwari:${FSCOPE}:rmeta:`}, get rauto(){return `yakuwari:${FSCOPE}:rauto:`}, get rhalf(){return `yakuwari:${FSCOPE}:rhalf:`}, get rtime(){return `yakuwari:${FSCOPE}:rtime:`},
   get statusEnabled(){return `yakuwari:${FSCOPE}:statusEnabled`}, // 勤務記号は共有だが「この部署で使うか」は部署ごと
   theme:"yakuwari:theme" // 表示テーマも施設共通
 };
@@ -1019,7 +1031,7 @@ document.addEventListener('visibilitychange',()=>{
 const S={
   tab:"board", date:todayISO(), ym:todayISO().slice(0,7),
   staff:[], status:[], times:[], tasks:[], types:[], roles:[], minStaff:3, req:{}, nightN:0, shiftN:{},
-  day:{selected:[],assign:{}}, roster:{}, rauto:{}, rhalf:{}, rmeta:{offDows:[],offDates:[]}
+  day:{selected:[],assign:{}}, roster:{}, rauto:{}, rhalf:{}, rtime:{}, rmeta:{offDows:[],offDates:[]}
 };
 function todayISO(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
 function daysInMonth(ym){const[y,m]=ym.split("-").map(Number);return new Date(y,m,0).getDate();}
@@ -1071,6 +1083,39 @@ function timePartSelects(prefix,cur){ const c=snapHalfHour(cur), [ch,cm]=c?c.spl
   return `<select class="${prefix}-h" aria-label="時">${h}</select>時<select class="${prefix}-m" aria-label="分">${m}</select>分`; }
 function halfHourOpts(cur){ const c=snapHalfHour(cur); let o=`<option value=""${c?"":" selected"}>--:--</option>`;
   for(let h=0;h<24;h++)for(const m of ["00","30"]){const v=String(h).padStart(2,"0")+":"+m; o+=`<option value="${v}"${v===c?" selected":""}>${v}</option>`;} return o; }
+// その日だけの勤務時間変更（非常勤）。通常と違う項目だけをマスに小さく表示
+function timeMark(s,d,e){ const o=(S.rtime[s.id]||{})[d]; if(!o||!e.work)return"";
+  const u=s.workTime||{}, f=t=>t?t.replace(/^0/,""):"";
+  const ds=o.s&&o.s!==u.s, de=o.e&&o.e!==u.e;
+  if(ds&&de)return `<span class="tm">${f(o.s)}<br>${f(o.e)}</span>`;
+  if(de)return `<span class="tm">〜${f(o.e)}</span>`;
+  if(ds)return `<span class="tm">${f(o.s)}〜</span>`;
+  return""; }
+let timeEditCtx=null;
+function openTimeEdit(sid,day){
+  const s=staffById(sid); if(!s)return;
+  if(!isPartTimeType(typeById(s.typeId))){toast("時間変更は非常勤のスタッフで使えます");return;}
+  const e=effOf(memMd(),S.ym,sid,day,rmonthUsed()); if(!e.work){toast("出勤の日だけ設定できます");return;}
+  const u=s.workTime||{}, cur=(S.rtime[sid]||{})[day]||{s:u.s||"",e:u.e||""}, f=t=>t?t.replace(/^0/,""):"";
+  timeEditCtx={sid,day};
+  $("#timeEditTitle").textContent=`${s.name}　${+S.ym.slice(5)}月${day}日の勤務時間`;
+  $("#timeEditUsual").textContent=(u.s||u.e)?`${f(u.s)}〜${f(u.e)}`:"未設定";
+  $("#timeEditSel").innerHTML=timePartSelects("te-s",cur.s)+'<span style="margin:0 4px">–</span>'+timePartSelects("te-e",cur.e);
+  const root=$("#timeEditSel");
+  ["te-s","te-e"].forEach(p=>{const h=root.querySelector('.'+p+'-h'), m=root.querySelector('.'+p+'-m');
+    h.onchange=()=>{if(h.value&&!m.value)m.value="00"; if(!h.value)m.value="";};
+    m.onchange=()=>{if(m.value&&!h.value)m.value="";}; });
+  openModal("#timeEditOverlay");
+}
+function readTimeEdit(p){const root=$("#timeEditSel"),h=root.querySelector('.'+p+'-h').value,m=root.querySelector('.'+p+'-m').value;return h?h+":"+(m||"00"):"";}
+function commitTimeEdit(clear){
+  if(!timeEditCtx)return; const {sid,day}=timeEditCtx, s=staffById(sid), u=s.workTime||{};
+  if(!S.rtime[sid])S.rtime[sid]={};
+  const a=clear?"":readTimeEdit("te-s"), b=clear?"":readTimeEdit("te-e");
+  if(clear||(!a&&!b)||(a===(u.s||"")&&b===(u.e||"")))delete S.rtime[sid][day]; else S.rtime[sid][day]={s:a,e:b};
+  saveRoster();renderRoster();closeModal("#timeEditOverlay");timeEditCtx=null;
+  toast(clear?"通常の勤務時間に戻しました":"この日の勤務時間を設定しました");
+}
 // 非常勤の勤務時間帯を氏名の下に表示（例：8:00〜14:30）
 function workTimeLabel(s){ const w=s.workTime; if(!w||!(w.s||w.e)||!isPartTimeType(typeById(s.typeId)))return"";
   const f=t=>t?t.replace(/^0/,""):""; return `<div class="wt">${f(w.s)}〜${f(w.e)}</div>`; }
@@ -1182,8 +1227,8 @@ function computeWorking(date){
 function selectedStaff(){return S.staff.filter(s=>S.day.selected.includes(s.id));}
 
 /* ---------- roster ---------- */
-function loadRoster(ym){S.ym=ym;S.roster=jget(K.roster+ym,{});S.rauto=jget(K.rauto+ym,{});S.rhalf=jget(K.rhalf+ym,{});S.rmeta=jget(K.rmeta+ym,{offDows:[],offDates:[]});}
-function saveRoster(){jset(K.roster+S.ym,S.roster);jset(K.rauto+S.ym,S.rauto);jset(K.rhalf+S.ym,S.rhalf);}
+function loadRoster(ym){S.ym=ym;S.roster=jget(K.roster+ym,{});S.rauto=jget(K.rauto+ym,{});S.rhalf=jget(K.rhalf+ym,{});S.rtime=jget(K.rtime+ym,{});S.rmeta=jget(K.rmeta+ym,{offDows:[],offDates:[]});}
+function saveRoster(){jset(K.roster+S.ym,S.roster);jset(K.rauto+S.ym,S.rauto);jset(K.rhalf+S.ym,S.rhalf);jset(K.rtime+S.ym,S.rtime);}
 function saveRmeta(){jset(K.rmeta+S.ym,S.rmeta);}
 function isAuto(sid,day){return !!(S.rauto[sid]||{})[day];}
 function setAuto(sid,day,on){if(!S.rauto[sid])S.rauto[sid]={};if(on)S.rauto[sid][day]=1;else delete S.rauto[sid][day];}
@@ -1326,6 +1371,10 @@ function renderBrushes(){
   });
   const er=document.createElement('button');er.className="brush eraser";er.setAttribute('aria-pressed',brush==="");
   er.innerHTML=`<span class="chip"></span>消す`;er.onclick=()=>{brush="";renderBrushes();};w.appendChild(er);
+  if(S.staff.some(s=>isPartTimeType(typeById(s.typeId)))){ // 非常勤の「その日だけ」の勤務時間変更
+    const tb=document.createElement('button');tb.className="brush";tb.id="btnTimeBrush";tb.setAttribute('aria-pressed',brush==="@time");
+    tb.innerHTML=`<span class="chip" style="background:#5E6A66">🕒</span>時間変更`;tb.onclick=()=>{brush="@time";renderBrushes();};w.appendChild(tb);
+  }
 }
 function renderRoster(){
   const nd=daysInMonth(S.ym),T=$("#rosterTable");
@@ -1352,7 +1401,7 @@ function renderRoster(){
     bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}${workTimeLabel(s)}</td>`;
     for(let d=1;d<=nd;d++){const e=eff(s.id,d);work+=e.w; if(sc){const k=sc.findIndex(c=>c.codes.includes(e.code));if(k>=0)cnt[k]+=1;}
       const hs=e.code&&statusByCode(e.code),hv=(S.rhalf[s.id]||{})[d],hm=(hs&&hs.half&&hv)?`<span class="hm">${hv==='pm'?'後':'前'}</span>`:'';
-      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${hs&&isWishStatus(hs)?'<span class="wish">公</span>':e.code}${hm}</td>`;}
+      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${hs&&isWishStatus(hs)?'<span class="wish">公</span>':e.code}${hm}${timeMark(s,d,e)}</td>`;}
     const off=offCount(s.id),tgt=staffTarget(s);
     const cls=tgt==null?'ok':off<tgt?'under':off>tgt?'over':'ok';
     if(sc){ const tot=cnt.reduce((a,b)=>a+b,0); boxRows.push({cnt,tot,off,tgt});
@@ -1394,7 +1443,9 @@ function renderRoster(){
   } else { rt.hidden=true; rt.innerHTML=""; }
   $$("td.rc",T).forEach(td=>{td.onclick=()=>{
     const sid=td.dataset.sid,day=+td.dataset.day;if(!S.roster[sid])S.roster[sid]={};
+    if(brush==="@time"){ openTimeEdit(sid,day); return; }
     if(!S.rhalf[sid])S.rhalf[sid]={};
+    if(S.rtime[sid])delete S.rtime[sid][day]; // 記号を変えたら、その日の時間変更は解除
     const bst=brush&&statusByCode(brush);
     if(bst&&bst.half){ // 半日の記号：タップするたびに 前(AM)→後(PM)→消す
       if(S.roster[sid][day]===brush){
@@ -1409,6 +1460,7 @@ function renderRoster(){
     saveRoster();renderRoster();
   };});
   renderRLegend();
+  if($("#brushes"))renderBrushes();
 }
 function renderRLegend(){
   const l=$("#rlegend");l.innerHTML='<span style="font-weight:700;color:var(--ink-soft)">記号：</span>';
@@ -1803,6 +1855,8 @@ function openAuto(){
   openModal("#autoOverlay");
 }
 $("#btnAuto").onclick=openAuto;
+$("#timeEditSave").onclick=()=>commitTimeEdit(false);
+$("#timeEditReset").onclick=()=>commitTimeEdit(true);
 function spread(arr,k){ if(k>=arr.length)return arr.slice(); const res=[];const step=arr.length/k;
   for(let i=0;i<k;i++)res.push(arr[Math.floor(i*step+step/2)]); return res; }
 $("#doAuto").onclick=()=>{
