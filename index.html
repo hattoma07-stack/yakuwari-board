@@ -898,12 +898,14 @@ const hasDriveJob=()=>jobsOf().some(j=>j.drive);
 const SUMCOLS_HOME=[
   {label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"夜",codes:["夜"]},
   {label:"休",codes:["公","希"]},{label:"有",codes:["有"]}];
-const SUMCOLS_BY_DEPT={home:SUMCOLS_HOME,nursing:SUMCOLS_HOME};
+const SUMCOLS_OFFICE=[{label:"出",codes:["出"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 事務：早番・遅番・夜勤なし
+const SUMCOLS_BY_DEPT={home:SUMCOLS_HOME,nursing:SUMCOLS_HOME,office:SUMCOLS_OFFICE};
 // 合計の列は値を出さない（月の日数との照合・赤字表示は行わない）
-const SUMTOTAL_BOX={home:true,nursing:true}; // 合計は表の外の別枠（右側）に出す
+const SUMTOTAL_BOX={home:true,nursing:true,office:true}; // 合計は表の外の別枠（右側）に出す
 const sumColsOf=()=>SUMCOLS_BY_DEPT[FSCOPE]||null;
 // 勤務表の下に出す「日ごとの記号別スタッフ数」の行（指定した部署のみ）
-const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"],nursing:["早","日","遅","夜"]};
+const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"],nursing:["早","日","遅","夜"],office:["出"]};
+const SHIFTROWS_MIN={office:true}; // この部署は記号別の行に「1日の最低出勤人数」の不足（赤）も出す
 // 送迎職員は「職種」ではなく、台帳の「送迎が可能」チェックで数える（兼任できる）。他の職種は職種の選択で数える
 const inJob=(j,s)=>j.drive?!!s.canDrive:s.job===j.id;
 const DEF_ROLES=[
@@ -1440,7 +1442,7 @@ function renderRoster(){
   const jobsRows=jobsOf();
   let foot='<tfoot>'+(jobsRows.length||SHIFTROWS_BY_DEPT[FSCOPE]?'':footRow('出勤数',minS,()=>true,true));
   jobsRows.forEach(j=>{foot+=footRow(escapeHtml(j.short),Number(S.req[j.id])||0,s=>inJob(j,s),false);});
-  (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st?escapeHtml(st.label.replace(c,'')):''),0,()=>true,false,c);});
+  (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st?escapeHtml(st.label.replace(c,'')):''),SHIFTROWS_MIN[FSCOPE]?minS:0,()=>true,false,c);});
   foot+='</tfoot>';
   T.style.setProperty('--kou',(statusByCode('公')||{}).color||'#9AA3A0'); // 印刷時の「公」の色
   T.innerHTML=`<colgroup>${cols}</colgroup>`+head+bodyH+foot;
