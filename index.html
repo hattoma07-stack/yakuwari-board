@@ -665,7 +665,7 @@
 <div class="overlay" id="staffOverlay"><div class="modal">
   <div class="modal-head"><h3>スタッフ台帳</h3><button class="x" data-close>×</button></div>
   <div class="modal-body">
-    <div class="mlabel">名前・色／雇用形態／月の休日数（空欄=形態の既定を使用・数値を入れるとその人だけ上書き）</div>
+    <div class="mlabel">名前・色／職種／雇用形態（非常勤は勤務時間）／勤務時間帯</div>
     <div class="edit-list" id="staffList"></div>
     <div class="edit-row"><input type="text" id="newStaffName" placeholder="スタッフ名を追加" maxlength="12"><button class="btn sm" id="addStaff">＋ 追加</button></div>
     <p style="margin-top:12px"><button class="btn sm" id="btnTypesFromStaff">雇用形態と既定休日数を編集</button></p>
@@ -700,7 +700,6 @@
     <div class="mlabel">② 雇用形態ごとの「月の休日数」の既定値（例：正職員＝9）</div>
     <div class="edit-list" id="typesList"></div>
     <button class="btn sm" id="addType">＋ 雇用形態を追加</button>
-    <p style="font-size:12px;color:var(--ink-soft);margin:8px 0 0">※ 個人ごとの上書きは「スタッフ台帳」で設定できます。</p>
     <hr style="border:none;border-top:1px solid var(--line);margin:18px 0">
     <div class="mlabel">③ 事業所の休業日（全員が公休・各人の休日数にカウント）</div>
     <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px">毎週の定休</div>
@@ -1056,8 +1055,9 @@ const saveTypes=()=>jset(K.types,S.types);
 const saveRoles=()=>jset(K.roles,S.roles);
 const roleById=id=>S.roles.find(r=>r.id===id);
 const typeById=id=>S.types.find(t=>t.id===id);
-// 月の休日数の目標。個人設定→雇用形態の既定の順。どちらも未設定なら null（目標なし）
-function staffTarget(s){ if(s.off!==null&&s.off!==undefined&&s.off!=="")return Number(s.off); const t=typeById(s.typeId); return (t&&t.off!==null&&t.off!==undefined&&t.off!=="")?Number(t.off):null; }
+// 月の休日数の目標＝雇用形態の既定。未設定なら null（目標なし）。個人ごとの設定は廃止
+const isPartTimeType=t=>!!(t&&/非常勤/.test(t.name||""));
+function staffTarget(s){ const t=typeById(s.typeId); return (t&&t.off!==null&&t.off!==undefined&&t.off!=="")?Number(t.off):null; }
 function typeName(s){const t=typeById(s.typeId);return t?t.name:"";}
 // 勤務時間帯（ドライバー等）: s.hours=null→終日 / {am:{s,e}|null, pm:{s,e}|null}
 const AM_DEF={s:"08:00",e:"10:00"}, PM_DEF={s:"16:00",e:"18:00"};
@@ -1404,7 +1404,6 @@ function renderStaffList(){
   S.staff.forEach((s,i)=>{
     const card=document.createElement('div');card.className="staff-edit";
     const segs=S.types.map(t=>`<button class="segbtn" data-ty="${t.id}" aria-pressed="${s.typeId===t.id}">${escapeHtml(t.name)}</button>`).join("");
-    const tdef=(typeById(s.typeId)||{}).off;
     const preset=hoursPreset(s);
     const hbtns=[["full","終日"],["both","朝夕"],["am","朝のみ"],["pm","夕のみ"]].concat(nightDeptOn()?[["night","夜勤のみ"]]:[])
       .map(([v,l])=>`<button class="segbtn" data-h="${v}" aria-pressed="${preset===v}">${l}</button>`).join("");
@@ -1427,9 +1426,11 @@ function renderStaffList(){
       </div>`:""}
       <div class="line2">
         <div class="fl"><span>雇用形態</span><div class="seg tyseg">${segs}</div></div>
-        <div class="fl"><span>月の休日数（個別）</span>
-          <input type="number" class="off-in" min="0" max="31" placeholder="${tdef==null?'既定なし':'既定 '+tdef+'日'}" value="${s.off??''}"></div>
       </div>
+      ${isPartTimeType(typeById(s.typeId))?`<div class="line2">
+        <div class="fl"><span>勤務時間（非常勤）</span>
+          <div style="display:flex;align-items:center;gap:6px"><input type="time" class="wt-s" value="${(s.workTime||{}).s||''}"><span>–</span><input type="time" class="wt-e" value="${(s.workTime||{}).e||''}"></div></div>
+      </div>`:""}
       <div class="line2">
         <div class="fl" style="flex:1"><span>勤務時間帯（ドライバー等）</span><div class="seg hseg">${hbtns}</div></div>
       </div>
@@ -1453,7 +1454,9 @@ function renderStaffList(){
     card.querySelectorAll('.hrow').forEach(row=>{const band=row.dataset.band;
       row.querySelector('.hs').onchange=e=>{s.hours[band].s=e.target.value;saveStaff();if(S.tab==="board")renderBoard();};
       row.querySelector('.he').onchange=e=>{s.hours[band].e=e.target.value;saveStaff();if(S.tab==="board")renderBoard();};});
-    card.querySelector('.off-in').oninput=e=>{s.off=e.target.value===''?null:Number(e.target.value);saveStaff();if(S.tab==="roster")renderRoster();};
+    const wts=card.querySelector('.wt-s'), wte=card.querySelector('.wt-e');
+    if(wts){ const upd=()=>{ s.workTime=(wts.value||wte.value)?{s:wts.value,e:wte.value}:null; saveStaff(); };
+      wts.onchange=upd; wte.onchange=upd; }
     card.querySelector('.del').onclick=()=>{showConfirm(`${s.name} を台帳から削除しますか？`,()=>{
       S.staff.splice(i,1);S.day.selected=S.day.selected.filter(x=>x!==s.id);
       Object.values(S.day.assign).forEach(r=>delete r[s.id]);saveStaff();saveDay();renderStaffList();refreshAll();
