@@ -239,7 +239,7 @@
   table.roster td.rc{cursor:pointer;height:34px;font-weight:700;font-size:14px}
   table.roster .rname .wt{font-size:10.5px;font-weight:700;color:var(--ink-soft);line-height:1.2;margin-top:1px;white-space:nowrap}
   table.roster td.rc .wish{color:#C62828}
-  table.roster td.rc .tm{display:block;font-size:7.5px;line-height:1.05;margin-top:1px;color:var(--ink-soft);white-space:nowrap}
+  table.roster td.rc .tm{display:block;font-size:9px;line-height:1.1;font-weight:700;color:#C62828;white-space:nowrap}
   table.roster td.rc .hm{display:block;font-size:8px;line-height:1;margin-top:1px}
   table.roster td.rc:hover{outline:2px solid var(--accent);outline-offset:-2px}
   table.roster col.sat,table.roster td.sat{background:var(--sat)}
@@ -417,7 +417,7 @@
     body.print-all-mode table.roster th.dcol .dow{font-size:5px}
     body.print-all-mode table.roster th.dcol .dn{font-size:6.5px}
     body.print-all-mode table.roster th.dcol .rest{font-size:4.5px}
-    body.print-all-mode table.roster td.rc .tm{font-size:4px}
+    body.print-all-mode table.roster td.rc .tm{font-size:4.5px}
     body.print-all-mode table.roster .rname .wt{font-size:4.5px;white-space:normal}
     body.print-all-mode table.roster .rname{font-size:6.5px;min-width:34px;width:34px;padding:1px}
     body.print-all-mode table.roster .sumcol,body.print-all-mode table.roster td.sumcell{min-width:20px;width:20px}
@@ -1400,8 +1400,9 @@ function renderRoster(){
     let work=0; const cnt=sc?sc.map(()=>0):null;
     bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}${workTimeLabel(s)}</td>`;
     for(let d=1;d<=nd;d++){const e=eff(s.id,d);work+=e.w; if(sc){const k=sc.findIndex(c=>c.codes.includes(e.code));if(k>=0)cnt[k]+=1;}
+      const tmk=timeMark(s,d,e); // 時間変更した日は、記号（日勤など）を出さず、時間だけを赤で表示
       const hs=e.code&&statusByCode(e.code),hv=(S.rhalf[s.id]||{})[d],hm=(hs&&hs.half&&hv)?`<span class="hm">${hv==='pm'?'後':'前'}</span>`:'';
-      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${hs&&isWishStatus(hs)?'<span class="wish">公</span>':e.code}${hm}${timeMark(s,d,e)}</td>`;}
+      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${tmk||((hs&&isWishStatus(hs)?'<span class="wish">公</span>':e.code)+hm)}</td>`;}
     const off=offCount(s.id),tgt=staffTarget(s);
     const cls=tgt==null?'ok':off<tgt?'under':off>tgt?'over':'ok';
     if(sc){ const tot=cnt.reduce((a,b)=>a+b,0); boxRows.push({cnt,tot,off,tgt});
