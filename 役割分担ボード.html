@@ -238,6 +238,7 @@
   table.roster td.sumcell.s-off.over{color:var(--warn)}
   table.roster td.rc{cursor:pointer;height:34px;font-weight:700;font-size:14px}
   table.roster .rname .wt{font-size:10.5px;font-weight:700;color:var(--ink-soft);line-height:1.2;margin-top:1px;white-space:nowrap}
+  table.roster td.rc .wish{color:#C62828}
   table.roster td.rc .hm{display:block;font-size:8px;line-height:1;margin-top:1px}
   table.roster td.rc:hover{outline:2px solid var(--accent);outline-offset:-2px}
   table.roster col.sat,table.roster td.sat{background:var(--sat)}
@@ -391,6 +392,7 @@
     .panel{box-shadow:none;border:1px solid #999;margin-bottom:8px}
     .panel-head{background:#f0f0f0}
     .board-wrap,.rtable-wrap{overflow:visible;box-shadow:none;border:1px solid #999}
+    table.roster td.rc .wish{color:var(--kou,#9AA3A0)!important}
     table.board{min-width:0}
     table.board thead th,table.roster thead th{position:static;background:#f0f0f0}
     td.staff-cell,.staff-col,table.roster .rname,table.roster .sumcol,table.roster td.sumcell{position:static;background:#f6f6f6}
@@ -1070,6 +1072,9 @@ function halfHourOpts(cur){ const c=snapHalfHour(cur); let o=`<option value=""${
 // 非常勤の勤務時間帯を氏名の下に表示（例：8:00〜14:30）
 function workTimeLabel(s){ const w=s.workTime; if(!w||!(w.s||w.e)||!isPartTimeType(typeById(s.typeId)))return"";
   const f=t=>t?t.replace(/^0/,""):""; return `<div class="wt">${f(w.s)}〜${f(w.e)}</div>`; }
+// 希望休は勤務表に赤い「公」で表示（印刷では赤文字にしない）
+const WISH_RED="#C62828";
+const isWishStatus=st=>!!(st&&(st.code==="希"||/希望/.test(st.label||"")));
 const isPartTimeType=t=>!!(t&&/非常勤/.test(t.name||""));
 function staffTarget(s){ const t=typeById(s.typeId); return (t&&t.off!==null&&t.off!==undefined&&t.off!=="")?Number(t.off):null; }
 function typeName(s){const t=typeById(s.typeId);return t?t.name:"";}
@@ -1314,7 +1319,7 @@ function renderBrushes(){
   const w=$("#brushes");w.innerHTML="";
   enabledStatuses().forEach(st=>{
     const b=document.createElement('button');b.className="brush";b.setAttribute('aria-pressed',brush===st.code);
-    b.innerHTML=`<span class="chip" style="background:${st.color}">${st.code}</span>${st.label}`;
+    b.innerHTML=`<span class="chip" style="background:${isWishStatus(st)?WISH_RED:st.color}">${isWishStatus(st)?"公":st.code}</span>${st.label}`;
     b.onclick=()=>{brush=st.code;renderBrushes();};w.appendChild(b);
   });
   const er=document.createElement('button');er.className="brush eraser";er.setAttribute('aria-pressed',brush==="");
@@ -1345,7 +1350,7 @@ function renderRoster(){
     bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}${workTimeLabel(s)}</td>`;
     for(let d=1;d<=nd;d++){const e=eff(s.id,d);work+=e.w; if(sc){const k=sc.findIndex(c=>c.codes.includes(e.code));if(k>=0)cnt[k]+=1;}
       const hs=e.code&&statusByCode(e.code),hv=(S.rhalf[s.id]||{})[d],hm=(hs&&hs.half&&hv)?`<span class="hm">${hv==='pm'?'後':'前'}</span>`:'';
-      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${e.code}${hm}</td>`;}
+      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${hs&&isWishStatus(hs)?'<span class="wish">公</span>':e.code}${hm}</td>`;}
     const off=offCount(s.id),tgt=staffTarget(s);
     const cls=tgt==null?'ok':off<tgt?'under':off>tgt?'over':'ok';
     if(sc){ const tot=cnt.reduce((a,b)=>a+b,0); boxRows.push({cnt,tot});
@@ -1370,6 +1375,7 @@ function renderRoster(){
   jobsRows.forEach(j=>{foot+=footRow(escapeHtml(j.short),Number(S.req[j.id])||0,s=>inJob(j,s),false);});
   (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st?escapeHtml(st.label.replace(c,'')):''),0,()=>true,false,c);});
   foot+='</tfoot>';
+  T.style.setProperty('--kou',(statusByCode('公')||{}).color||'#9AA3A0'); // 印刷時の「公」の色
   T.innerHTML=`<colgroup>${cols}</colgroup>`+head+bodyH+foot;
   // 合計の別枠（月の日数に達していなければ赤字）。表の各行と高さをそろえる
   const rt=$("#rtotal");
@@ -1407,7 +1413,7 @@ function renderRLegend(){
   Object.values(S.roster||{}).forEach(rr=>Object.values(rr).forEach(c=>c&&usedCodes.add(c)));
   const list=S.status.filter(st=>isStatusEnabled(st.code)||usedCodes.has(st.code));
   list.forEach(st=>{const e=document.createElement('span');e.className="rl";
-    e.innerHTML=`<span class="chip" style="background:${st.color}">${st.code}</span>${st.label}${st.half?'<span style="color:var(--ink-faint);font-size:11px">(0.5日)</span>':st.work?'<span style="color:var(--ink-faint);font-size:11px">(出勤)</span>':''}`;
+    e.innerHTML=`<span class="chip" style="background:${isWishStatus(st)?WISH_RED:st.color}">${isWishStatus(st)?"公":st.code}</span>${st.label}${st.half?'<span style="color:var(--ink-faint);font-size:11px">(0.5日)</span>':st.work?'<span style="color:var(--ink-faint);font-size:11px">(出勤)</span>':''}`;
     l.appendChild(e);});
 }
 function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
