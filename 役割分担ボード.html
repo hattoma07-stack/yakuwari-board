@@ -846,7 +846,7 @@ const DEF_TIMES_HOME=[ // 訪問介護は24時間体制のため終日カバー
   {id:uid(),time:"12:00",phase:"昼の訪問"},{id:uid(),time:"14:00",phase:"午後の訪問"},
   {id:uid(),time:"16:00",phase:"夕方の訪問"},{id:uid(),time:"18:00",phase:"夜の訪問"},
   {id:uid(),time:"20:00",phase:"夜間巡回"},{id:uid(),time:"22:00",phase:"夜間巡回"}];
-const DEF_TYPES=[{id:"ty_sey",name:"正職員",off:9},{id:"ty_part",name:"パート",off:10}];
+const DEF_TYPES=[{id:"ty_sey",name:"正職員",off:9},{id:"ty_part",name:"パート",off:null}];
 // 職種別の最低出勤人数を管理する部署（それ以外の部署は従来どおり合計人数のみ）
 const JOBS_BY_DEPT={day:[
   {id:"care",name:"介護職員",short:"介護職員"},
@@ -1038,6 +1038,7 @@ function loadMasters(){
   if(!S.times) S.times=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_TIMES_HOME:DEF_TIMES));
   if(!S.tasks) S.tasks=JSON.parse(JSON.stringify(FSCOPE==="home"?DEF_TASKS_HOME:DEF_TASKS));
   if(!S.types) S.types=JSON.parse(JSON.stringify(DEF_TYPES));
+  S.types.forEach(t=>{ if(!t.migNoOff){ if(t.name==="パート"&&t.off===10)t.off=null; t.migNoOff=true; } }); // パートの休日数の既定は廃止（一度だけ移行）
   if(!S.roles) S.roles=JSON.parse(JSON.stringify(DEF_ROLES));
   if(!S.staff){
     S.staff=["佐藤","鈴木","高橋","田中","渡辺"].map((n,i)=>({id:uid(),name:n,color:STAFF_COLORS[i],typeId:S.types[0].id,off:null}));
@@ -1054,7 +1055,8 @@ const saveTypes=()=>jset(K.types,S.types);
 const saveRoles=()=>jset(K.roles,S.roles);
 const roleById=id=>S.roles.find(r=>r.id===id);
 const typeById=id=>S.types.find(t=>t.id===id);
-function staffTarget(s){ if(s.off!==null&&s.off!==undefined&&s.off!=="")return Number(s.off); const t=typeById(s.typeId); return t?Number(t.off):0; }
+// 月の休日数の目標。個人設定→雇用形態の既定の順。どちらも未設定なら null（目標なし）
+function staffTarget(s){ if(s.off!==null&&s.off!==undefined&&s.off!=="")return Number(s.off); const t=typeById(s.typeId); return (t&&t.off!==null&&t.off!==undefined&&t.off!=="")?Number(t.off):null; }
 function typeName(s){const t=typeById(s.typeId);return t?t.name:"";}
 // 勤務時間帯（ドライバー等）: s.hours=null→終日 / {am:{s,e}|null, pm:{s,e}|null}
 const AM_DEF={s:"08:00",e:"10:00"}, PM_DEF={s:"16:00",e:"18:00"};
@@ -1330,14 +1332,14 @@ function renderRoster(){
       const hs=e.code&&statusByCode(e.code),hv=(S.rhalf[s.id]||{})[d],hm=(hs&&hs.half&&hv)?`<span class="hm">${hv==='pm'?'後':'前'}</span>`:'';
       bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${e.code}${hm}</td>`;}
     const off=offCount(s.id),tgt=staffTarget(s);
-    const cls=off<tgt?'under':off>tgt?'over':'ok';
+    const cls=tgt==null?'ok':off<tgt?'under':off>tgt?'over':'ok';
     if(sc){ const tot=cnt.reduce((a,b)=>a+b,0); boxRows.push({cnt,tot});
       if(boxMode){ bodyH+='</tr>'; return; }
       cnt.forEach((n,i)=>{if(!sc[i].blank)bodyH+=`<td class="sumcell sn num" style="${scR(i)}">${n||''}</td>`;});
       if(!nTot) bodyH+='</tr>';
       else bodyH+=`<td class="sumcell sn sn-total num${tot<nd?' short':' full'}" style="right:0" title="${tot<nd?`月の日数（${nd}日）に${nd-tot}日足りません`:'月の日数と一致'}">${tot}</td></tr>`;
       return; }
-    bodyH+=`<td class="sumcell s-work num">${fmtN(work)}</td><td class="sumcell s-off num ${cls}"><span class="cnt">${fmtN(off)}</span>/${tgt}</td></tr>`;
+    bodyH+=`<td class="sumcell s-work num">${fmtN(work)}</td><td class="sumcell s-off num ${cls}"><span class="cnt">${fmtN(off)}</span>${tgt==null?'':'/'+tgt}</td></tr>`;
   });
   bodyH+='</tbody>';
   const minS=Number(S.minStaff)||0;
@@ -1425,7 +1427,7 @@ function renderStaffList(){
       <div class="line2">
         <div class="fl"><span>雇用形態</span><div class="seg tyseg">${segs}</div></div>
         <div class="fl"><span>月の休日数（個別）</span>
-          <input type="number" class="off-in" min="0" max="31" placeholder="既定 ${tdef??''}日" value="${s.off??''}"></div>
+          <input type="number" class="off-in" min="0" max="31" placeholder="${tdef==null?'既定なし':'既定 '+tdef+'日'}" value="${s.off??''}"></div>
       </div>
       <div class="line2">
         <div class="fl" style="flex:1"><span>勤務時間帯（ドライバー等）</span><div class="seg hseg">${hbtns}</div></div>
@@ -1470,11 +1472,11 @@ $("#newStaffName").addEventListener('keydown',e=>{if(e.key==="Enter")addStaffMas
 function renderTypesList(){
   const w=$("#typesList");w.innerHTML="";
   S.types.forEach((t,i)=>{const row=document.createElement('div');row.className="edit-row";
-    row.innerHTML=`<input type="text" value="" placeholder="形態名"><input type="number" min="0" max="31" value="${t.off}" title="月の休日数" style="width:72px">
+    row.innerHTML=`<input type="text" value="" placeholder="形態名"><input type="number" min="0" max="31" value="${t.off??''}" placeholder="なし" title="月の休日数（空欄＝既定なし）" style="width:72px">
       <span style="font-size:12px;color:var(--ink-soft)">日/月</span><button class="del" title="削除">🗑</button>`;
     row.children[0].value=t.name;
     row.children[0].oninput=e=>{t.name=e.target.value;saveTypes();if(S.tab==="roster")renderRoster();};
-    row.children[1].oninput=e=>{t.off=e.target.value===''?0:Number(e.target.value);saveTypes();if(S.tab==="roster")renderRoster();};
+    row.children[1].oninput=e=>{t.off=e.target.value===''?null:Number(e.target.value);saveTypes();if(S.tab==="roster")renderRoster();};
     row.children[3].onclick=()=>{if(S.types.length<=1){toast("最低1つは必要です");return;}
       const removed=S.types[i];S.types.splice(i,1);
       S.staff.forEach(s=>{if(s.typeId===removed.id)s.typeId=S.types[0].id;});
@@ -1763,9 +1765,9 @@ $("#btnSettings").onclick=openSettings;
 
 // ---- 休日数に合わせて自動作成 ----
 function openAuto(){
-  const lines=S.staff.map(s=>{const off=offCount(s.id),tgt=staffTarget(s);const need=tgt-off;
-    const mark=need>0?`あと公休${fmtN(need)}日`:need<0?`目標超過 ${fmtN(-need)}日`:`充足`;
-    return `${s.name}（${typeName(s)}）：現在 休${fmtN(off)}/目標${tgt} → ${mark}`;}).join("<br>");
+  const lines=S.staff.map(s=>{const off=offCount(s.id),tgt=staffTarget(s);const need=tgt==null?0:tgt-off;
+    const mark=tgt==null?`目標なし`:need>0?`あと公休${fmtN(need)}日`:need<0?`目標超過 ${fmtN(-need)}日`:`充足`;
+    return `${s.name}（${typeName(s)}）：現在 休${fmtN(off)}${tgt==null?'':'/目標'+tgt} → ${mark}`;}).join("<br>");
   $("#autoSummary").innerHTML=lines;
   openModal("#autoOverlay");
 }
@@ -1812,7 +1814,7 @@ $("#doAuto").onclick=()=>{
         cands.forEach(s=>{const rr=S.roster[s.id]; if(rr[d])return;
           const nextBlank=d<nd&&!rr[d+1];
           if(d<nd&&!nextBlank&&!isRestC(rr[d+1]))return;   // 翌日がすでに勤務なら不可
-          if(nextBlank&&!s.nightOnly&&offOf(s)+1>staffTarget(s))return;   // 夜勤明けの休みで休日数の目標を超えないように
+          if(nextBlank&&!s.nightOnly&&staffTarget(s)!=null&&offOf(s)+1>staffTarget(s))return;   // 夜勤明けの休みで休日数の目標を超えないように
           const sc=nCnt[s.id]+(s.nightOnly?-1000:0); if(sc<bs){bs=sc;best=s;} }); // 夜勤のみの人を優先
         if(!best){nightShort.push(d);break;}
         const rr=S.roster[best.id]; rr[d]=nightSt.code;setAuto(best.id,d,true);
@@ -1833,8 +1835,8 @@ $("#doAuto").onclick=()=>{
   const need={};
   S.staff.forEach(s=>{const rr=S.roster[s.id];let off=0;
     for(let d=1;d<=nd;d++){const c=rr[d];const st=c&&statusByCode(c);if(st)off+=st.half?0.5:(!st.work?1:0);}
-    const raw=staffTarget(s)-off; if(raw<0&&!s.nightOnly)warn.push(s.name+"(希望休が目標超過)");
-    need[s.id]=s.nightOnly?0:Math.max(0,Math.floor(raw+1e-9));});
+    const tg=staffTarget(s); const raw=tg==null?0:tg-off; if(raw<0&&!s.nightOnly)warn.push(s.name+"(希望休が目標超過)");
+    need[s.id]=(s.nightOnly||tg==null)?0:Math.max(0,Math.floor(raw+1e-9));}); // 目標なしの人は公休を追加しない
   const nearOff=(rr,day)=>{let best=99;for(let d=1;d<=nd;d++){const c=rr[d];const st=c&&statusByCode(c);
     if(st&&!st.work){const dist=Math.abs(d-day);if(dist<best)best=dist;}}return best;};
   // 週休2日に近づけるため、カレンダー週（日〜土）ごとの休み数を数え、まだ休みが少ない週を優先
