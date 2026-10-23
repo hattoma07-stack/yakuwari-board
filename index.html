@@ -419,26 +419,27 @@
   @media print{
     body.print-all-mode .app,body.print-all-mode .gate{display:none!important}
     #allDeptPrint{page:allDept}
-    body.print-all-mode #allDeptPrint{
-      display:grid!important;grid-template-columns:1fr;align-content:start;gap:4mm;
-    }
+    body.print-all-mode #allDeptPrint{display:block!important}
+    /* 印刷は4枚（A3横）: デイサービス／居宅・事務・厨房／訪問介護／看護・リハビリ。1枚あたりの部署数が少ないほど文字を大きくする */
+    body.print-all-mode .print-page{display:grid;grid-template-columns:1fr;align-content:start;gap:4mm;
+      break-after:page;page-break-after:always;--ps:1.5}
+    body.print-all-mode .print-page:last-child{break-after:auto;page-break-after:auto}
+    body.print-all-mode .print-page.pg-1{--ps:1.9}
+    body.print-all-mode .print-page.pg-2{--ps:1.7}
+    body.print-all-mode .print-page.pg-3{--ps:1.5}
     body.print-all-mode .print-dept{margin-bottom:0;break-inside:avoid}
-    body.print-all-mode .print-dept h2{font-size:11px;margin:0 0 3px;padding-bottom:3px;border-bottom-width:1px}
-    body.print-all-mode table.roster thead th{font-size:6.5px;padding:1px}
+    body.print-all-mode .print-dept h2{font-size:calc(11px*var(--ps,1));margin:0 0 3px;padding-bottom:3px;border-bottom-width:1px}
+    body.print-all-mode table.roster thead th{font-size:calc(6.5px*var(--ps,1));padding:1px}
     body.print-all-mode table.roster th.dcol{min-width:0;width:auto}
-    body.print-all-mode table.roster th.dcol .dow{font-size:5px}
-    body.print-all-mode table.roster th.dcol .dn{font-size:6.5px}
-    body.print-all-mode table.roster th.dcol .rest{font-size:4.5px}
-    body.print-all-mode table.roster td.rc .tm{font-size:4.5px}
-    body.print-all-mode table.roster .rname .wt{font-size:4.5px;white-space:normal}
-    body.print-all-mode table.roster .rname{font-size:6.5px;min-width:34px;width:34px;padding:1px}
-    body.print-all-mode table.roster .sumcol,body.print-all-mode table.roster td.sumcell{min-width:20px;width:20px}
-    body.print-all-mode table.roster .s-work{right:20px}
-    body.print-all-mode table.roster .sn{min-width:16px;width:16px;font-size:6.5px}
-    body.print-all-mode table.roster td.sumcell.s-off,body.print-all-mode table.roster td.sumcell.s-off .cnt{font-size:6.5px}
-    body.print-all-mode table.roster td.rc{height:11px;font-size:6.5px}
-    body.print-all-mode table.roster tfoot td{font-size:5.5px;height:11px}
-    body.print-all-mode table.roster tfoot td.low{font-size:6.5px}
+    body.print-all-mode table.roster th.dcol .dow{font-size:calc(5px*var(--ps,1))}
+    body.print-all-mode table.roster th.dcol .dn{font-size:calc(6.5px*var(--ps,1))}
+    body.print-all-mode table.roster th.dcol .rest{font-size:calc(4.5px*var(--ps,1))}
+    body.print-all-mode table.roster td.rc .tm{font-size:calc(4.5px*var(--ps,1))}
+    body.print-all-mode table.roster .rname .wt{font-size:calc(4.5px*var(--ps,1));white-space:normal}
+    body.print-all-mode table.roster .rname{font-size:calc(6.5px*var(--ps,1));min-width:calc(34px*var(--ps,1));width:calc(34px*var(--ps,1));padding:1px}
+    body.print-all-mode table.roster td.rc{height:calc(11px*var(--ps,1));font-size:calc(6.5px*var(--ps,1))}
+    body.print-all-mode table.roster tfoot td{font-size:calc(5.5px*var(--ps,1));height:calc(11px*var(--ps,1))}
+    body.print-all-mode table.roster tfoot td.low{font-size:calc(6.5px*var(--ps,1))}
   }
 </style>
 
@@ -2018,7 +2019,8 @@ $("#btnStaffMgr").onclick=$("#stgStaff").onclick=()=>{renderStaffList();openModa
 $("#btnTplSave").onclick=openTplSave;$("#btnTplLoad").onclick=openTplLoad;
 $("#btnPrintBoard").onclick=$("#btnPrintRoster").onclick=()=>window.print();
 
-// ---- 管理者：全部署の勤務表を1つにまとめて印刷 ----
+// ---- 管理者：全部署の勤務表をまとめて印刷（A3横・4枚） ----
+const PRINT_PAGES=[["day"],["kyotaku","office","kitchen"],["home"],["nursing","rehab"]];
 async function printAllDepartments(){
   const btn=$("#btnPrintAll"); const origLabel=btn.textContent;
   btn.disabled=true; btn.textContent="🖨 準備中…";
@@ -2032,16 +2034,20 @@ async function printAllDepartments(){
       loadRoster(origYm);
       renderRoster();
       const tableHTML=$("#rosterTable").outerHTML;
-      sections.push({label:FACILITY_NAME[scope],tableHTML});
+      sections.push({scope,label:FACILITY_NAME[scope],tableHTML});
     }
     FSCOPE=origScope;
     loadMasters();loadRoster(origYm);
     if(origTab==="roster")renderRoster();
-    $("#allDeptPrint").innerHTML=sections.map(s=>`
+    // 4枚に分けて並べる（A3横）。該当しない部署が増えた場合は最後のページに追加
+    const bySc={}; sections.forEach(x=>{bySc[x.scope]=x;});
+    const used=new Set(); const pages=PRINT_PAGES.map(g=>g.filter(sc=>{if(!bySc[sc])return false;used.add(sc);return true;}).map(sc=>bySc[sc])).filter(g=>g.length);
+    const rest=sections.filter(x=>!used.has(x.scope)); if(rest.length)pages.push(rest);
+    $("#allDeptPrint").innerHTML=pages.map(g=>`<div class="print-page pg-${Math.min(g.length,3)}">`+g.map(s=>`
       <div class="print-dept">
         <h2>${escapeHtml(s.label)}　（${origYm.replace("-","年")}月）</h2>
         ${s.tableHTML}
-      </div>`).join("");
+      </div>`).join("")+`</div>`).join("");
     document.body.classList.add('print-all-mode');
     // 描画がブラウザに反映されるのを待ってから印刷を開く（直後に呼ぶと空白で印刷されることがあるため）
     await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
