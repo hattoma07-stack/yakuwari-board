@@ -1958,6 +1958,11 @@ $("#doAuto").onclick=()=>{
   S.staff.forEach(s=>{ const rr=S.roster[s.id], wu={};
     for(let d=1;d<=nd;d++){const c=rr[d];const st=c&&statusByCode(c);if(st&&!st.work){const wi=weekIndexOf(d);wu[wi]=(wu[wi]||0)+1;}}
     weekUsed[s.id]=wu; });
+  // 早番・遅番に入れる人（常勤）が足りなくならないよう、その日の「早遅に入れる人数」を数えておく
+  const shiftOnPre=shiftMixOn()&&S.shiftN&&statusByCode("早")&&statusByCode("遅")&&isStatusEnabled("早")&&isStatusEnabled("遅");
+  const shiftNeed=shiftOnPre?((Number(S.shiftN.early)||0)+(Number(S.shiftN.late)||0)):0;
+  const isElig=s=>!isPartTimeType(typeById(s.typeId))&&!s.nightOnly;
+  const availEL={}; for(let d=1;d<=nd;d++)availEL[d]=S.staff.filter(s=>{if(!isElig(s))return false;const c=S.roster[s.id][d];return !c||c==="早"||c==="遅";}).length;
   let progress=true;
   while(progress){ progress=false;
     for(const s of S.staff){ if(need[s.id]<=0)continue; const rr=S.roster[s.id]; const wu=weekUsed[s.id];
@@ -1965,10 +1970,11 @@ $("#doAuto").onclick=()=>{
       const myJobs=jobs.filter(j=>inJob(j,s)&&(Number(jreq[j.id])||0)>0);
       for(let d=1;d<=nd;d++){ if(rr[d]||dayWork[d]<=min)continue;   // 空欄 かつ 休ませても最低人数を保てる日
         if(myJobs.some(j=>dayJ[j.id][d]<=(Number(jreq[j.id])||0)))continue;                        // 職種ごとの最低人数も保てる日
+        if(shiftNeed&&isElig(s)&&availEL[d]<=shiftNeed)continue;                                   // 早番・遅番の人数も保てる日
         const wi=weekIndexOf(d);
         const score=-((wu[wi]||0)*1000)+dayWork[d]*5+nearOff(rr,d); // 1: 休みが少ない週を優先 2: 出勤余力 3: 既存の休みから離す
         if(score>bestScore){bestScore=score;best=d;} }
-      if(best>0){rr[best]=rcode;setAuto(s.id,best,true);dayWork[best]--;need[s.id]--;jobs.forEach(j=>{if(inJob(j,s))dayJ[j.id][best]--;});
+      if(best>0){rr[best]=rcode;setAuto(s.id,best,true);dayWork[best]--;need[s.id]--;if(isElig(s))availEL[best]--;jobs.forEach(j=>{if(inJob(j,s))dayJ[j.id][best]--;});
         const wi=weekIndexOf(best);wu[wi]=(wu[wi]||0)+1;progress=true;}
     }
   }
