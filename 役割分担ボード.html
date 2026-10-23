@@ -900,13 +900,13 @@ const SUMCOLS_HOME=[
   {label:"休",codes:["公","希"]},{label:"有",codes:["有"]}];
 const SUMCOLS_OFFICE=[{label:"出",codes:["出"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 事務：早番・遅番・夜勤なし
 const SUMCOLS_DAY=[{label:"出",codes:["出","半","研"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // デイサービス：半休・研修は出に含める
-const SUMCOLS_BY_DEPT={home:SUMCOLS_HOME,nursing:SUMCOLS_HOME,office:SUMCOLS_OFFICE,day:SUMCOLS_DAY};
+const SUMCOLS_BY_DEPT={home:SUMCOLS_HOME,nursing:SUMCOLS_HOME,office:SUMCOLS_OFFICE,day:SUMCOLS_DAY,rehab:SUMCOLS_DAY};
 // 合計の列は値を出さない（月の日数との照合・赤字表示は行わない）
-const SUMTOTAL_BOX={home:true,nursing:true,office:true,day:true}; // 合計は表の外の別枠（右側）に出す
+const SUMTOTAL_BOX={home:true,nursing:true,office:true,day:true,rehab:true}; // 合計は表の外の別枠（右側）に出す
 const sumColsOf=()=>SUMCOLS_BY_DEPT[FSCOPE]||null;
 // 勤務表の下に出す「日ごとの記号別スタッフ数」の行（指定した部署のみ）
-const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"],nursing:["早","日","遅","夜"],office:["出"]};
-const SHIFTROWS_MIN={office:true}; // この部署は記号別の行に「1日の最低出勤人数」の不足（赤）も出す
+const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"],nursing:["早","日","遅","夜"],office:["出"],rehab:["出"]};
+const SHIFTROWS_MIN={office:true,rehab:true}; // この部署は記号別の行に「1日の最低出勤人数」の不足（赤）も出す
 // 送迎職員は「職種」ではなく、台帳の「送迎が可能」チェックで数える（兼任できる）。他の職種は職種の選択で数える
 const inJob=(j,s)=>j.drive?!!s.canDrive:s.job===j.id;
 const DEF_ROLES=[
@@ -935,7 +935,7 @@ const DEF_STATUS_ENABLED={
   office:["出","公","有","希","欠"],
   nursing:["日","早","遅","夜","公","有","希","欠"],
   kitchen:["出","公","有","希","欠"],
-  rehab:["出","公","有","希","欠"]
+  rehab:["出","半","研","公","有","希","欠"]
 };
 
 /* ---------- storage（ローカル保存＋Googleスプレッドシート同期） ---------- */
@@ -1060,8 +1060,8 @@ function loadMasters(){
   S.staff=jget(K.staff,null); S.status=jget(K.status,null);
   S.times=jget(K.times,null); S.tasks=jget(K.tasks,null); S.types=jget(K.types,null); S.roles=jget(K.roles,null);
   S.statusEnabled=jget(K.statusEnabled,null);
-  if(FSCOPE==="nursing"&&S.statusEnabled&&!jget(K.meta,{}).seMig){ // 看護を訪問介護と同じ記号セットへ（旧い既定のままの場合だけ一度移行）
-    const old=["出","公","有","希","欠"]; if(S.statusEnabled.length===old.length&&old.every(c=>S.statusEnabled.includes(c))){S.statusEnabled=DEF_STATUS_ENABLED.nursing.slice();saveStatusEnabled();}
+  if((FSCOPE==="nursing"||FSCOPE==="rehab")&&S.statusEnabled&&!jget(K.meta,{}).seMig){ // 看護・リハビリを新しい記号セットへ（旧い既定のままの場合だけ一度移行）
+    const old=["出","公","有","希","欠"]; if(S.statusEnabled.length===old.length&&old.every(c=>S.statusEnabled.includes(c))){S.statusEnabled=DEF_STATUS_ENABLED[FSCOPE].slice();saveStatusEnabled();}
     jset(K.meta,{...jget(K.meta,{}),seMig:true}); }
   const mn=jget(K.meta,{}).minStaff; S.minStaff=(mn==null?3:mn);
   S.shiftN=jget(K.meta,{}).shiftN||JSON.parse(JSON.stringify(DEF_SHIFTN[FSCOPE]||{}));
