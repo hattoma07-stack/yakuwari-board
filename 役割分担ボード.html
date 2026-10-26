@@ -884,7 +884,8 @@ const JOBS_BY_DEPT={day:[
   {id:"counselor",name:"生活相談員",short:"生活相談員"},
   {id:"nurse",name:"委託看護職員",short:"委託看護職員"},
   {id:"ft",name:"機能訓練指導員",short:"機能訓練指導員"},
-  {id:"driver",name:"送迎職員",short:"送迎職員",drive:true}]};
+  {id:"driver",name:"送迎職員",short:"送迎職員",drive:true},
+  {id:"drv",name:"ドライバー",short:"ドライバー",noRow:true}]}; // ドライバー：台帳で選ぶ職種（送迎職員にも数える。下の人数の行は出さない）
 const DEF_REQ={day:{care:8,counselor:1,nurse:1,ft:1,driver:3}};
 const jobsOf=()=>JOBS_BY_DEPT[FSCOPE]||[];
 // 夜勤の振り分けを行う部署（スタッフ台帳の「夜勤が可能」にチェックした人だけが対象）と、1晩あたりの既定人数
@@ -895,6 +896,7 @@ const nightDeptOn=()=>NIGHT_DEPTS.includes(FSCOPE);
 const DEF_SHIFTN={home:{early:2,late:2},nursing:{early:2,late:2},kitchen:{early:2,late:2}}; // 訪問介護と看護は同じ作り
 const shiftMixOn=()=>!!DEF_SHIFTN[FSCOPE];
 const hasDriveJob=()=>jobsOf().some(j=>j.drive);
+const rowJobsOf=()=>jobsOf().filter(j=>!j.noRow); // 下の人数の行・最低人数の設定の対象
 // 勤務表の右側に出す「記号ごとの日数」の列（指定した部署のみ）。合計が月の日数と一致するか確認できる
 const SUMCOLS_HOME=[
   {label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"夜",codes:["夜"]},
@@ -910,7 +912,7 @@ const sumColsOf=()=>SUMCOLS_BY_DEPT[FSCOPE]||null;
 const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"],nursing:["早","日","遅","夜"],office:["出"],rehab:["出"],kitchen:["早","日","遅"],kyotaku:["出"]};
 const SHIFTROWS_MIN={office:true,rehab:true,kyotaku:true}; // この部署は記号別の行に「1日の最低出勤人数」の不足（赤）も出す
 // 送迎職員は「職種」ではなく、台帳の「送迎が可能」チェックで数える（兼任できる）。他の職種は職種の選択で数える
-const inJob=(j,s)=>j.drive?!!s.canDrive:s.job===j.id;
+const inJob=(j,s)=>j.drive?(!!s.canDrive||s.job==="drv"):s.job===j.id;
 const DEF_ROLES=[
   {id:"r_leader",name:"リーダー",leader:true,cells:{}},
   {id:"r_a",name:"役割A",leader:false,cells:{}},
@@ -1089,7 +1091,7 @@ function loadMasters(){
     seeded=false;
   }
   // migrate: ensure typeId / hours / task duration
-  S.staff.forEach(s=>{if(!s.typeId)s.typeId=S.types[0].id; if(s.off===undefined)s.off=null; if(s.hours===undefined)s.hours=null; if(s.job===undefined)s.job=""; if(s.canNight===undefined)s.canNight=false; if(s.nightOnly===undefined)s.nightOnly=false; if(s.nightCount===undefined)s.nightCount=null; if(s.workDays===undefined)s.workDays=null; if(s.canDrive===undefined){s.canDrive=(s.job==="driver"); if(s.job==="driver")s.job="";}});
+  S.staff.forEach(s=>{if(!s.typeId)s.typeId=S.types[0].id; if(s.off===undefined)s.off=null; if(s.hours===undefined)s.hours=null; if(FSCOPE==="day"&&s.hours&&!s.job)s.job="drv"; if(s.job===undefined)s.job=""; if(s.canNight===undefined)s.canNight=false; if(s.nightOnly===undefined)s.nightOnly=false; if(s.nightCount===undefined)s.nightCount=null; if(s.workDays===undefined)s.workDays=null; if(s.canDrive===undefined){s.canDrive=(s.job==="driver"); if(s.job==="driver")s.job="";}});
   S.tasks.forEach(t=>{if(!t.dur)t.dur=30;});
   saveStaff();jset(K.status,S.status);jset(K.times,S.times);jset(K.tasks,S.tasks);jset(K.types,S.types);jset(K.roles,S.roles);
   return seeded;
@@ -1471,7 +1473,7 @@ function renderRoster(){
       r+=`<td class="${clsFor(d)} num${low?' low':''}">${n?fmtN(n):''}</td>`;}
     return r+(sc?'<td class="sumcol sn"></td>'.repeat(nShow):'<td class="sumcol s-work"></td><td class="sumcol s-off"></td>')+'</tr>';
   };
-  const jobsRows=jobsOf();
+  const jobsRows=rowJobsOf();
   let foot='<tfoot>'+(jobsRows.length||SHIFTROWS_BY_DEPT[FSCOPE]?'':footRow('出勤数',minS,()=>true,true));
   jobsRows.forEach(j=>{foot+=footRow(escapeHtml(j.short),Number(S.req[j.id])||0,s=>inJob(j,s),false);});
   (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st?escapeHtml(st.label.replace(c,'')):''),SHIFTROWS_MIN[FSCOPE]?minS:0,()=>true,false,c);});
@@ -1528,7 +1530,7 @@ function renderStaffList(){
     const card=document.createElement('div');card.className="staff-edit";
     const segs=S.types.map(t=>`<button class="segbtn" data-ty="${t.id}" aria-pressed="${s.typeId===t.id}">${escapeHtml(t.name)}</button>`).join("");
     const preset=hoursPreset(s);
-    const hbtns=[["full","終日"],["both","朝夕"],["am","朝のみ"],["pm","夕のみ"]].concat(nightDeptOn()?[["night","夜勤のみ"]]:[])
+    const hbtns=(FSCOPE==="day"?[["both","朝夕"],["am","朝のみ"],["pm","夕のみ"]]:[["full","終日"],["both","朝夕"],["am","朝のみ"],["pm","夕のみ"]]).concat(nightDeptOn()?[["night","夜勤のみ"]]:[])
       .map(([v,l])=>`<button class="segbtn" data-h="${v}" aria-pressed="${preset===v}">${l}</button>`).join("");
     const bandRow=(k,l,b)=>b?`<div class="hrow" data-band="${k}"><span>${l}</span><input type="time" class="hs" value="${b.s}"><span>–</span><input type="time" class="he" value="${b.e}"></div>`:"";
     const hdetail=s.hours?`<div class="hrows">${bandRow('am','朝',s.hours.am)}${bandRow('pm','夕',s.hours.pm)}</div>`:"";
@@ -1560,9 +1562,9 @@ function renderStaffList(){
         <div class="fl" style="flex:1"><span>勤務できる曜日（非常勤）</span>
           <div class="seg wdseg">${DOW.map((w,i)=>`<button class="segbtn" data-wd="${i}" aria-pressed="${!s.workDays||s.workDays.includes(i)}">${w}</button>`).join("")}</div></div>
       </div>`:""}
-      <div class="line2">
-        <div class="fl" style="flex:1"><span>勤務時間帯（ドライバー等）</span><div class="seg hseg">${hbtns}</div></div>
-      </div>
+      ${(FSCOPE!=="day"||s.job==="drv"||s.hours)?`<div class="line2">
+        <div class="fl" style="flex:1"><span>${FSCOPE==="day"?"勤務時間帯（ドライバー）":"勤務時間帯（ドライバー等）"}</span><div class="seg hseg">${hbtns}</div></div>
+      </div>`:""}
       ${hdetail}`;
     card.querySelector('.nm-in').value=s.name;
     card.querySelector('input[type=color]').oninput=e=>{s.color=e.target.value;saveStaff();refreshAll();};
@@ -1574,7 +1576,9 @@ function renderStaffList(){
     const dchk=card.querySelector('.drive-in');
     if(dchk)dchk.onchange=e=>{s.canDrive=e.target.checked;saveStaff();if(S.tab==="roster")renderRoster();else refreshAll();};
     card.querySelectorAll('.jobseg .segbtn').forEach(b=>b.onclick=()=>{
-      s.job=b.dataset.job;saveStaff();renderStaffList();
+      s.job=b.dataset.job;
+      if(FSCOPE==="day"){ if(s.job==="drv"&&!s.hours)setHoursPreset(s,"both"); else if(s.job!=="drv")s.hours=null; } // ドライバーは朝夕を初期値に、ほかの職種は時間帯の制限なし
+      saveStaff();renderStaffList();
       if(S.tab==="roster")renderRoster();else refreshAll();});
     card.querySelectorAll('.tyseg .segbtn').forEach(b=>b.onclick=()=>{
       s.typeId=b.dataset.ty;saveStaff();renderStaffList();
@@ -1866,7 +1870,7 @@ function openSettings(){
   $("#settingsTitle").textContent=`休日・休業日の設定（${y}年${m}月）`;
   const mi=$("#minStaffIn");mi.value=S.minStaff;
   mi.oninput=e=>{S.minStaff=e.target.value===''?0:Number(e.target.value);saveMeta();if(S.tab==="roster")renderRoster();};
-  const jobs=jobsOf();
+  const jobs=rowJobsOf();
   $("#jobReqBox").hidden=!jobs.length;
   $("#nightReqBox").hidden=!nightDeptOn();
   $("#shiftReqBox").hidden=!shiftMixOn();
@@ -1990,7 +1994,7 @@ $("#doAuto").onclick=()=>{
   for(let d=1;d<=nd;d++){ let w=0; S.staff.forEach(s=>{const c=S.roster[s.id][d];
     w+=wOfCode(c,s,d);}); dayWork[d]=w; }
   // 職種別の日別出勤数（職種ごとの最低人数を守るため）
-  const jobs=jobsOf(), jreq=S.req||{}, dayJ={};
+  const jobs=rowJobsOf(), jreq=S.req||{}, dayJ={};
   jobs.forEach(j=>{dayJ[j.id]={}; for(let d=1;d<=nd;d++){let w=0;
     S.staff.forEach(s=>{ if(!inJob(j,s))return; const c=S.roster[s.id][d];
       w+=wOfCode(c,s,d); }); dayJ[j.id][d]=w;}});
