@@ -251,6 +251,7 @@
   table.roster td.rc{cursor:pointer;height:34px;font-weight:700;font-size:14px}
   table.roster .rname .wt{font-size:10.5px;font-weight:700;color:var(--ink-soft);line-height:1.2;margin-top:1px;white-space:nowrap}
   table.roster td.rc .wish{color:#C62828}
+  table.roster td.rc .hl{display:block;font-size:9px;font-weight:700;letter-spacing:-.3px;white-space:nowrap}
   table.roster td.rc .tm{display:block;letter-spacing:-.3px;font-size:7.5px;line-height:1.1;font-weight:700;color:#C62828;white-space:nowrap}
   table.roster td.rc .hm{display:block;font-size:8px;line-height:1;margin-top:1px}
   table.roster td.rc:hover{outline:2px solid var(--accent);outline-offset:-2px}
@@ -574,7 +575,7 @@
       </div>
       <div class="rtotal no-print" id="rtotal" hidden></div>
     </div>
-    <p class="hint no-print" style="text-align:left">希望休を塗る →「休日数に合わせて自動作成」で、なるべく週2日休みになるよう不足分の公休を配置し残りを出勤に。右端の「休/目標」で過不足を確認できます。非常勤の勤務時間をその日だけ変える場合は、「時間変更」を選んでマスをタップして時間を入力します。半日の記号（半休・半有）は、マスをタップするたびに「前（AM）→後（PM）→消す」と切り替わり、0.5日分として数えます。</p>
+    <p class="hint no-print" style="text-align:left">希望休を塗る →「休日数に合わせて自動作成」で、なるべく週2日休みになるよう不足分の公休を配置し残りを出勤に。右端の「休/目標」で過不足を確認できます。非常勤の勤務時間をその日だけ変える場合は、「時間変更」を選んでマスをタップして時間を入力します。半日の休みは、「公休」または「有休」を選んでマスを続けてタップします（1回目＝全日、2回目＝AM休／AM有、3回目＝PM休／PM有、4回目＝消す）。AM・PMは0.5日分として数えます。</p>
   </div>
 
   <!-- ============ SETTINGS VIEW ============ -->
@@ -899,7 +900,7 @@ const SUMCOLS_HOME=[
   {label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"夜",codes:["夜"]},
   {label:"休",codes:["公","希"]},{label:"有",codes:["有"]}];
 const SUMCOLS_OFFICE=[{label:"出",codes:["出"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 事務：早番・遅番・夜勤なし
-const SUMCOLS_DAY=[{label:"日",codes:["日","出","半","研"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // デイサービス：日勤（過去の「出」・半休・研修を含む）。早・遅・夜はなし
+const SUMCOLS_DAY=[{label:"日",codes:["日","出"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // デイサービス：日勤（過去の「出」・半休・研修を含む）。早・遅・夜はなし
 const SUMCOLS_KITCHEN=[{label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 栄養士・厨房：夜勤なし
 const SUMCOLS_BY_DEPT={home:SUMCOLS_HOME,nursing:SUMCOLS_HOME,office:SUMCOLS_OFFICE,day:SUMCOLS_DAY,rehab:SUMCOLS_DAY,kitchen:SUMCOLS_KITCHEN,kyotaku:SUMCOLS_OFFICE};
 // 合計の列は値を出さない（月の日数との照合・赤字表示は行わない）
@@ -923,19 +924,17 @@ const DEF_STATUS=[
   {code:"早",label:"早番",color:"#4A7FB5",work:true},
   {code:"遅",label:"遅番",color:"#C9722E",work:true},
   {code:"夜",label:"夜勤",color:"#4C4C8E",work:true,night:true},
-  {code:"半",label:"半休",color:"#C9A227",work:true,half:true},
-  {code:"研",label:"研修",color:"#8E6FB0",work:true},
   {code:"公",label:"公休",color:"#9AA3A0",work:false},
   {code:"有",label:"有休",color:"#4A9E8F",work:false},
   {code:"希",label:"希望休",color:"#B0A99A",work:false}];
 // 部署ごとに「初期状態で使う記号」。あとから設定画面で自由に変更可能。
 const DEF_STATUS_ENABLED={
-  day:["日","半","研","公","有","希"],
+  day:["日","公","有","希"],
   home:["日","早","遅","夜","公","有","希"],
   office:["出","公","有","希"],
   nursing:["日","早","遅","夜","公","有","希"],
   kitchen:["日","早","遅","公","有","希"],
-  rehab:["出","半","研","公","有","希"],
+  rehab:["出","公","有","希"],
   kyotaku:["出","公","有","希"]
 };
 
@@ -1071,9 +1070,11 @@ function loadMasters(){
   S.req=jget(K.meta,{}).req||JSON.parse(JSON.stringify(DEF_REQ[FSCOPE]||{}));
   let seeded=jget(K.meta,{}).seeded;
   if(!S.status) S.status=JSON.parse(JSON.stringify(DEF_STATUS));
-  { const ketsu=st=>st.code==="欠"&&st.label==="欠勤"; // 「欠勤」は廃止：記号一覧と各部署の使う記号から外す
-    if(S.status.some(ketsu)){S.status=S.status.filter(st=>!ketsu(st));jset(K.status,S.status);}
-    if(S.statusEnabled&&S.statusEnabled.includes("欠")&&!S.status.some(st=>st.code==="欠")){S.statusEnabled=S.statusEnabled.filter(c=>c!=="欠");saveStatusEnabled();} }
+  { // 廃止した記号（欠勤・研修・半休）を、記号一覧と各部署の使う記号から外す。半休は「公休」を続けてタップする方式に変更
+    const gone=st=>(st.code==="欠"&&st.label==="欠勤")||(st.code==="研"&&st.label==="研修")||(st.code==="半"&&st.label==="半休");
+    if(S.status.some(gone)){S.status=S.status.filter(st=>!gone(st));jset(K.status,S.status);}
+    if(S.statusEnabled){ const keep=S.statusEnabled.filter(c=>c==="欠"||c==="研"||c==="半"?S.status.some(st=>st.code===c):true);
+      if(keep.length!==S.statusEnabled.length){S.statusEnabled=keep;saveStatusEnabled();} } }
   S.status.forEach(st=>{if(st.night===undefined)st.night=/夜/.test(st.label||st.code||"");}); // 夜勤の記号（翌日は休み）
   S.status.forEach(st=>{if(st.half===undefined)st.half=/^半/.test(st.label||st.code||"");}); // 「半休」「半有」など半日扱いの記号
   if(!S.statusEnabled) S.statusEnabled=(DEF_STATUS_ENABLED[FSCOPE]||S.status.map(s=>s.code)).slice();
@@ -1173,6 +1174,9 @@ function effOf(md,ym,sid,day,used){
     const st=statusByCode(code);
     if(off&&auto&&st&&st.work) return {code:cs.code,color:cs.color,work:false,rest:true,w:0,r:1,auto:true};
     if(!st&&code==="欠")return {code,color:"#BC4A3C",work:false,rest:true,w:0,r:1,auto}; // 廃止した「欠」を過去に入力していたマスは休みとして扱う
+    const hh=(md.rh&&md.rh[sid]||{})[day];
+    if(st&&!st.work&&!isWishStatus(st)&&hh) // 公休・有休を続けてタップ：AM／PM は半日（0.5日）休み＋0.5日出勤
+      return {code,color:st.color,work:true,rest:false,w:0.5,r:0.5,hr:hh,auto};
     const w=st?st.work:true;
     // w/r = 出勤・休みを何日分として数えるか（半日の記号は 0.5 日ずつ）
     const wf=st?(st.half?0.5:(st.work?1:0)):1, rf=st?(st.half?0.5:(st.work?0:1)):0;
@@ -1181,7 +1185,7 @@ function effOf(md,ym,sid,day,used){
   if(off) return {code:cs.code,color:cs.color,work:false,rest:true,w:0,r:1,auto:true};
   return {code:'',color:'',work:used,rest:false,w:used?1:0,r:0,auto:false};
 }
-const memMd=()=>({r:S.roster,ra:S.rauto,rm:S.rmeta});
+const memMd=()=>({r:S.roster,ra:S.rauto,rm:S.rmeta,rh:S.rhalf});
 const SN_W=34;
 const fmtN=n=>Number.isInteger(n)?String(n):n.toFixed(1);
 // その月の各スタッフの「休み日数」
@@ -1237,8 +1241,9 @@ function monthUsed(r,rm){
 }
 // その月のデータ。今ロード中の月なら（保存前の編集も反映するため）メモリ優先。
 function monthData(ym){
-  if(ym===S.ym) return {r:S.roster||{},ra:S.rauto||{},rm:S.rmeta||{offDows:[],offDates:[]}};
-  return {r:jget(K.roster+ym,{})||{},ra:jget(K.rauto+ym,{})||{},rm:jget(K.rmeta+ym,{offDows:[],offDates:[]})};
+  if(ym===S.ym) return {r:S.roster||{},ra:S.rauto||{},rm:S.rmeta||{offDows:[],offDates:[]},rh:S.rhalf||{}};
+  const r=jget(K.roster+ym,{})||{}, rh=jget(K.rhalf+ym,{})||{}; legacyHalf(r,rh);
+  return {r,ra:jget(K.rauto+ym,{})||{},rm:jget(K.rmeta+ym,{offDows:[],offDates:[]}),rh};
 }
 function monthHasRoster(ym){const md=monthData(ym);return monthUsed(md.r,md.rm);}
 function computeWorking(date){
@@ -1251,7 +1256,9 @@ function computeWorking(date){
 function selectedStaff(){return S.staff.filter(s=>S.day.selected.includes(s.id));}
 
 /* ---------- roster ---------- */
-function loadRoster(ym){S.ym=ym;S.roster=jget(K.roster+ym,{});S.rauto=jget(K.rauto+ym,{});S.rhalf=jget(K.rhalf+ym,{});S.rtime=jget(K.rtime+ym,{});S.rmeta=jget(K.rmeta+ym,{offDows:[],offDates:[]});}
+// 旧い「半」（半休）のマスは、「公休」＋AM/PM に読み替える
+function legacyHalf(r,h){ for(const sid in r){ for(const d in r[sid]){ if(r[sid][d]==="半"){ r[sid][d]="公"; (h[sid]||(h[sid]={}))[d]=h[sid][d]||"am"; } } } }
+function loadRoster(ym){S.ym=ym;S.roster=jget(K.roster+ym,{});S.rauto=jget(K.rauto+ym,{});S.rhalf=jget(K.rhalf+ym,{});legacyHalf(S.roster,S.rhalf);S.rtime=jget(K.rtime+ym,{});S.rmeta=jget(K.rmeta+ym,{offDows:[],offDates:[]});}
 /* ---- 勤務表の「元に戻す／やり直す」（部署×月ごと・直近50回・画面を開いている間だけ保持） ---- */
 const HIST={};
 const histKey=()=>FSCOPE+":"+S.ym;
@@ -1435,10 +1442,12 @@ function renderRoster(){
   S.staff.forEach(s=>{
     let work=0; const cnt=sc?sc.map(()=>0):null;
     bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}${workTimeLabel(s)}</td>`;
-    for(let d=1;d<=nd;d++){const e=eff(s.id,d);work+=e.w; if(sc){const k=sc.findIndex(c=>c.codes.includes(e.code));if(k>=0)cnt[k]+=1;}
+    for(let d=1;d<=nd;d++){const e=eff(s.id,d);work+=e.w;
+      if(sc){ if(e.hr){ const kr=sc.findIndex(c=>c.codes.includes(e.code)), kw=sc.findIndex(c=>c.codes.includes("日")||c.codes.includes("出")); if(kr>=0)cnt[kr]+=0.5; if(kw>=0)cnt[kw]+=0.5; }
+        else { const k=sc.findIndex(c=>c.codes.includes(e.code)); if(k>=0)cnt[k]+=1; } }
       const tmk=timeMark(s,d,e); // 時間変更した日は、記号（日勤など）を出さず、時間だけを赤で表示
       const hs=e.code&&statusByCode(e.code),hv=(S.rhalf[s.id]||{})[d],hm=(hs&&hs.half&&hv)?`<span class="hm">${hv==='pm'?'後':'前'}</span>`:'';
-      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${tmk||((hs&&isWishStatus(hs)?'<span class="wish">公</span>':e.code)+hm)}</td>`;}
+      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${tmk||(e.hr?`<span class="hl">${e.hr==='pm'?'PM':'AM'}${e.code==='公'?'休':e.code}</span>`:((hs&&isWishStatus(hs)?'<span class="wish">公</span>':e.code)+hm))}</td>`;}
     const off=offCount(s.id),tgt=staffTarget(s);
     const cls=tgt==null?'ok':off<tgt?'under':off>tgt?'over':'ok';
     if(sc){ const tot=cnt.reduce((a,b)=>a+b,0); boxRows.push({cnt,tot,off,tgt});
@@ -1453,7 +1462,7 @@ function renderRoster(){
   const minS=Number(S.minStaff)||0;
   const footRow=(label,min,pred,note,code)=>{
     let r=`<tr><td class="rname">${label}${note&&min?`<span style="font-weight:400;color:var(--ink-soft)">（最低${min}）</span>`:''}</td>`;
-    for(let d=1;d<=nd;d++){let n=0;S.staff.forEach(s=>{if(pred(s)){const e=eff(s.id,d);n+=code?(e.code===code?1:0):e.w;}});
+    for(let d=1;d<=nd;d++){let n=0;S.staff.forEach(s=>{if(pred(s)){const e=eff(s.id,d);n+=code?(e.code===code?1:((e.hr&&(code==="日"||code==="出"))?0.5:0)):e.w;}});
       const low=min&&used&&!isSetOff(d)&&n<min;
       r+=`<td class="${clsFor(d)} num${low?' low':''}">${n?fmtN(n):''}</td>`;}
     return r+(sc?'<td class="sumcol sn"></td>'.repeat(nShow):'<td class="sumcol s-work"></td><td class="sumcol s-off"></td>')+'</tr>';
@@ -1473,7 +1482,7 @@ function renderRoster(){
     rt.innerHTML=`<table class="rtot"><thead><tr>`+cs.map(x=>`<th>${x.c.label}</th>`).join("")+
       `<th class="rt-total" title="月の日数（${nd}日）と一致すれば正常">合計<div class="rt-sub">月${nd}日</div></th></tr></thead><tbody>`+
       boxRows.map(r=>`<tr>`+cs.map(x=>{ const isOff=x.c.label==="休"; const bad=isOff&&r.tgt!=null&&Math.abs(r.off-r.tgt)>1e-9; // 休日数が目標に満たない／超える場合は赤
-        return `<td class="num${bad?' bad':''}"${isOff&&r.tgt!=null?` title="休みの合計 ${fmtN(r.off)}日（目標 ${r.tgt}日）"`:''}>${r.cnt[x.i]||''}</td>`; }).join("")+
+        return `<td class="num${bad?' bad':''}"${isOff&&r.tgt!=null?` title="休みの合計 ${fmtN(r.off)}日（目標 ${r.tgt}日）"`:''}>${r.cnt[x.i]?fmtN(r.cnt[x.i]):''}</td>`; }).join("")+
         `<td class="num rt-total ${r.tot<nd?'short':'full'}" title="${r.tot<nd?`月の日数（${nd}日）に${nd-r.tot}日足りません`:'月の日数と一致'}">${r.tot}</td></tr>`).join("")+`</tbody></table>`;
     const mr=[...T.querySelectorAll('thead tr, tbody tr')], sr=[...rt.querySelectorAll('thead tr, tbody tr')];
     mr.forEach((r,i)=>{if(sr[i])sr[i].style.height=r.getBoundingClientRect().height+'px';});
@@ -1485,7 +1494,13 @@ function renderRoster(){
     if(!S.rhalf[sid])S.rhalf[sid]={};
     if(S.rtime[sid])delete S.rtime[sid][day]; // 記号を変えたら、その日の時間変更は解除
     const bst=brush&&statusByCode(brush);
-    if(bst&&bst.half){ // 半日の記号：タップするたびに 前(AM)→後(PM)→消す
+    if(bst&&!bst.work&&!isWishStatus(bst)){ // 公休・有休：続けてタップ＝1回目 全日 → 2回目 AM → 3回目 PM → 4回目 消す
+      if(S.roster[sid][day]===brush){
+        const h=S.rhalf[sid][day];
+        if(!h)S.rhalf[sid][day]="am"; else if(h==="am")S.rhalf[sid][day]="pm";
+        else {delete S.roster[sid][day];delete S.rhalf[sid][day];}
+      } else {S.roster[sid][day]=brush;delete S.rhalf[sid][day];}
+    } else if(bst&&bst.half){ // 半日の記号：タップするたびに 前(AM)→後(PM)→消す
       if(S.roster[sid][day]===brush){
         if(S.rhalf[sid][day]==="pm"){delete S.roster[sid][day];delete S.rhalf[sid][day];}
         else S.rhalf[sid][day]="pm";
@@ -1665,7 +1680,7 @@ $("#addStatus").onclick=()=>{
   saveStatusEnabled();renderStatusList();renderRoster();
 };
 $("#loadDefStatus").onclick=()=>{
-  showConfirm("勤務記号を標準セット（出勤・日勤・早番・遅番・夜勤・半休・研修・公休・有休・希望休）に置き換えます。これは全部署で共有されます。よろしいですか？\n※ 現在の記号を使った勤務表の表示が変わる場合があります。",()=>{
+  showConfirm("勤務記号を標準セット（出勤・日勤・早番・遅番・夜勤・公休・有休・希望休）に置き換えます。これは全部署で共有されます。よろしいですか？\n※ 現在の記号を使った勤務表の表示が変わる場合があります。",()=>{
     S.status=JSON.parse(JSON.stringify(DEF_STATUS));
     jset(K.status,S.status);renderStatusList();renderRoster();toast("標準の勤務記号セットを読み込みました（全部署共通）");
   },"置き換える");
@@ -1915,7 +1930,7 @@ $("#doAuto").onclick=()=>{
   // 2) 事業所休業日の空欄 → 公休（自動印）
   S.staff.forEach(s=>{ if(!S.roster[s.id])S.roster[s.id]={};const rr=S.roster[s.id];
     for(let d=1;d<=nd;d++){ if(!rr[d]&&isSetOff(d)){rr[d]=rcode;setAuto(s.id,d,true);} } });
-  const wOfCode=(c,s)=>{ if(!c)return (s&&s.nightOnly)?0:1; const st=statusByCode(c); return st?(st.half?0.5:(st.work?1:0)):1; }; // 空欄=出勤候補1・半日=0.5
+  const wOfCode=(c,s,d)=>{ if(!c)return (s&&s.nightOnly)?0:1; const st=statusByCode(c); if(st&&!st.work&&!isWishStatus(st)&&s&&d&&(S.rhalf[s.id]||{})[d])return 0.5; return st?(st.half?0.5:(st.work?1:0)):1; }; // 空欄=出勤候補1・半日=0.5
   // 2b) 夜勤の翌日は休み（夜勤の記号は手入力のもの。翌日が空欄なら公休にする。前月末の夜勤は当月1日を休みに）
   const isNight=c=>{const st=c&&statusByCode(c);return !!(st&&st.night);};
   const isRestC=c=>{const st=c&&statusByCode(c);return !!(st&&!st.work);};
@@ -1936,7 +1951,7 @@ $("#doAuto").onclick=()=>{
     const cands=S.staff.filter(s=>s.canNight||s.nightOnly);
     if(!cands.length)noNightStaff=true;
     const nCnt={}; cands.forEach(s=>{nCnt[s.id]=0;for(let d=1;d<=nd;d++)if(isNight(S.roster[s.id][d]))nCnt[s.id]++;});
-    const offOf=s=>{let o=0;const rr=S.roster[s.id];for(let d=1;d<=nd;d++){const st=rr[d]&&statusByCode(rr[d]);if(st)o+=st.half?0.5:(!st.work?1:0);}return o;};
+    const offOf=s=>{let o=0;const rr=S.roster[s.id];for(let d=1;d<=nd;d++){const st=rr[d]&&statusByCode(rr[d]);if(st)o+=st.half?0.5:(!st.work?((S.rhalf[s.id]||{})[d]&&!isWishStatus(st)?0.5:1):0);}return o;};
     for(let d=1;d<=nd&&cands.length;d++){ if(isSetOff(d))continue;
       let have=S.staff.filter(s=>isNight(S.roster[s.id][d])).length;
       while(have<nightN){
@@ -1954,17 +1969,17 @@ $("#doAuto").onclick=()=>{
   // 3) 現時点の日別出勤数（空欄＝出勤候補として数える）
   const dayWork={};
   for(let d=1;d<=nd;d++){ let w=0; S.staff.forEach(s=>{const c=S.roster[s.id][d];
-    w+=wOfCode(c,s);}); dayWork[d]=w; }
+    w+=wOfCode(c,s,d);}); dayWork[d]=w; }
   // 職種別の日別出勤数（職種ごとの最低人数を守るため）
   const jobs=jobsOf(), jreq=S.req||{}, dayJ={};
   jobs.forEach(j=>{dayJ[j.id]={}; for(let d=1;d<=nd;d++){let w=0;
     S.staff.forEach(s=>{ if(!inJob(j,s))return; const c=S.roster[s.id][d];
-      w+=wOfCode(c,s); }); dayJ[j.id][d]=w;}});
+      w+=wOfCode(c,s,d); }); dayJ[j.id][d]=w;}});
   // 4) 不足分の公休を配置（最低出勤人数を絶対の下限に、ラウンドロビンで公平＆分散）
   const warn=[];
   const need={};
   S.staff.forEach(s=>{const rr=S.roster[s.id];let off=0;
-    for(let d=1;d<=nd;d++){const c=rr[d];const st=c&&statusByCode(c);if(st)off+=st.half?0.5:(!st.work?1:0);}
+    for(let d=1;d<=nd;d++){const c=rr[d];const st=c&&statusByCode(c);if(st)off+=st.half?0.5:(!st.work?((S.rhalf[s.id]||{})[d]&&!isWishStatus(st)?0.5:1):0);}
     const tg=staffTarget(s); const raw=tg==null?0:tg-off; if(raw<0&&!s.nightOnly)warn.push(s.name+"(希望休が目標超過)");
     need[s.id]=(s.nightOnly||tg==null)?0:Math.max(0,Math.floor(raw+1e-9));}); // 目標なしの人は公休を追加しない
   const nearOff=(rr,day)=>{let best=99;for(let d=1;d<=nd;d++){const c=rr[d];const st=c&&statusByCode(c);
