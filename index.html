@@ -902,7 +902,7 @@ const SUMCOLS_HOME=[
 const SUMCOLS_OFFICE=[{label:"出",codes:["出"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 事務：早番・遅番・夜勤なし
 const SUMCOLS_DAY=[{label:"日",codes:["日","出"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // デイサービス：日勤（過去の「出」・半休・研修を含む）。早・遅・夜はなし
 const SUMCOLS_KITCHEN=[{label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 栄養士・厨房：夜勤なし
-const SUMCOLS_BY_DEPT={home:SUMCOLS_HOME,nursing:SUMCOLS_HOME,office:SUMCOLS_OFFICE,day:SUMCOLS_DAY,rehab:SUMCOLS_DAY,kitchen:SUMCOLS_KITCHEN,kyotaku:SUMCOLS_OFFICE};
+const SUMCOLS_BY_DEPT={home:SUMCOLS_HOME,nursing:SUMCOLS_HOME,office:SUMCOLS_OFFICE,day:SUMCOLS_DAY,rehab:SUMCOLS_OFFICE,kitchen:SUMCOLS_KITCHEN,kyotaku:SUMCOLS_OFFICE};
 // 合計の列は値を出さない（月の日数との照合・赤字表示は行わない）
 const SUMTOTAL_BOX={home:true,nursing:true,office:true,day:true,rehab:true,kitchen:true,kyotaku:true}; // 合計は表の外の別枠（右側）に出す
 const sumColsOf=()=>SUMCOLS_BY_DEPT[FSCOPE]||null;
