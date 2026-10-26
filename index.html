@@ -927,17 +927,16 @@ const DEF_STATUS=[
   {code:"研",label:"研修",color:"#8E6FB0",work:true},
   {code:"公",label:"公休",color:"#9AA3A0",work:false},
   {code:"有",label:"有休",color:"#4A9E8F",work:false},
-  {code:"希",label:"希望休",color:"#B0A99A",work:false},
-  {code:"欠",label:"欠勤",color:"#BC4A3C",work:false}];
+  {code:"希",label:"希望休",color:"#B0A99A",work:false}];
 // 部署ごとに「初期状態で使う記号」。あとから設定画面で自由に変更可能。
 const DEF_STATUS_ENABLED={
-  day:["出","半","研","公","有","希","欠"],
-  home:["日","早","遅","夜","公","有","希","欠"],
-  office:["出","公","有","希","欠"],
-  nursing:["日","早","遅","夜","公","有","希","欠"],
-  kitchen:["日","早","遅","公","有","希","欠"],
-  rehab:["出","半","研","公","有","希","欠"],
-  kyotaku:["出","公","有","希","欠"]
+  day:["出","半","研","公","有","希"],
+  home:["日","早","遅","夜","公","有","希"],
+  office:["出","公","有","希"],
+  nursing:["日","早","遅","夜","公","有","希"],
+  kitchen:["日","早","遅","公","有","希"],
+  rehab:["出","半","研","公","有","希"],
+  kyotaku:["出","公","有","希"]
 };
 
 /* ---------- storage（ローカル保存＋Googleスプレッドシート同期） ---------- */
@@ -1071,6 +1070,9 @@ function loadMasters(){
   S.req=jget(K.meta,{}).req||JSON.parse(JSON.stringify(DEF_REQ[FSCOPE]||{}));
   let seeded=jget(K.meta,{}).seeded;
   if(!S.status) S.status=JSON.parse(JSON.stringify(DEF_STATUS));
+  { const ketsu=st=>st.code==="欠"&&st.label==="欠勤"; // 「欠勤」は廃止：記号一覧と各部署の使う記号から外す
+    if(S.status.some(ketsu)){S.status=S.status.filter(st=>!ketsu(st));jset(K.status,S.status);}
+    if(S.statusEnabled&&S.statusEnabled.includes("欠")&&!S.status.some(st=>st.code==="欠")){S.statusEnabled=S.statusEnabled.filter(c=>c!=="欠");saveStatusEnabled();} }
   S.status.forEach(st=>{if(st.night===undefined)st.night=/夜/.test(st.label||st.code||"");}); // 夜勤の記号（翌日は休み）
   S.status.forEach(st=>{if(st.half===undefined)st.half=/^半/.test(st.label||st.code||"");}); // 「半休」「半有」など半日扱いの記号
   if(!S.statusEnabled) S.statusEnabled=(DEF_STATUS_ENABLED[FSCOPE]||S.status.map(s=>s.code)).slice();
@@ -1169,6 +1171,7 @@ function effOf(md,ym,sid,day,used){
   if(code){
     const st=statusByCode(code);
     if(off&&auto&&st&&st.work) return {code:cs.code,color:cs.color,work:false,rest:true,w:0,r:1,auto:true};
+    if(!st&&code==="欠")return {code,color:"#BC4A3C",work:false,rest:true,w:0,r:1,auto}; // 廃止した「欠」を過去に入力していたマスは休みとして扱う
     const w=st?st.work:true;
     // w/r = 出勤・休みを何日分として数えるか（半日の記号は 0.5 日ずつ）
     const wf=st?(st.half?0.5:(st.work?1:0)):1, rf=st?(st.half?0.5:(st.work?0:1)):0;
@@ -1661,7 +1664,7 @@ $("#addStatus").onclick=()=>{
   saveStatusEnabled();renderStatusList();renderRoster();
 };
 $("#loadDefStatus").onclick=()=>{
-  showConfirm("勤務記号を標準セット（出勤・日勤・早番・遅番・夜勤・半休・研修・公休・有休・希望休・欠勤）に置き換えます。これは全部署で共有されます。よろしいですか？\n※ 現在の記号を使った勤務表の表示が変わる場合があります。",()=>{
+  showConfirm("勤務記号を標準セット（出勤・日勤・早番・遅番・夜勤・半休・研修・公休・有休・希望休）に置き換えます。これは全部署で共有されます。よろしいですか？\n※ 現在の記号を使った勤務表の表示が変わる場合があります。",()=>{
     S.status=JSON.parse(JSON.stringify(DEF_STATUS));
     jset(K.status,S.status);renderStatusList();renderRoster();toast("標準の勤務記号セットを読み込みました（全部署共通）");
   },"置き換える");
