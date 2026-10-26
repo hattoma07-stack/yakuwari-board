@@ -1533,7 +1533,7 @@ function renderStaffList(){
     const hbtns=(FSCOPE==="day"?[["both","朝夕"],["am","朝のみ"],["pm","夕のみ"]]:[["full","終日"],["both","朝夕"],["am","朝のみ"],["pm","夕のみ"]]).concat(nightDeptOn()?[["night","夜勤のみ"]]:[])
       .map(([v,l])=>`<button class="segbtn" data-h="${v}" aria-pressed="${preset===v}">${l}</button>`).join("");
     const bandRow=(k,l,b)=>b?`<div class="hrow" data-band="${k}"><span>${l}</span><input type="time" class="hs" value="${b.s}"><span>–</span><input type="time" class="he" value="${b.e}"></div>`:"";
-    const hdetail=s.hours?`<div class="hrows">${bandRow('am','朝',s.hours.am)}${bandRow('pm','夕',s.hours.pm)}</div>`:"";
+    const hdetail=(s.hours&&FSCOPE!=="day")?`<div class="hrows">${bandRow('am','朝',s.hours.am)}${bandRow('pm','夕',s.hours.pm)}</div>`:"";
     card.innerHTML=`
       <div class="line1">
         <input type="color" value="${s.color}" title="色">
