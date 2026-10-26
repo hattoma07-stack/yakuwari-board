@@ -899,7 +899,7 @@ const SUMCOLS_HOME=[
   {label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"夜",codes:["夜"]},
   {label:"休",codes:["公","希"]},{label:"有",codes:["有"]}];
 const SUMCOLS_OFFICE=[{label:"出",codes:["出"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 事務：早番・遅番・夜勤なし
-const SUMCOLS_DAY=[{label:"出",codes:["出","半","研"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // デイサービス：半休・研修は出に含める
+const SUMCOLS_DAY=[{label:"日",codes:["日","出","半","研"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // デイサービス：日勤（過去の「出」・半休・研修を含む）。早・遅・夜はなし
 const SUMCOLS_KITCHEN=[{label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 栄養士・厨房：夜勤なし
 const SUMCOLS_BY_DEPT={home:SUMCOLS_HOME,nursing:SUMCOLS_HOME,office:SUMCOLS_OFFICE,day:SUMCOLS_DAY,rehab:SUMCOLS_DAY,kitchen:SUMCOLS_KITCHEN,kyotaku:SUMCOLS_OFFICE};
 // 合計の列は値を出さない（月の日数との照合・赤字表示は行わない）
@@ -930,7 +930,7 @@ const DEF_STATUS=[
   {code:"希",label:"希望休",color:"#B0A99A",work:false}];
 // 部署ごとに「初期状態で使う記号」。あとから設定画面で自由に変更可能。
 const DEF_STATUS_ENABLED={
-  day:["出","半","研","公","有","希"],
+  day:["日","半","研","公","有","希"],
   home:["日","早","遅","夜","公","有","希"],
   office:["出","公","有","希"],
   nursing:["日","早","遅","夜","公","有","希"],
@@ -1061,8 +1061,9 @@ function loadMasters(){
   S.staff=jget(K.staff,null); S.status=jget(K.status,null);
   S.times=jget(K.times,null); S.tasks=jget(K.tasks,null); S.types=jget(K.types,null); S.roles=jget(K.roles,null);
   S.statusEnabled=jget(K.statusEnabled,null);
-  if((FSCOPE==="nursing"||FSCOPE==="rehab"||FSCOPE==="kitchen")&&S.statusEnabled&&!jget(K.meta,{}).seMig){ // 看護・リハビリを新しい記号セットへ（旧い既定のままの場合だけ一度移行）
-    const old=["出","公","有","希","欠"]; if(S.statusEnabled.length===old.length&&old.every(c=>S.statusEnabled.includes(c))){S.statusEnabled=DEF_STATUS_ENABLED[FSCOPE].slice();saveStatusEnabled();}
+  if((FSCOPE==="nursing"||FSCOPE==="rehab"||FSCOPE==="kitchen"||FSCOPE==="day")&&S.statusEnabled&&!jget(K.meta,{}).seMig){ // 新しい記号セットへ（旧い既定のままの場合だけ一度移行。デイサービスは「出」→「日」）
+    const oldBase=FSCOPE==="day"?["出","半","研","公","有","希"]:["出","公","有","希"], cur=S.statusEnabled.filter(c=>c!=="欠");
+    if(cur.length===oldBase.length&&oldBase.every(c=>cur.includes(c))){S.statusEnabled=DEF_STATUS_ENABLED[FSCOPE].slice();saveStatusEnabled();}
     jset(K.meta,{...jget(K.meta,{}),seMig:true}); }
   const mn=jget(K.meta,{}).minStaff; S.minStaff=(mn==null?3:mn);
   S.shiftN=jget(K.meta,{}).shiftN||JSON.parse(JSON.stringify(DEF_SHIFTN[FSCOPE]||{}));
