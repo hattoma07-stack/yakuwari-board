@@ -1543,8 +1543,7 @@ function renderStaffList(){
       ${nightDeptOn()?`<div class="line2">
         <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="night-can" ${s.canNight?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">夜勤が可能（自動作成で夜勤を割り振る対象になります）</label>${(s.canNight||s.nightOnly)?`
         <label style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;margin-top:6px">月の夜勤回数
-          <input type="number" class="night-cnt" min="0" max="31" placeholder="指定なし" value="${s.nightCount==null?'':s.nightCount}" style="width:84px;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:5px 8px">回
-          <span style="font-weight:400;font-size:11.5px;color:var(--ink-soft)">（空欄＝回数は指定せず、夜勤の少ない人から順に割り振り）</span></label>`:""}
+          <input type="number" class="night-cnt" min="0" max="31" placeholder="指定なし" value="${s.nightCount==null?'':s.nightCount}" style="width:84px;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:5px 8px">回</label>`:""}
       </div>`:""}
       <div class="line2">
         <div class="fl"><span>雇用形態</span><div class="seg tyseg">${segs}</div></div>
