@@ -556,6 +556,8 @@
       </div>
       <button class="btn" id="btnSettings"><span class="ico">🧮</span>休日・休業日の設定</button>
       <button class="btn primary" id="btnAuto"><span class="ico">✨</span>休日数に合わせて自動作成</button>
+      <button class="btn" id="btnUndo" title="元に戻す（Ctrl＋Z／⌘＋Z）"><span class="ico">↶</span>元に戻す</button>
+      <button class="btn" id="btnRedo" title="やり直す（Ctrl＋Y／⌘＋Shift＋Z）"><span class="ico">↷</span>やり直す</button>
       <span class="spacer"></span>
       <button class="btn primary" id="btnPrintRoster"><span class="ico">🖨️</span>印刷・PDF（事務提出用）</button>
       <button class="btn ghost sm" id="btnTheme2" title="表示切替">◐</button>
@@ -1127,7 +1129,7 @@ function openTimeEdit(sid,day){
 }
 function readTimeEdit(p){const root=$("#timeEditSel"),h=root.querySelector('.'+p+'-h').value,m=root.querySelector('.'+p+'-m').value;return h?h+":"+(m||"00"):"";}
 function commitTimeEdit(clear){
-  if(!timeEditCtx)return; const {sid,day}=timeEditCtx, s=staffById(sid), u=s.workTime||{};
+  if(!timeEditCtx)return; pushUndo(); const {sid,day}=timeEditCtx, s=staffById(sid), u=s.workTime||{};
   if(!S.rtime[sid])S.rtime[sid]={};
   const a=clear?"":readTimeEdit("te-s"), b=clear?"":readTimeEdit("te-e");
   if(clear||(!a&&!b)||(a===(u.s||"")&&b===(u.e||"")))delete S.rtime[sid][day]; else S.rtime[sid][day]={s:a,e:b};
@@ -1246,6 +1248,18 @@ function selectedStaff(){return S.staff.filter(s=>S.day.selected.includes(s.id))
 
 /* ---------- roster ---------- */
 function loadRoster(ym){S.ym=ym;S.roster=jget(K.roster+ym,{});S.rauto=jget(K.rauto+ym,{});S.rhalf=jget(K.rhalf+ym,{});S.rtime=jget(K.rtime+ym,{});S.rmeta=jget(K.rmeta+ym,{offDows:[],offDates:[]});}
+/* ---- 勤務表の「元に戻す／やり直す」（部署×月ごと・直近50回・画面を開いている間だけ保持） ---- */
+const HIST={};
+const histKey=()=>FSCOPE+":"+S.ym;
+const histOf=()=>HIST[histKey()]||(HIST[histKey()]={undo:[],redo:[]});
+const rosterSnap=()=>JSON.stringify({r:S.roster,a:S.rauto,h:S.rhalf,t:S.rtime});
+function pushUndo(){ const h=histOf(); h.undo.push(rosterSnap()); if(h.undo.length>50)h.undo.shift(); h.redo=[]; updateUndoButtons(); }
+function restoreSnap(js){ const o=JSON.parse(js); S.roster=o.r||{}; S.rauto=o.a||{}; S.rhalf=o.h||{}; S.rtime=o.t||{}; saveRoster(); renderRoster(); }
+function undoRoster(){ const h=histOf(); if(!h.undo.length){toast("これ以上、元に戻せません");return;}
+  h.redo.push(rosterSnap()); restoreSnap(h.undo.pop()); toast("元に戻しました"); }
+function redoRoster(){ const h=histOf(); if(!h.redo.length){toast("やり直せる操作がありません");return;}
+  h.undo.push(rosterSnap()); restoreSnap(h.redo.pop()); toast("やり直しました"); }
+function updateUndoButtons(){ const h=histOf(), u=$("#btnUndo"), r=$("#btnRedo"); if(!u||!r)return; u.disabled=!h.undo.length; r.disabled=!h.redo.length; }
 function saveRoster(){jset(K.roster+S.ym,S.roster);jset(K.rauto+S.ym,S.rauto);jset(K.rhalf+S.ym,S.rhalf);jset(K.rtime+S.ym,S.rtime);}
 function saveRmeta(){jset(K.rmeta+S.ym,S.rmeta);}
 function isAuto(sid,day){return !!(S.rauto[sid]||{})[day];}
@@ -1463,6 +1477,7 @@ function renderRoster(){
   $$("td.rc",T).forEach(td=>{td.onclick=()=>{
     const sid=td.dataset.sid,day=+td.dataset.day;if(!S.roster[sid])S.roster[sid]={};
     if(brush==="@time"){ openTimeEdit(sid,day); return; }
+    pushUndo();
     if(!S.rhalf[sid])S.rhalf[sid]={};
     if(S.rtime[sid])delete S.rtime[sid][day]; // 記号を変えたら、その日の時間変更は解除
     const bst=brush&&statusByCode(brush);
@@ -1479,6 +1494,7 @@ function renderRoster(){
     saveRoster();renderRoster();
   };});
   if($("#brushes"))renderBrushes();
+  updateUndoButtons();
 }
 function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
@@ -1870,11 +1886,21 @@ function openAuto(){
   openModal("#autoOverlay");
 }
 $("#btnAuto").onclick=openAuto;
+$("#btnUndo").onclick=undoRoster;
+$("#btnRedo").onclick=redoRoster;
+document.addEventListener("keydown",e=>{ // Ctrl/⌘＋Z：元に戻す、Ctrl＋Y または Ctrl/⌘＋Shift＋Z：やり直す
+  if(!ROLE||S.tab!=="roster"||modalStack.length)return;
+  const t=e.target, tag=(t&&t.tagName)||""; if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(t&&t.isContentEditable))return;
+  if(!(e.ctrlKey||e.metaKey))return; const k=(e.key||"").toLowerCase();
+  if(k==="z"&&!e.shiftKey){e.preventDefault();undoRoster();}
+  else if(k==="y"||(k==="z"&&e.shiftKey)){e.preventDefault();redoRoster();}
+});
 $("#timeEditSave").onclick=()=>commitTimeEdit(false);
 $("#timeEditReset").onclick=()=>commitTimeEdit(true);
 function spread(arr,k){ if(k>=arr.length)return arr.slice(); const res=[];const step=arr.length/k;
   for(let i=0;i<k;i++)res.push(arr[Math.floor(i*step+step/2)]); return res; }
 $("#doAuto").onclick=()=>{
+  pushUndo(); // 自動作成も元に戻せる
   const wcode=(enabledStatuses().find(s=>s.work)||S.status.find(s=>s.work)||{}).code;
   const rcode=closedStatus().code;
   if(!wcode){toast("「出勤」の勤務記号がありません");return;}
