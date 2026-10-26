@@ -697,7 +697,7 @@
 <div class="overlay" id="staffOverlay"><div class="modal">
   <div class="modal-head"><h3>スタッフ台帳</h3><button class="x" data-close>×</button></div>
   <div class="modal-body">
-    <div class="mlabel">名前・色／職種／雇用形態（非常勤は勤務時間）／勤務時間帯</div>
+    <div class="mlabel">名前・色／職種／雇用形態（非常勤は勤務時間・勤務できる曜日）</div>
     <div class="edit-list" id="staffList"></div>
     <div class="edit-row"><input type="text" id="newStaffName" placeholder="スタッフ名を追加" maxlength="12"><button class="btn sm" id="addStaff">＋ 追加</button></div>
     <p style="margin-top:12px"><button class="btn sm" id="btnTypesFromStaff">雇用形態と既定休日数を編集</button></p>
@@ -1091,7 +1091,7 @@ function loadMasters(){
     seeded=false;
   }
   // migrate: ensure typeId / hours / task duration
-  S.staff.forEach(s=>{if(!s.typeId)s.typeId=S.types[0].id; if(s.off===undefined)s.off=null; if(s.hours===undefined)s.hours=null; if(FSCOPE==="day"&&s.hours&&!s.job)s.job="drv"; if(s.job===undefined)s.job=""; if(s.canNight===undefined)s.canNight=false; if(s.nightOnly===undefined)s.nightOnly=false; if(s.nightCount===undefined)s.nightCount=null; if(s.workDays===undefined)s.workDays=null; if(s.canDrive===undefined){s.canDrive=(s.job==="driver"); if(s.job==="driver")s.job="";}});
+  S.staff.forEach(s=>{if(!s.typeId)s.typeId=S.types[0].id; if(s.off===undefined)s.off=null; if(s.hours===undefined)s.hours=null; if(FSCOPE==="day"&&s.hours&&!s.job)s.job="drv"; if(FSCOPE!=="day"&&s.hours)s.hours=null; if(s.job===undefined)s.job=""; if(s.canNight===undefined)s.canNight=false; if(s.nightOnly===undefined)s.nightOnly=false; if(s.nightCount===undefined)s.nightCount=null; if(s.workDays===undefined)s.workDays=null; if(s.canDrive===undefined){s.canDrive=(s.job==="driver"); if(s.job==="driver")s.job="";}});
   S.tasks.forEach(t=>{if(!t.dur)t.dur=30;});
   saveStaff();jset(K.status,S.status);jset(K.times,S.times);jset(K.tasks,S.tasks);jset(K.types,S.types);jset(K.roles,S.roles);
   return seeded;
@@ -1548,6 +1548,7 @@ function renderStaffList(){
       </div>`:""}
       ${nightDeptOn()?`<div class="line2">
         <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="night-can" ${s.canNight?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">夜勤が可能（自動作成で夜勤を割り振る対象になります）</label>${(s.canNight||s.nightOnly)?`
+        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;margin-top:6px"><input type="checkbox" class="night-only" ${s.nightOnly?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">夜勤のみ（夜勤だけに入り、夜勤以外の日は休みにします）</label>`:""}${(s.canNight||s.nightOnly)?`
         <label style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;margin-top:6px">月の夜勤回数
           <input type="number" class="night-cnt" min="0" max="31" placeholder="指定なし" value="${s.nightCount==null?'':s.nightCount}" style="width:84px;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:5px 8px">回</label>`:""}
       </div>`:""}
@@ -1562,8 +1563,8 @@ function renderStaffList(){
         <div class="fl" style="flex:1"><span>勤務できる曜日（非常勤）</span>
           <div class="seg wdseg">${DOW.map((w,i)=>`<button class="segbtn" data-wd="${i}" aria-pressed="${!s.workDays||s.workDays.includes(i)}">${w}</button>`).join("")}</div></div>
       </div>`:""}
-      ${(FSCOPE!=="day"||s.job==="drv"||s.hours)?`<div class="line2">
-        <div class="fl" style="flex:1"><span>${FSCOPE==="day"?"勤務時間帯（ドライバー）":"勤務時間帯（ドライバー等）"}</span><div class="seg hseg">${hbtns}</div></div>
+      ${(FSCOPE==="day"&&(s.job==="drv"||s.hours))?`<div class="line2">
+        <div class="fl" style="flex:1"><span>勤務時間帯（ドライバー）</span><div class="seg hseg">${hbtns}</div></div>
       </div>`:""}
       ${hdetail}`;
     card.querySelector('.nm-in').value=s.name;
@@ -1571,6 +1572,8 @@ function renderStaffList(){
     card.querySelector('.nm-in').oninput=e=>{s.name=e.target.value;saveStaff();refreshAll();};
     const nchk=card.querySelector('.night-can');
     if(nchk){ nchk.onchange=e=>{s.canNight=e.target.checked;if(!s.canNight){s.nightOnly=false;s.nightCount=null;}saveStaff();renderStaffList();}; }
+    const nonly=card.querySelector('.night-only');
+    if(nonly)nonly.onchange=e=>{s.nightOnly=e.target.checked;if(s.nightOnly)s.canNight=true;saveStaff();renderStaffList();};
     const ncnt=card.querySelector('.night-cnt');
     if(ncnt)ncnt.oninput=e=>{s.nightCount=e.target.value===''?null:Math.max(0,Number(e.target.value));saveStaff();};
     const dchk=card.querySelector('.drive-in');
