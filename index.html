@@ -1148,7 +1148,6 @@ function commitTimeEdit(clear){
 // 非常勤の「勤務できる曜日」。未設定（null）なら制限なし
 const DOW_JP=["日","月","火","水","木","金","土"];
 function workDayOk(s,d){ if(!s.workDays||!isPartTimeType(typeById(s.typeId)))return true; return s.workDays.includes(dow(S.ym,d)); }
-function workDaysLabel(s){ if(!s.workDays||!isPartTimeType(typeById(s.typeId)))return""; return `<div class="wt">${s.workDays.map(i=>DOW_JP[i]).join("・")}</div>`; }
 function workTimeLabel(s){ const w=s.workTime; if(!w||!(w.s||w.e)||!isPartTimeType(typeById(s.typeId)))return"";
   const f=t=>t?t.replace(/^0/,""):""; return `<div class="wt">${f(w.s)}〜${f(w.e)}</div>`; }
 // 希望休は勤務表に赤い「公」で表示（印刷では赤文字にしない）
@@ -1449,7 +1448,7 @@ function renderRoster(){
   let bodyH='<tbody>'; const boxRows=[];
   S.staff.forEach(s=>{
     let work=0; const cnt=sc?sc.map(()=>0):null;
-    bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}${workTimeLabel(s)}${workDaysLabel(s)}</td>`;
+    bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}${workTimeLabel(s)}</td>`;
     for(let d=1;d<=nd;d++){const e=eff(s.id,d);work+=e.w;
       if(sc){ if(e.hr){ const kr=sc.findIndex(c=>c.codes.includes(e.code)), kw=sc.findIndex(c=>c.codes.includes("日")||c.codes.includes("出")); if(kr>=0)cnt[kr]+=0.5; if(kw>=0)cnt[kw]+=0.5; }
         else { const k=sc.findIndex(c=>c.codes.includes(e.code)); if(k>=0)cnt[k]+=1; } }
