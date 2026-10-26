@@ -1089,7 +1089,7 @@ function loadMasters(){
     seeded=false;
   }
   // migrate: ensure typeId / hours / task duration
-  S.staff.forEach(s=>{if(!s.typeId)s.typeId=S.types[0].id; if(s.off===undefined)s.off=null; if(s.hours===undefined)s.hours=null; if(s.job===undefined)s.job=""; if(s.canNight===undefined)s.canNight=false; if(s.nightOnly===undefined)s.nightOnly=false; if(s.nightCount===undefined)s.nightCount=null; if(s.canDrive===undefined){s.canDrive=(s.job==="driver"); if(s.job==="driver")s.job="";}});
+  S.staff.forEach(s=>{if(!s.typeId)s.typeId=S.types[0].id; if(s.off===undefined)s.off=null; if(s.hours===undefined)s.hours=null; if(s.job===undefined)s.job=""; if(s.canNight===undefined)s.canNight=false; if(s.nightOnly===undefined)s.nightOnly=false; if(s.nightCount===undefined)s.nightCount=null; if(s.workDays===undefined)s.workDays=null; if(s.canDrive===undefined){s.canDrive=(s.job==="driver"); if(s.job==="driver")s.job="";}});
   S.tasks.forEach(t=>{if(!t.dur)t.dur=30;});
   saveStaff();jset(K.status,S.status);jset(K.times,S.times);jset(K.tasks,S.tasks);jset(K.types,S.types);jset(K.roles,S.roles);
   return seeded;
@@ -1141,6 +1141,10 @@ function commitTimeEdit(clear){
   toast(clear?"通常の勤務時間に戻しました":"この日の勤務時間を設定しました");
 }
 // 非常勤の勤務時間帯を氏名の下に表示（例：8:00〜14:30）
+// 非常勤の「勤務できる曜日」。未設定（null）なら制限なし
+const DOW_JP=["日","月","火","水","木","金","土"];
+function workDayOk(s,d){ if(!s.workDays||!isPartTimeType(typeById(s.typeId)))return true; return s.workDays.includes(dow(S.ym,d)); }
+function workDaysLabel(s){ if(!s.workDays||!isPartTimeType(typeById(s.typeId)))return""; return `<div class="wt">${s.workDays.map(i=>DOW_JP[i]).join("・")}</div>`; }
 function workTimeLabel(s){ const w=s.workTime; if(!w||!(w.s||w.e)||!isPartTimeType(typeById(s.typeId)))return"";
   const f=t=>t?t.replace(/^0/,""):""; return `<div class="wt">${f(w.s)}〜${f(w.e)}</div>`; }
 // 希望休は勤務表に赤い「公」で表示（印刷では赤文字にしない）
@@ -1441,7 +1445,7 @@ function renderRoster(){
   let bodyH='<tbody>'; const boxRows=[];
   S.staff.forEach(s=>{
     let work=0; const cnt=sc?sc.map(()=>0):null;
-    bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}${workTimeLabel(s)}</td>`;
+    bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}${workTimeLabel(s)}${workDaysLabel(s)}</td>`;
     for(let d=1;d<=nd;d++){const e=eff(s.id,d);work+=e.w;
       if(sc){ if(e.hr){ const kr=sc.findIndex(c=>c.codes.includes(e.code)), kw=sc.findIndex(c=>c.codes.includes("日")||c.codes.includes("出")); if(kr>=0)cnt[kr]+=0.5; if(kw>=0)cnt[kw]+=0.5; }
         else { const k=sc.findIndex(c=>c.codes.includes(e.code)); if(k>=0)cnt[k]+=1; } }
@@ -1551,6 +1555,10 @@ function renderStaffList(){
       ${isPartTimeType(typeById(s.typeId))?`<div class="line2">
         <div class="fl"><span>勤務時間（非常勤）</span>
           <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">${timePartSelects("wt-s",(s.workTime||{}).s)}<span style="margin:0 4px">–</span>${timePartSelects("wt-e",(s.workTime||{}).e)}</div></div>
+      </div>
+      <div class="line2">
+        <div class="fl" style="flex:1"><span>勤務できる曜日（非常勤）</span>
+          <div class="seg wdseg">${DOW.map((w,i)=>`<button class="segbtn" data-wd="${i}" aria-pressed="${!s.workDays||s.workDays.includes(i)}">${w}</button>`).join("")}</div></div>
       </div>`:""}
       <div class="line2">
         <div class="fl" style="flex:1"><span>勤務時間帯（ドライバー等）</span><div class="seg hseg">${hbtns}</div></div>
@@ -1577,6 +1585,10 @@ function renderStaffList(){
     card.querySelectorAll('.hrow').forEach(row=>{const band=row.dataset.band;
       row.querySelector('.hs').onchange=e=>{s.hours[band].s=e.target.value;saveStaff();if(S.tab==="board")renderBoard();};
       row.querySelector('.he').onchange=e=>{s.hours[band].e=e.target.value;saveStaff();if(S.tab==="board")renderBoard();};});
+    card.querySelectorAll('.wdseg .segbtn').forEach(b=>b.onclick=()=>{ // 勤務できる曜日の切り替え（全曜日＝制限なし）
+      const wd=+b.dataset.wd; let cur=s.workDays?s.workDays.slice():[0,1,2,3,4,5,6];
+      if(cur.includes(wd)){ if(cur.length===1){toast("勤務できる曜日を、1つ以上選んでください");return;} cur=cur.filter(x=>x!==wd); } else cur.push(wd);
+      cur.sort((a,c)=>a-c); s.workDays=cur.length===7?null:cur; saveStaff(); renderStaffList(); if(S.tab==="roster")renderRoster(); });
     if(card.querySelector('.wt-s-h')){
       const val=p=>{const h=card.querySelector('.'+p+'-h').value, m=card.querySelector('.'+p+'-m').value; return h?h+":"+(m||"00"):"";};
       const upd=()=>{ const a=val('wt-s'), b=val('wt-e'); s.workTime=(a||b)?{s:a,e:b}:null; saveStaff(); };
@@ -1933,7 +1945,7 @@ $("#doAuto").onclick=()=>{
   S.rauto={};
   // 2) 事業所休業日の空欄 → 公休（自動印）
   S.staff.forEach(s=>{ if(!S.roster[s.id])S.roster[s.id]={};const rr=S.roster[s.id];
-    for(let d=1;d<=nd;d++){ if(!rr[d]&&isSetOff(d)){rr[d]=rcode;setAuto(s.id,d,true);} } });
+    for(let d=1;d<=nd;d++){ if(!rr[d]&&(isSetOff(d)||!workDayOk(s,d))){rr[d]=rcode;setAuto(s.id,d,true);} } }); // 事業所の休業日と、非常勤の勤務できない曜日 → 公休
   const wOfCode=(c,s,d)=>{ if(!c)return (s&&s.nightOnly)?0:1; const st=statusByCode(c); if(st&&!st.work&&!isWishStatus(st)&&s&&d&&(S.rhalf[s.id]||{})[d])return 0.5; return st?(st.half?0.5:(st.work?1:0)):1; }; // 空欄=出勤候補1・半日=0.5
   // 2b) 夜勤の翌日は休み（夜勤の記号は手入力のもの。翌日が空欄なら公休にする。前月末の夜勤は当月1日を休みに）
   const isNight=c=>{const st=c&&statusByCode(c);return !!(st&&st.night);};
