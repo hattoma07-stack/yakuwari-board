@@ -556,7 +556,7 @@
         <label for="month">対象月</label>
         <input type="month" id="month">
       </div>
-      <button class="btn" id="btnSettings"><span class="ico">🧮</span>休日・休業日の設定</button>
+      <button class="btn" id="btnSettings"><span class="ico">🧮</span>出勤人数・休業日設定</button>
       <button class="btn primary" id="btnAuto"><span class="ico">✨</span>休日数に合わせて自動作成</button>
       <button class="btn" id="btnUndo" title="元に戻す（Ctrl＋Z／⌘＋Z）"><span class="ico">↶</span>元に戻す</button>
       <button class="btn" id="btnRedo" title="やり直す（Ctrl＋Y／⌘＋Shift＋Z）"><span class="ico">↷</span>やり直す</button>
@@ -719,14 +719,13 @@
     <div class="mlabel">名前・色／職種／雇用形態（非常勤は勤務時間・勤務できる曜日）</div>
     <div class="edit-list" id="staffList"></div>
     <div class="edit-row"><input type="text" id="newStaffName" placeholder="スタッフ名を追加" maxlength="12"><button class="btn sm" id="addStaff">＋ 追加</button></div>
-    <p style="margin-top:12px"><button class="btn sm" id="btnTypesFromStaff">雇用形態を編集</button></p>
   </div>
   <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
 </div></div>
 
 <!-- Combined settings modal: 休日数 + 事業所休業日 -->
 <div class="overlay" id="settingsOverlay"><div class="modal">
-  <div class="modal-head"><h3 id="settingsTitle">休日・休業日の設定</h3><button class="x" data-close>×</button></div>
+  <div class="modal-head"><h3 id="settingsTitle">出勤人数・休業日設定</h3><button class="x" data-close>×</button></div>
   <div class="modal-body">
     <div class="mlabel">① 1日の最低出勤人数（自動作成でこの人数を下回らないように公休を配置）</div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
@@ -750,12 +749,7 @@
       <p style="font-size:12px;color:var(--ink-soft);margin:6px 0 0">※ 職種はスタッフ台帳で各スタッフに設定します。生活相談員は介護職員の人数には含まれません。送迎職員は、台帳で「送迎が可能」にチェックしたスタッフを数えます（介護職員などと兼任できます）。</p>
     </div>
     <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
-    <div class="mlabel">② 雇用形態（名前の追加・変更）</div>
-    <p id="offTableView" style="font-size:12px;color:var(--ink-soft);margin:0 0 8px"></p>
-    <div class="edit-list" id="typesList"></div>
-    <button class="btn sm" id="addType">＋ 雇用形態を追加</button>
-    <hr style="border:none;border-top:1px solid var(--line);margin:18px 0">
-    <div class="mlabel">③ 事業所の休業日（全員が公休・各人の休日数にカウント）</div>
+    <div class="mlabel">② 事業所の休業日（全員が公休・各人の休日数にカウント）</div>
     <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px">毎週の定休</div>
     <div class="dow-row" id="offDowRow"></div>
     <div style="font-size:12px;color:var(--ink-soft);margin:12px 0 6px">臨時の休業日（日付をタップ）</div>
@@ -1647,22 +1641,6 @@ function addStaffMaster(){
 $("#addStaff").onclick=addStaffMaster;
 $("#newStaffName").addEventListener('keydown',e=>{if(e.key==="Enter")addStaffMaster();});
 
-function renderTypesList(){
-  const w=$("#typesList");w.innerHTML="";
-  S.types.forEach((t,i)=>{const row=document.createElement('div');row.className="edit-row";
-    row.innerHTML=`<input type="text" value="" placeholder="形態名"><button class="del" title="削除">🗑</button>`;
-    row.children[0].value=t.name;
-    row.children[0].oninput=e=>{t.name=e.target.value;saveTypes();if(S.tab==="roster")renderRoster();};
-    row.children[1].onclick=()=>{if(S.types.length<=1){toast("最低1つは必要です");return;}
-      const removed=S.types[i];S.types.splice(i,1);
-      S.staff.forEach(s=>{if(s.typeId===removed.id)s.typeId=S.types[0].id;});
-      saveTypes();saveStaff();renderTypesList();refreshAll();};
-    w.appendChild(row);});
-  const t=offTable()[FSCOPE]; const cells=Array.from({length:12},(_,m)=>{const v=t?t[m]:undefined; return v===undefined?DEF_OFF_MONTH:(v??"－");});
-  $("#offTableView").textContent="年間休日（管理者が設定）："+cells.map((v,m)=>`${m+1}月 ${v}`).join("／");
-}
-$("#addType").onclick=()=>{S.types.push({id:uid(),name:"新しい形態",off:8});saveTypes();renderTypesList();};
-$("#btnTypesFromStaff").onclick=()=>{closeModal('#staffOverlay');openSettings();};
 
 function renderTimeList(){
   const w=$("#timeList");w.innerHTML="";
@@ -1895,10 +1873,10 @@ $("#btnSync").onclick=()=>{
   }
 };
 $("#stgStatus").onclick=()=>{$("#statusModalTitle").textContent=`勤務記号の設定（${FACILITY_NAME[FSCOPE]}）`;renderStatusList();openModal("#statusOverlay");};
-// ---- 休日・休業日の設定（統合） ----
+// ---- 出勤人数・休業日設定（統合） ----
 function openSettings(){
   const[y,m]=S.ym.split("-").map(Number);
-  $("#settingsTitle").textContent=`休日・休業日の設定（${y}年${m}月）`;
+  $("#settingsTitle").textContent=`出勤人数・休業日設定（${y}年${m}月）`;
   const mi=$("#minStaffIn");mi.value=S.minStaff;
   mi.oninput=e=>{S.minStaff=e.target.value===''?0:Number(e.target.value);saveMeta();if(S.tab==="roster")renderRoster();};
   const jobs=rowJobsOf();
@@ -1918,7 +1896,6 @@ function openSettings(){
       <input type="number" min="0" max="99" style="width:72px" value="${Number(S.req[j.id])||0}"><span style="font-size:12px;color:var(--ink-soft)">名以上</span>`;
     row.querySelector('input').oninput=e=>{S.req[j.id]=e.target.value===''?0:Number(e.target.value);saveMeta();if(S.tab==="roster")renderRoster();};
     jl.appendChild(row);});
-  renderTypesList();
   renderOffCalendar();
   openModal("#settingsOverlay");
 }
