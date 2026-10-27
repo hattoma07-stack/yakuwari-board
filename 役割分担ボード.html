@@ -2298,7 +2298,7 @@ function renderPassList(){
 }
 function renderOffAll(){
   const w=$("#offAllList"); w.innerHTML=""; const g=globalOff();
-  const names=[...new Set([...Object.keys(g),...S.types.map(t=>t.name)])];
+  const names=[...new Set([...Object.keys(g),...S.types.map(t=>t.name)])].filter(n=>n!=="非常勤"); // 非常勤は休日数の目標なし
   names.forEach(n=>{ const row=document.createElement('div'); row.className="edit-row";
     const cur=Object.prototype.hasOwnProperty.call(g,n)?g[n]:(S.types.find(t=>t.name===n)||{}).off;
     row.innerHTML=`<span style="flex:1;font-weight:700;font-size:13px"></span><input type="number" min="0" max="31" placeholder="なし" style="width:72px"><span style="font-size:12px;color:var(--ink-soft)">日/月</span>`;
@@ -2307,7 +2307,7 @@ function renderOffAll(){
     w.appendChild(row); });
 }
 $("#stgOffAll").onclick=()=>{renderOffAll();openModal("#offAllOverlay");};
-$("#offAllAdd").onclick=()=>{ const n=$("#offAllNewName").value.trim(); if(!n)return; const m={...globalOff()}; if(!(n in m))m[n]=null; jset(K.offdays,m); $("#offAllNewName").value=""; renderOffAll(); };
+$("#offAllAdd").onclick=()=>{ const n=$("#offAllNewName").value.trim(); if(!n)return; const m={...globalOff()}; if(n==="非常勤"){toast("非常勤は休日数の設定がありません");return;} if(!(n in m))m[n]=null; jset(K.offdays,m); $("#offAllNewName").value=""; renderOffAll(); };
 $("#stgPass").onclick=()=>{renderPassList();openModal("#passOverlay");};
 
 async function initGate(){
