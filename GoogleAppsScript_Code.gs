@@ -37,7 +37,7 @@ const ALLOWED_EMAILS = [];
 
 // APIトークン（合言葉）。この値と一致しないGET/POSTリクエストは拒否します。
 // アプリ側（役割分担ボードのHTML）の SYNC_TOKEN と必ず同じ値にしてください。
-const API_TOKEN = "（削除済み）";
+const API_TOKEN = "ここに、自分で決めた長い文字列を入れる（この値は公開しないこと）";
 
 function checkToken_(token) {
   return API_TOKEN && token === API_TOKEN;

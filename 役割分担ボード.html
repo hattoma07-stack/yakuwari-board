@@ -982,9 +982,10 @@ const DEF_STATUS_ENABLED={
 };
 
 /* ---------- storage（ローカル保存＋Googleスプレッドシート同期） ---------- */
-const SYNC_URL="https:https://script.google.com/macros/s/（削除済み）/exec";
-// Google Apps Script側の API_TOKEN と必ず同じ値にしてください（一致しないと拒否されます）
-const SYNC_TOKEN="（削除済み）";
+// 同期（Googleスプレッドシート）は停止中。アドレスとトークンは、公開されるこのコードには書かないこと。
+// 空のままの間は、データは各端末のブラウザ内にだけ保存され、他の端末や部署とは共有されない。
+const SYNC_URL="";
+const SYNC_TOKEN="";
 const jget=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
 const jset=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} syncPush(k,v);};
 
