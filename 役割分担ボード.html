@@ -1646,8 +1646,8 @@ function renderTypesList(){
   const w=$("#typesList");w.innerHTML="";
   const g=globalOff();
   S.types.forEach((t,i)=>{const row=document.createElement('div');row.className="edit-row"; const locked=Object.prototype.hasOwnProperty.call(g,t.name);
-    row.innerHTML=`<input type="text" value="" placeholder="形態名"><input type="number" min="0" max="31" value="${locked?(typeOff(t)??''):(t.off??'')}" placeholder="なし" title="${locked?'管理者が全部署共通で設定した休日数です':'月の休日数（空欄＝既定なし）'}" style="width:72px"${locked?' disabled':''}>
-      <span style="font-size:12px;color:var(--ink-soft)">日/月${locked?'（全部署共通）':''}</span><button class="del" title="削除">🗑</button>`;
+    row.innerHTML=`<input type="text" value="" placeholder="形態名"><input type="number" min="0" max="31"${t.name==="非常勤"?' hidden':''} value="${locked?(typeOff(t)??''):(t.off??'')}" placeholder="なし" title="${locked?'管理者が全部署共通で設定した休日数です':'月の休日数（空欄＝既定なし）'}" style="width:72px"${locked?' disabled':''}>
+      <span style="font-size:12px;color:var(--ink-soft)"${t.name==="非常勤"?' hidden':''}>日/月${locked?'（全部署共通）':''}</span><button class="del" title="削除">🗑</button>`;
     row.children[0].value=t.name;
     row.children[0].oninput=e=>{t.name=e.target.value;saveTypes();if(S.tab==="roster")renderRoster();};
     row.children[1].oninput=e=>{t.off=e.target.value===''?null:Number(e.target.value);saveTypes();if(S.tab==="roster")renderRoster();};
