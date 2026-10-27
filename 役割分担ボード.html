@@ -182,6 +182,7 @@
     border-radius:9px;padding:6px 11px 6px 10px;font-weight:700;font-size:14px}
   .spick input{accent-color:var(--accent);width:16px;height:16px}
   .spick.off{opacity:.45}
+  .off-badge{font-weight:700;font-size:14px;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:999px;padding:7px 14px;white-space:nowrap}
   .leader-tag{display:block;font-size:10px;font-weight:700;color:var(--accent-ink);
     background:var(--accent-soft);border-radius:4px;padding:2px 6px;line-height:1.5;margin-top:8px;width:fit-content}
   .leadbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
@@ -560,6 +561,7 @@
       <button class="btn" id="btnUndo" title="元に戻す（Ctrl＋Z／⌘＋Z）"><span class="ico">↶</span>元に戻す</button>
       <button class="btn" id="btnRedo" title="やり直す（Ctrl＋Y／⌘＋Shift＋Z）"><span class="ico">↷</span>やり直す</button>
       <span class="spacer"></span>
+      <span class="off-badge" id="offBadge" title="年間休日の表（管理者が設定）による、この月の公休日数"></span>
       <button class="btn primary" id="btnPrintRoster"><span class="ico">🖨️</span>印刷・PDF（事務提出用）</button>
       <button class="btn ghost sm" id="btnTheme2" title="表示切替">◐</button>
     </div>
@@ -1449,7 +1451,9 @@ function renderBrushes(){
     tb.innerHTML=`<span class="chip" style="background:#5E6A66">🕒</span>時間変更`;tb.onclick=()=>{brush="@time";renderBrushes();};w.appendChild(tb);
   }
 }
+function renderOffBadge(){ const el=$("#offBadge"); if(!el)return; const n=monthOffOf(FSCOPE,S.ym); el.textContent=n==null?"公休：目標なし":`${S.ym.split("-")[1].replace(/^0/,"")}月の公休：${n}日`; }
 function renderRoster(){
+  renderOffBadge();
   const nd=daysInMonth(S.ym),T=$("#rosterTable");
   const used=rmonthUsed(), md=memMd();
   const clsFor=d=>{const w=dow(S.ym,d);return isSetOff(d)?'off':(w===0?'sun':w===6?'sat':'');};
