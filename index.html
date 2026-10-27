@@ -640,8 +640,8 @@
         <div class="setting-card">
           <div class="sc-icon">📅</div>
           <div class="sc-body">
-            <h3>公休日数（全部署共通）</h3>
-            <p>雇用形態ごとの「月の休日数」を、全部署まとめて設定します。部署ごとに設定しなくても、勤務表の目標・自動作成に反映されます。</p>
+            <h3>年間休日（全部署）</h3>
+            <p>部署ごとの月別の公休日数（1〜12月）を、1つの表で設定します。勤務表の目標・自動作成に反映されます（非常勤は目標なし）。</p>
           </div>
           <button class="btn" id="stgOffAll">編集する</button>
         </div>
@@ -680,12 +680,11 @@
 </div></div>
 
 <!-- Passcode modal -->
-<div class="overlay" id="offAllOverlay"><div class="modal">
-  <div class="modal-head"><h3>公休日数（全部署共通）</h3><button class="x" data-close>×</button></div>
+<div class="overlay" id="offAllOverlay"><div class="modal" style="width:min(860px,100%)">
+  <div class="modal-head"><h3>年間休日（管理者のみ）</h3><button class="x" data-close>×</button></div>
   <div class="modal-body">
-    <div class="mlabel">雇用形態ごとの「月の休日数」（ここで設定した形態は全部署に反映。空欄＝目標なし）</div>
-    <div class="edit-list" id="offAllList"></div>
-    <div class="edit-row"><input type="text" id="offAllNewName" placeholder="雇用形態名を追加（例：嘱託）" maxlength="12"><button class="btn sm" id="offAllAdd">＋ 追加</button></div>
+    <div class="mlabel">部署ごとの月別の公休日数（空欄＝目標なし。非常勤は目標なし）</div>
+    <div style="overflow-x:auto"><table id="offTable" style="border-collapse:collapse;font-size:13px;width:100%"></table></div>
     <p style="font-size:12px;color:var(--ink-soft);margin-top:10px">設定後は、各部署の勤務表で「休日数に合わせて自動作成」を押すと反映されます。</p>
   </div>
   <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
@@ -718,7 +717,7 @@
     <div class="mlabel">名前・色／職種／雇用形態（非常勤は勤務時間・勤務できる曜日）</div>
     <div class="edit-list" id="staffList"></div>
     <div class="edit-row"><input type="text" id="newStaffName" placeholder="スタッフ名を追加" maxlength="12"><button class="btn sm" id="addStaff">＋ 追加</button></div>
-    <p style="margin-top:12px"><button class="btn sm" id="btnTypesFromStaff">雇用形態と既定休日数を編集</button></p>
+    <p style="margin-top:12px"><button class="btn sm" id="btnTypesFromStaff">雇用形態を編集</button></p>
   </div>
   <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
 </div></div>
@@ -749,7 +748,8 @@
       <p style="font-size:12px;color:var(--ink-soft);margin:6px 0 0">※ 職種はスタッフ台帳で各スタッフに設定します。生活相談員は介護職員の人数には含まれません。送迎職員は、台帳で「送迎が可能」にチェックしたスタッフを数えます（介護職員などと兼任できます）。</p>
     </div>
     <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
-    <div class="mlabel">② 雇用形態ごとの「月の休日数」の既定値（管理者が「全部署共通」で設定した形態は、ここでは変更できません）</div>
+    <div class="mlabel">② 雇用形態（名前の追加・変更）</div>
+    <p id="offTableView" style="font-size:12px;color:var(--ink-soft);margin:0 0 8px"></p>
     <div class="edit-list" id="typesList"></div>
     <button class="btn sm" id="addType">＋ 雇用形態を追加</button>
     <hr style="border:none;border-top:1px solid var(--line);margin:18px 0">
@@ -843,7 +843,7 @@ const K={
   get day(){return `yakuwari:${FSCOPE}:day:`}, get roster(){return `yakuwari:${FSCOPE}:roster:`},
   get rmeta(){return `yakuwari:${FSCOPE}:rmeta:`}, get rauto(){return `yakuwari:${FSCOPE}:rauto:`}, get rhalf(){return `yakuwari:${FSCOPE}:rhalf:`}, get rtime(){return `yakuwari:${FSCOPE}:rtime:`},
   get statusEnabled(){return `yakuwari:${FSCOPE}:statusEnabled`}, // 勤務記号は共有だが「この部署で使うか」は部署ごと
-  offdays:"yakuwari:offdays", // 月の休日数（雇用形態名ごと）は管理者が全部署共通で設定
+  offtable:"yakuwari:offtable", // 年間休日の表（部署×1〜12月の公休日数）。管理者のみ設定
   theme:"yakuwari:theme" // 表示テーマも施設共通
 };
 const FACILITY_NAME={day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ",kyotaku:"居宅支援事業所"};
@@ -1173,10 +1173,11 @@ function workTimeLabel(s){ const w=s.workTime; if(!w||!(w.s||w.e)||!isPartTimeTy
 const WISH_RED="#C62828";
 const isWishStatus=st=>!!(st&&(st.code==="希"||/希望/.test(st.label||"")));
 const isPartTimeType=t=>!!(t&&/非常勤/.test(t.name||""));
-// 管理者が設定した全部署共通の休日数（雇用形態名ごと）。未設定の形態は、従来の部署ごとの値を使う
-const globalOff=()=>jget(K.offdays,{})||{};
-function typeOff(t){ if(!t)return null; const g=globalOff(); const v=Object.prototype.hasOwnProperty.call(g,t.name)?g[t.name]:t.off; return (v!==null&&v!==undefined&&v!=="")?Number(v):null; }
-function staffTarget(s){ return typeOff(typeById(s.typeId)); }
+// 年間休日の表（部署×1〜12月）。管理者が設定。未設定の月は既定9日。非常勤は目標なし
+const DEF_OFF_MONTH=9;
+const offTable=()=>jget(K.offtable,{})||{};
+function monthOffOf(fac,ym){ const arr=offTable()[fac]; const v=arr?arr[Number(ym.split("-")[1])-1]:undefined; if(v===undefined)return DEF_OFF_MONTH; return (v===null||v==="")?null:Number(v); }
+function staffTarget(s){ const t=typeById(s.typeId); if(t&&t.name==="非常勤")return null; return monthOffOf(FSCOPE,S.ym); }
 function typeName(s){const t=typeById(s.typeId);return t?t.name:"";}
 // 勤務時間帯（ドライバー等）: s.hours=null→終日 / {am:{s,e}|null, pm:{s,e}|null}
 const AM_DEF={s:"08:00",e:"10:00"}, PM_DEF={s:"16:00",e:"18:00"};
@@ -1644,18 +1645,17 @@ $("#newStaffName").addEventListener('keydown',e=>{if(e.key==="Enter")addStaffMas
 
 function renderTypesList(){
   const w=$("#typesList");w.innerHTML="";
-  const g=globalOff();
-  S.types.forEach((t,i)=>{const row=document.createElement('div');row.className="edit-row"; const locked=Object.prototype.hasOwnProperty.call(g,t.name);
-    row.innerHTML=`<input type="text" value="" placeholder="形態名"><input type="number" min="0" max="31"${t.name==="非常勤"?' hidden':''} value="${locked?(typeOff(t)??''):(t.off??'')}" placeholder="なし" title="${locked?'管理者が全部署共通で設定した休日数です':'月の休日数（空欄＝既定なし）'}" style="width:72px"${locked?' disabled':''}>
-      <span style="font-size:12px;color:var(--ink-soft)"${t.name==="非常勤"?' hidden':''}>日/月${locked?'（全部署共通）':''}</span><button class="del" title="削除">🗑</button>`;
+  S.types.forEach((t,i)=>{const row=document.createElement('div');row.className="edit-row";
+    row.innerHTML=`<input type="text" value="" placeholder="形態名"><button class="del" title="削除">🗑</button>`;
     row.children[0].value=t.name;
     row.children[0].oninput=e=>{t.name=e.target.value;saveTypes();if(S.tab==="roster")renderRoster();};
-    row.children[1].oninput=e=>{t.off=e.target.value===''?null:Number(e.target.value);saveTypes();if(S.tab==="roster")renderRoster();};
-    row.children[3].onclick=()=>{if(S.types.length<=1){toast("最低1つは必要です");return;}
+    row.children[1].onclick=()=>{if(S.types.length<=1){toast("最低1つは必要です");return;}
       const removed=S.types[i];S.types.splice(i,1);
       S.staff.forEach(s=>{if(s.typeId===removed.id)s.typeId=S.types[0].id;});
       saveTypes();saveStaff();renderTypesList();refreshAll();};
     w.appendChild(row);});
+  const t=offTable()[FSCOPE]; const cells=Array.from({length:12},(_,m)=>{const v=t?t[m]:undefined; return v===undefined?DEF_OFF_MONTH:(v??"－");});
+  $("#offTableView").textContent="年間休日（管理者が設定）："+cells.map((v,m)=>`${m+1}月 ${v}`).join("／");
 }
 $("#addType").onclick=()=>{S.types.push({id:uid(),name:"新しい形態",off:8});saveTypes();renderTypesList();};
 $("#btnTypesFromStaff").onclick=()=>{closeModal('#staffOverlay');openSettings();};
@@ -2297,17 +2297,16 @@ function renderPassList(){
   });
 }
 function renderOffAll(){
-  const w=$("#offAllList"); w.innerHTML=""; const g=globalOff();
-  const names=[...new Set([...Object.keys(g),...S.types.map(t=>t.name)])].filter(n=>n!=="非常勤"); // 非常勤は休日数の目標なし
-  names.forEach(n=>{ const row=document.createElement('div'); row.className="edit-row";
-    const cur=Object.prototype.hasOwnProperty.call(g,n)?g[n]:(S.types.find(t=>t.name===n)||{}).off;
-    row.innerHTML=`<span style="flex:1;font-weight:700;font-size:13px"></span><input type="number" min="0" max="31" placeholder="なし" style="width:72px"><span style="font-size:12px;color:var(--ink-soft)">日/月</span>`;
-    row.children[0].textContent=n; row.children[1].value=cur??"";
-    row.children[1].oninput=e=>{ const m={...globalOff()}; m[n]=e.target.value===""?null:Number(e.target.value); jset(K.offdays,m); if(S.tab==="roster")renderRoster(); };
-    w.appendChild(row); });
+  const tb=$("#offTable"); const tbl=offTable();
+  let h='<tr><th style="text-align:left;padding:4px 6px">部署</th>'+Array.from({length:12},(_,m)=>`<th style="padding:4px 2px">${m+1}月</th>`).join("")+'<th style="padding:4px 6px">年間</th></tr>';
+  ALL_FACILITIES.forEach(f=>{ const arr=tbl[f]||[]; let tot=0;
+    h+=`<tr data-f="${f}"><td style="padding:4px 6px;font-weight:700;white-space:nowrap">${escapeHtml(FACILITY_NAME[f])}</td>`+Array.from({length:12},(_,m)=>{ const v=arr[m]===undefined?DEF_OFF_MONTH:arr[m]; tot+=Number(v)||0;
+      return `<td style="padding:2px"><input type="number" min="0" max="31" data-m="${m}" value="${v??""}" style="width:44px;font:inherit;text-align:center;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:6px;padding:4px 2px"></td>`; }).join("")+`<td class="offtot" style="padding:4px 6px;text-align:center;font-weight:700">${tot}</td></tr>`; });
+  tb.innerHTML=h;
+  tb.querySelectorAll("input").forEach(inp=>inp.oninput=()=>{ const tr=inp.closest("tr"), f=tr.dataset.f; const m={...offTable()}; const arr=Array.from({length:12},(_,k)=>{const x=tr.querySelector(`input[data-m="${k}"]`).value; return x===""?null:Number(x);}); m[f]=arr;
+    jset(K.offtable,m); tr.querySelector(".offtot").textContent=arr.reduce((a,b)=>a+(b||0),0); if(S.tab==="roster")renderRoster(); });
 }
 $("#stgOffAll").onclick=()=>{renderOffAll();openModal("#offAllOverlay");};
-$("#offAllAdd").onclick=()=>{ const n=$("#offAllNewName").value.trim(); if(!n)return; const m={...globalOff()}; if(n==="非常勤"){toast("非常勤は休日数の設定がありません");return;} if(!(n in m))m[n]=null; jset(K.offdays,m); $("#offAllNewName").value=""; renderOffAll(); };
 $("#stgPass").onclick=()=>{renderPassList();openModal("#passOverlay");};
 
 async function initGate(){
