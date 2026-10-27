@@ -52,31 +52,30 @@
   .app{max-width:2200px;margin:0 auto;padding:16px 14px 90px}
 
   /* ---------- Login gate ---------- */
-  .gate{position:fixed;inset:0;background:var(--ground);display:flex;align-items:center;justify-content:center;
-    padding:20px;z-index:100}
+  .gate{position:fixed;inset:0;background:var(--ground);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;
+    padding:20px;z-index:100;overflow:auto;--gate-ink:#3E4A6D}
   .gate[hidden]{display:none}
-  .gate-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
-    padding:32px 28px;width:min(420px,100%);text-align:center}
-  .gate-mark{width:52px;height:52px;border-radius:13px;background:var(--accent-soft);color:var(--accent-ink);
-    display:grid;place-items:center;font-size:26px;margin:0 auto 14px}
-  .gate-card h1{font-size:19px;margin-bottom:6px}
-  .gate-sub{font-size:13px;color:var(--ink-soft);margin-bottom:22px}
-  .gate-roles{display:flex;flex-direction:column;gap:10px}
-  .gate-roles[hidden]{display:none}
-  .gate-role{display:flex;align-items:center;gap:12px;text-align:left;width:100%;
-    border:1.5px solid var(--line-strong);background:var(--surface-2);border-radius:11px;padding:12px 14px;cursor:pointer;font:inherit}
-  .gate-role:hover{border-color:var(--accent);background:var(--accent-soft)}
-  .gate-role .gr-ico{font-size:22px;flex:none}
-  .gate-role .gr-lbl{font-weight:700;font-size:14.5px;color:var(--ink);display:block}
-  .gate-role .gr-sub{font-size:11.5px;color:var(--ink-soft);display:block;margin-top:1px}
-  .gate-pass{margin-top:20px;text-align:left}
-  .gate-pass-label{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px}
-  .gate-pass input{width:100%;font:inherit;font-size:16px;letter-spacing:.08em;color:var(--ink);
-    background:var(--surface-2);border:1.5px solid var(--line-strong);border-radius:9px;padding:10px 12px;text-align:center}
-  .gate-pass input:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
-  .gate-error{color:var(--alert);font-size:12.5px;margin-top:8px;text-align:center}
-  .gate-pass-btns{display:flex;gap:8px;margin-top:14px}
-  .gate-pass-btns .btn{flex:1;justify-content:center}
+  .gate-top{display:flex;align-items:center;gap:10px;font-size:22px;font-weight:800;letter-spacing:.04em;color:var(--gate-ink)}
+  .gate-logo{width:36px;height:36px;border-radius:10px;background:var(--accent-soft);display:grid;place-items:center}
+  .gate-logo .gi{width:24px;height:24px}
+  .gi{width:68px;height:68px;fill:none;stroke:var(--gate-ink);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+  .gate-stage{display:flex;align-items:center;justify-content:center;gap:56px;width:100%}
+  .gate-art{display:grid;grid-template-columns:repeat(2,68px);gap:26px 30px;opacity:.9}
+  .gate-art-l .gi:nth-child(even),.gate-art-r .gi:nth-child(odd){transform:translateY(22px)}
+  .gate-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+    padding:30px 32px 26px;width:min(380px,100%);text-align:left;display:flex;flex-direction:column}
+  .gate-card h1{font-size:18px;text-align:center;margin-bottom:20px;color:var(--ink)}
+  .gate-lbl{font-size:12.5px;font-weight:700;color:var(--ink);margin:0 0 6px}
+  .gate-card select,.gate-card input{width:100%;font:inherit;font-size:15px;color:var(--ink);background:var(--surface-2);
+    border:1.5px solid var(--line-strong);border-radius:8px;padding:10px 12px;margin-bottom:16px}
+  .gate-card input{letter-spacing:.08em}
+  .gate-card select:focus-visible,.gate-card input:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+  .gate-go{width:100%;justify-content:center;padding:11px 14px;font-size:15px;margin-top:4px}
+  .gate-foot{font-size:11.5px;color:var(--ink-soft);text-align:center;margin-top:16px}
+  @media (max-width:900px){ .gate-art{display:none} }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .gate{--gate-ink:#A9B6E0} }
+  :root[data-theme="dark"] .gate{--gate-ink:#A9B6E0}
+  .gate-error{color:var(--alert);font-size:12.5px;margin:-6px 0 12px;text-align:center}
 
   /* ---------- Facility switcher / session bar ---------- */
   .fac-switch{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--ink-soft)}
@@ -454,29 +453,21 @@
 
 <!-- ============ LOGIN GATE ============ -->
 <div class="gate" id="gate">
-  <div class="gate-card">
-    <div class="gate-mark">🗓️</div>
-    <h1>CareRhythm</h1>
-    <p class="gate-sub">ご自身の区分を選んでください</p>
-    <div class="gate-roles" id="gateRoles">
-      <button class="gate-role" data-role="admin"><span class="gr-ico">🛡️</span><span class="gr-lbl">管理者</span><span class="gr-sub">全部署をまとめて確認・発行</span></button>
-      <button class="gate-role" data-role="day"><span class="gr-ico">📋</span><span class="gr-lbl">デイサービス</span><span class="gr-sub">役割分担・勤務表</span></button>
-      <button class="gate-role" data-role="home"><span class="gr-ico">🚶</span><span class="gr-lbl">訪問介護</span><span class="gr-sub">役割分担・勤務表</span></button>
-      <button class="gate-role" data-role="office"><span class="gr-ico">🗂️</span><span class="gr-lbl">事務</span><span class="gr-sub">勤務表の作成</span></button>
-      <button class="gate-role" data-role="nursing"><span class="gr-ico">🩺</span><span class="gr-lbl">看護</span><span class="gr-sub">勤務表の作成</span></button>
-      <button class="gate-role" data-role="kitchen"><span class="gr-ico">🍳</span><span class="gr-lbl">栄養士・厨房</span><span class="gr-sub">勤務表の作成</span></button>
-      <button class="gate-role" data-role="rehab"><span class="gr-ico">🦵</span><span class="gr-lbl">リハビリ</span><span class="gr-sub">勤務表の作成</span></button>
-      <button class="gate-role" data-role="kyotaku"><span class="gr-ico">🏠</span><span class="gr-lbl">居宅支援事業所</span><span class="gr-sub">勤務表の作成</span></button>
-    </div>
-    <div class="gate-pass" id="gatePass" hidden>
-      <p class="gate-pass-label" id="gatePassLabel"></p>
-      <input type="password" id="gatePassInput" inputmode="numeric" placeholder="パスコード" autocomplete="off">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="ic-heart" viewBox="0 0 48 48"><path d="M24 42C11 31 6 24 6 17a9 9 0 0 1 18-3 9 9 0 0 1 18 3c0 7-5 14-18 25z"/><path d="M8 25h9l3-8 5 14 3-6h12"/></symbol><symbol id="ic-clip" viewBox="0 0 48 48"><rect x="10" y="9" width="28" height="34" rx="2"/><rect x="18" y="5" width="12" height="7" rx="2"/><path d="M24 19v12M18 25h12M17 37h14"/></symbol><symbol id="ic-steth" viewBox="0 0 48 48"><path d="M12 6v10a8 8 0 0 0 16 0V6M10 6h4M26 6h4M20 24v6a8 8 0 0 0 16 0v-5"/><circle cx="36" cy="21" r="4"/></symbol><symbol id="ic-syringe" viewBox="0 0 48 48"><path d="M29 7l12 12M27 11l10 10M11 29l16-16 10 10-16 16zM11 29l-5 5M8 41l6-6M17 25l4 4M21 21l4 4"/></symbol><symbol id="ic-bed" viewBox="0 0 48 48"><path d="M5 9v31M5 31h38v9M5 36h38M9 22a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v9H9zM23 31v-5h14a6 6 0 0 1 6 6"/></symbol><symbol id="ic-pill" viewBox="0 0 48 48"><g transform="rotate(-45 24 24)"><rect x="6" y="13" width="36" height="22" rx="5"/></g><circle cx="19" cy="19" r="2.5"/><circle cx="29" cy="29" r="2.5"/><circle cx="24" cy="24" r="2.5"/><circle cx="14" cy="24" r="2.5"/><circle cx="24" cy="34" r="2.5"/></symbol><symbol id="ic-mask" viewBox="0 0 48 48"><path d="M10 14h28v12c0 8-6 13-14 13s-14-5-14-13zM10 19H7v7h3M38 19h3v7h-3M15 22h18M15 26h18M17 30h14"/></symbol><symbol id="ic-therm" viewBox="0 0 48 48"><path d="M34 6l8 8-5 5-8-8zM29 11l-18 18 4 4 18-18M15 33l-7 7-2-2 7-7"/><path d="M20 20l4 4"/></symbol></defs></svg>
+  <div class="gate-top"><span class="gate-logo"><svg class="gi"><use href="#ic-heart"/></svg></span>CareRhythm</div>
+  <div class="gate-stage">
+    <div class="gate-art gate-art-l" aria-hidden="true"><svg class="gi"><use href="#ic-heart"/></svg><svg class="gi"><use href="#ic-clip"/></svg><svg class="gi"><use href="#ic-steth"/></svg><svg class="gi"><use href="#ic-bed"/></svg><svg class="gi"><use href="#ic-mask"/></svg><svg class="gi"><use href="#ic-pill"/></svg></div>
+    <form class="gate-card" id="gateForm" onsubmit="return false">
+      <h1>ログイン</h1>
+      <label class="gate-lbl" for="gateRoleSel">区分（部署）</label>
+      <select id="gateRoleSel" aria-label="区分（部署）"></select>
+      <label class="gate-lbl" for="gatePassInput">パスコード</label>
+      <input type="password" id="gatePassInput" inputmode="numeric" placeholder="パスコードを入力" autocomplete="off">
       <p class="gate-error" id="gateError" hidden>パスコードが違います</p>
-      <div class="gate-pass-btns">
-        <button class="btn" id="gateBack">戻る</button>
-        <button class="btn primary" id="gateEnter">入る</button>
-      </div>
-    </div>
+      <button type="button" class="btn primary gate-go" id="gateEnter">ログイン</button>
+      <p class="gate-foot">パスコードを忘れた場合は、管理者にご連絡ください</p>
+    </form>
+    <div class="gate-art gate-art-r" aria-hidden="true"><svg class="gi"><use href="#ic-therm"/></svg><svg class="gi"><use href="#ic-syringe"/></svg><svg class="gi"><use href="#ic-clip"/></svg><svg class="gi"><use href="#ic-pill"/></svg><svg class="gi"><use href="#ic-heart"/></svg><svg class="gi"><use href="#ic-steth"/></svg></div>
   </div>
 </div>
 
@@ -2175,21 +2166,16 @@ function sessGet(k){try{return sessionStorage.getItem(k);}catch(e){return null;}
 function sessSet(k,v){try{sessionStorage.setItem(k,v);}catch(e){}}
 function sessDel(k){try{sessionStorage.removeItem(k);}catch(e){}}
 
+// 区分（部署）の選択肢。最後に選んだ区分を、この端末だけに覚えておく（同期しない）
+(function buildGateRoles(){
+  const sel=$("#gateRoleSel"); let last=""; try{last=localStorage.getItem("cr_lastrole")||"";}catch(e){}
+  sel.innerHTML='<option value="">選択してください</option>'+Object.keys(ROLE_LABEL).map(k=>`<option value="${k}">${ROLE_LABEL[k]}</option>`).join("");
+  if(ROLE_LABEL[last])sel.value=last;
+})();
 function showGateRoles(){
-  $("#gatePass").hidden=true; $("#gateRoles").hidden=false;
-  $("#gateError").hidden=true; $("#gatePassInput").value=""; pendingRole=null;
+  $("#gateError").hidden=true; $("#gatePassInput").value=""; $("#gatePassInput").disabled=false; pendingRole=null;
 }
-function showGatePassStep(role){
-  pendingRole=role;
-  $("#gateRoles").hidden=true; $("#gatePass").hidden=false;
-  $("#gatePassLabel").textContent=`${ROLE_LABEL[role]} のパスコード`;
-  $("#gatePassInput").value=""; $("#gatePassInput").focus();
-  const remain=checkLock(role);
-  if(remain>0){ $("#gateError").textContent=lockMsg(remain); $("#gateError").hidden=false; $("#gatePassInput").disabled=true; }
-  else { $("#gateError").hidden=true; $("#gatePassInput").disabled=false; }
-}
-$$("#gateRoles .gate-role").forEach(b=>b.onclick=()=>showGatePassStep(b.dataset.role));
-$("#gateBack").onclick=showGateRoles;
+$("#gatePassInput").addEventListener('focus',()=>{ $("#gateError").hidden=true; });
 // ---- ログイン試行回数のロック（総当たり対策） ----
 const LOCK_KEY="yakuwari:gate:lockstate";
 const LOCK_MAX_FAILS=5, LOCK_MINUTES=5;
@@ -2214,7 +2200,8 @@ function clearFails(role){
 function lockMsg(ms){const m=Math.ceil(ms/60000);return `試行回数が多いため一時的にロックされています。約${m}分後にもう一度お試しください。`;}
 
 async function attemptLogin(){
-  if(!pendingRole)return;
+  pendingRole=$("#gateRoleSel").value||null;
+  if(!pendingRole){ $("#gateError").textContent="区分（部署）を選んでください"; $("#gateError").hidden=false; return; }
   const remain=checkLock(pendingRole);
   if(remain>0){ $("#gateError").textContent=lockMsg(remain); $("#gateError").hidden=false; return; }
   const codes=loadPasscodes();
@@ -2227,6 +2214,7 @@ async function attemptLogin(){
   }
   clearFails(pendingRole);
   ROLE=pendingRole;
+  try{localStorage.setItem("cr_lastrole",ROLE);}catch(e){}
   sessSet("yakuwari:gate:role",ROLE);
   FSCOPE = ROLE==="admin" ? "day" : ROLE; // admin は day から開始（切替可）。それ以外は自分の部署固定。
   if(ROLE==="admin"){ const savedFac=sessGet("yakuwari:gate:facility"); if(savedFac)FSCOPE=savedFac; }
