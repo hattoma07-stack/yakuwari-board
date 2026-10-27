@@ -638,6 +638,14 @@
       <h2 class="settings-group-title"><span class="sgt-ico">🔐</span>アクセスとログイン（管理者のみ）</h2>
       <div class="settings-grid">
         <div class="setting-card">
+          <div class="sc-icon">📅</div>
+          <div class="sc-body">
+            <h3>公休日数（全部署共通）</h3>
+            <p>雇用形態ごとの「月の休日数」を、全部署まとめて設定します。部署ごとに設定しなくても、勤務表の目標・自動作成に反映されます。</p>
+          </div>
+          <button class="btn" id="stgOffAll">編集する</button>
+        </div>
+        <div class="setting-card">
           <div class="sc-icon">🔑</div>
           <div class="sc-body">
             <h3>パスコードの変更</h3>
@@ -672,6 +680,16 @@
 </div></div>
 
 <!-- Passcode modal -->
+<div class="overlay" id="offAllOverlay"><div class="modal">
+  <div class="modal-head"><h3>公休日数（全部署共通）</h3><button class="x" data-close>×</button></div>
+  <div class="modal-body">
+    <div class="mlabel">雇用形態ごとの「月の休日数」（ここで設定した形態は全部署に反映。空欄＝目標なし）</div>
+    <div class="edit-list" id="offAllList"></div>
+    <div class="edit-row"><input type="text" id="offAllNewName" placeholder="雇用形態名を追加（例：嘱託）" maxlength="12"><button class="btn sm" id="offAllAdd">＋ 追加</button></div>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:10px">設定後は、各部署の勤務表で「休日数に合わせて自動作成」を押すと反映されます。</p>
+  </div>
+  <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
+</div></div>
 <div class="overlay" id="passOverlay"><div class="modal">
   <div class="modal-head"><h3>パスコードの変更</h3><button class="x" data-close>×</button></div>
   <div class="modal-body">
@@ -731,7 +749,7 @@
       <p style="font-size:12px;color:var(--ink-soft);margin:6px 0 0">※ 職種はスタッフ台帳で各スタッフに設定します。生活相談員は介護職員の人数には含まれません。送迎職員は、台帳で「送迎が可能」にチェックしたスタッフを数えます（介護職員などと兼任できます）。</p>
     </div>
     <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
-    <div class="mlabel">② 雇用形態ごとの「月の休日数」の既定値（例：正職員＝9）</div>
+    <div class="mlabel">② 雇用形態ごとの「月の休日数」の既定値（管理者が「全部署共通」で設定した形態は、ここでは変更できません）</div>
     <div class="edit-list" id="typesList"></div>
     <button class="btn sm" id="addType">＋ 雇用形態を追加</button>
     <hr style="border:none;border-top:1px solid var(--line);margin:18px 0">
@@ -825,6 +843,7 @@ const K={
   get day(){return `yakuwari:${FSCOPE}:day:`}, get roster(){return `yakuwari:${FSCOPE}:roster:`},
   get rmeta(){return `yakuwari:${FSCOPE}:rmeta:`}, get rauto(){return `yakuwari:${FSCOPE}:rauto:`}, get rhalf(){return `yakuwari:${FSCOPE}:rhalf:`}, get rtime(){return `yakuwari:${FSCOPE}:rtime:`},
   get statusEnabled(){return `yakuwari:${FSCOPE}:statusEnabled`}, // 勤務記号は共有だが「この部署で使うか」は部署ごと
+  offdays:"yakuwari:offdays", // 月の休日数（雇用形態名ごと）は管理者が全部署共通で設定
   theme:"yakuwari:theme" // 表示テーマも施設共通
 };
 const FACILITY_NAME={day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ",kyotaku:"居宅支援事業所"};
@@ -1154,7 +1173,10 @@ function workTimeLabel(s){ const w=s.workTime; if(!w||!(w.s||w.e)||!isPartTimeTy
 const WISH_RED="#C62828";
 const isWishStatus=st=>!!(st&&(st.code==="希"||/希望/.test(st.label||"")));
 const isPartTimeType=t=>!!(t&&/非常勤/.test(t.name||""));
-function staffTarget(s){ const t=typeById(s.typeId); return (t&&t.off!==null&&t.off!==undefined&&t.off!=="")?Number(t.off):null; }
+// 管理者が設定した全部署共通の休日数（雇用形態名ごと）。未設定の形態は、従来の部署ごとの値を使う
+const globalOff=()=>jget(K.offdays,{})||{};
+function typeOff(t){ if(!t)return null; const g=globalOff(); const v=Object.prototype.hasOwnProperty.call(g,t.name)?g[t.name]:t.off; return (v!==null&&v!==undefined&&v!=="")?Number(v):null; }
+function staffTarget(s){ return typeOff(typeById(s.typeId)); }
 function typeName(s){const t=typeById(s.typeId);return t?t.name:"";}
 // 勤務時間帯（ドライバー等）: s.hours=null→終日 / {am:{s,e}|null, pm:{s,e}|null}
 const AM_DEF={s:"08:00",e:"10:00"}, PM_DEF={s:"16:00",e:"18:00"};
@@ -1622,9 +1644,10 @@ $("#newStaffName").addEventListener('keydown',e=>{if(e.key==="Enter")addStaffMas
 
 function renderTypesList(){
   const w=$("#typesList");w.innerHTML="";
-  S.types.forEach((t,i)=>{const row=document.createElement('div');row.className="edit-row";
-    row.innerHTML=`<input type="text" value="" placeholder="形態名"><input type="number" min="0" max="31" value="${t.off??''}" placeholder="なし" title="月の休日数（空欄＝既定なし）" style="width:72px">
-      <span style="font-size:12px;color:var(--ink-soft)">日/月</span><button class="del" title="削除">🗑</button>`;
+  const g=globalOff();
+  S.types.forEach((t,i)=>{const row=document.createElement('div');row.className="edit-row"; const locked=Object.prototype.hasOwnProperty.call(g,t.name);
+    row.innerHTML=`<input type="text" value="" placeholder="形態名"><input type="number" min="0" max="31" value="${locked?(typeOff(t)??''):(t.off??'')}" placeholder="なし" title="${locked?'管理者が全部署共通で設定した休日数です':'月の休日数（空欄＝既定なし）'}" style="width:72px"${locked?' disabled':''}>
+      <span style="font-size:12px;color:var(--ink-soft)">日/月${locked?'（全部署共通）':''}</span><button class="del" title="削除">🗑</button>`;
     row.children[0].value=t.name;
     row.children[0].oninput=e=>{t.name=e.target.value;saveTypes();if(S.tab==="roster")renderRoster();};
     row.children[1].oninput=e=>{t.off=e.target.value===''?null:Number(e.target.value);saveTypes();if(S.tab==="roster")renderRoster();};
@@ -2273,6 +2296,18 @@ function renderPassList(){
     w.appendChild(row);
   });
 }
+function renderOffAll(){
+  const w=$("#offAllList"); w.innerHTML=""; const g=globalOff();
+  const names=[...new Set([...Object.keys(g),...S.types.map(t=>t.name)])];
+  names.forEach(n=>{ const row=document.createElement('div'); row.className="edit-row";
+    const cur=Object.prototype.hasOwnProperty.call(g,n)?g[n]:(S.types.find(t=>t.name===n)||{}).off;
+    row.innerHTML=`<span style="flex:1;font-weight:700;font-size:13px"></span><input type="number" min="0" max="31" placeholder="なし" style="width:72px"><span style="font-size:12px;color:var(--ink-soft)">日/月</span>`;
+    row.children[0].textContent=n; row.children[1].value=cur??"";
+    row.children[1].oninput=e=>{ const m={...globalOff()}; m[n]=e.target.value===""?null:Number(e.target.value); jset(K.offdays,m); if(S.tab==="roster")renderRoster(); };
+    w.appendChild(row); });
+}
+$("#stgOffAll").onclick=()=>{renderOffAll();openModal("#offAllOverlay");};
+$("#offAllAdd").onclick=()=>{ const n=$("#offAllNewName").value.trim(); if(!n)return; const m={...globalOff()}; if(!(n in m))m[n]=null; jset(K.offdays,m); $("#offAllNewName").value=""; renderOffAll(); };
 $("#stgPass").onclick=()=>{renderPassList();openModal("#passOverlay");};
 
 async function initGate(){
