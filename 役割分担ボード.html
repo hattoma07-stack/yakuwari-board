@@ -263,6 +263,13 @@
   table.roster td.rc.auto{opacity:.5}
   table.roster td.sumcell{font-weight:700;font-size:13px;background:var(--surface-2);color:var(--ink)}
   table.roster td.sumcell.s-work{color:var(--accent-ink)}
+  #shiftPrint{display:none}
+  #shiftPrintBtns[hidden]{display:none!important}
+  .ftm{display:block;font-size:9.5px;font-weight:400;color:var(--ink-soft);white-space:nowrap;letter-spacing:0}
+  .sp-page h2{font-size:15px;margin:0 0 8px;padding-bottom:6px;border-bottom:2px solid #333}
+  .sp-page .sp-sub{font-size:11.5px;color:#555;margin:0 0 8px}
+  .sp-page table.board{min-width:0;width:100%}
+  .sh-tag{display:inline-block;font-size:9.5px;font-weight:700;border:1px solid var(--line-strong);border-radius:4px;padding:0 4px;margin-left:6px;color:var(--ink-soft);vertical-align:1px}
   .rwrap2{display:flex;gap:12px;align-items:flex-start;position:relative;margin-top:38px}
   .rwrap2 .off-badge{position:absolute;right:0;top:-34px}
   .rwrap2 .rtable-wrap{flex:1;min-width:0}
@@ -423,6 +430,11 @@
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
   @media print{
+    body.print-shift-mode .app,body.print-shift-mode .gate,body.print-shift-mode #allDeptPrint{display:none!important}
+    body.print-shift-mode #shiftPrint{display:block!important}
+    body.print-shift-mode .toast{display:none!important}
+    body.print-shift-mode .sp-page table.board td.cell{height:34px}
+    body.print-all-mode .ftm{display:none}
     body.print-all-mode .app,body.print-all-mode .gate{display:none!important}
     #allDeptPrint{page:allDept}
     body.print-all-mode #allDeptPrint{display:block!important}
@@ -518,6 +530,8 @@
       <span class="spacer"></span>
       <button class="btn" id="btnTplSave"><span class="ico">💾</span>テンプレ保存</button>
       <button class="btn" id="btnTplLoad"><span class="ico">📂</span>テンプレ読込</button>
+      <span id="shiftPrintBtns" hidden style="display:inline-flex;gap:6px;align-items:center"><span style="font-size:12px;color:var(--ink-soft)">時間帯別に印刷</span>
+        <button class="btn sm" data-sp="早">早番</button><button class="btn sm" data-sp="日">日勤</button><button class="btn sm" data-sp="遅">遅番</button></span>
       <button class="btn primary" id="btnPrintBoard"><span class="ico">🖨️</span>印刷・PDF</button>
       <button class="btn ghost sm" id="btnTheme" title="表示切替">◐</button>
     </div>
@@ -662,6 +676,7 @@
   </div>
 </div>
 <div id="allDeptPrint"></div>
+<div id="shiftPrint"></div>
 
 <!-- 時間変更（その日だけの勤務時間・非常勤） -->
 <div class="overlay" id="timeEditOverlay"><div class="modal" style="width:min(440px,100%)">
@@ -736,6 +751,10 @@
       <div class="mlabel" style="margin-top:14px">早番・遅番の人数（1日あたり。自動作成で割り振り、残りの出勤者は日勤にします。0なら日勤のみ）</div>
       <div class="edit-row"><span style="width:60px;flex:none;font-weight:700;font-size:13px">早番</span><input type="number" id="earlyNIn" min="0" max="20" style="width:72px"><span style="font-size:12px;color:var(--ink-soft)">名</span>
         <span style="width:60px;flex:none;font-weight:700;font-size:13px;margin-left:12px">遅番</span><input type="number" id="lateNIn" min="0" max="20" style="width:72px"><span style="font-size:12px;color:var(--ink-soft)">名</span></div>
+    </div>
+    <div id="shiftTimeBox" hidden>
+      <div class="mlabel" style="margin-top:14px">早番・日勤・遅番・夜勤の勤務時間（勤務表の下の欄に表示。役割分担表の「時間帯別に印刷」にも使います）</div>
+      <div id="shiftTimeList"></div>
     </div>
     <div id="nightReqBox" hidden>
       <div class="mlabel" style="margin-top:14px">夜勤の人数（1晩あたり。自動作成で、スタッフ台帳で「夜勤が可能」にした人だけに割り振ります。0なら自動では割り振りません）</div>
@@ -927,6 +946,11 @@ const SUMTOTAL_BOX={home:true,nursing:true,office:true,day:true,rehab:true,kitch
 const sumColsOf=()=>SUMCOLS_BY_DEPT[FSCOPE]||null;
 // 勤務表の下に出す「日ごとの記号別スタッフ数」の行（指定した部署のみ）
 const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"],nursing:["早","日","遅","夜"],office:["出"],rehab:["出"],kitchen:["早","日","遅"],kyotaku:["出"]};
+// 早番・日勤・遅番・夜勤の勤務時間（訪問介護・看護）。設定画面で変更できる
+const DEF_SHIFTTIMES={home:{"早":{s:"06:00",e:"15:00"},"日":{s:"08:30",e:"17:30"},"遅":{s:"13:00",e:"22:00"},"夜":{s:"21:00",e:"07:00"}}};
+DEF_SHIFTTIMES.nursing=DEF_SHIFTTIMES.home;
+const SHIFT_NAMES={"早":"早番","日":"日勤","遅":"遅番","夜":"夜勤"};
+const shiftTimeLabel=c=>{const t=(S.shiftTimes||{})[c]; return t&&t.s&&t.e?`${t.s.replace(/^0/,"")}〜${t.e.replace(/^0/,"")}`:"";};
 const SHIFTROWS_MIN={office:true,rehab:true,kyotaku:true}; // この部署は記号別の行に「1日の最低出勤人数」の不足（赤）も出す
 // 送迎職員は「職種」ではなく、台帳の「送迎が可能」チェックで数える（兼任できる）。他の職種は職種の選択で数える
 const inJob=(j,s)=>j.drive?(!!s.canDrive||s.job==="drv"):s.job===j.id;
@@ -1066,7 +1090,7 @@ document.addEventListener('visibilitychange',()=>{
 /* ---------- state ---------- */
 const S={
   tab:"board", date:todayISO(), ym:todayISO().slice(0,7),
-  staff:[], status:[], times:[], tasks:[], types:[], roles:[], minStaff:3, req:{}, nightN:0, nightRun:2, shiftN:{},
+  staff:[], status:[], times:[], tasks:[], types:[], roles:[], minStaff:3, req:{}, nightN:0, nightRun:2, shiftN:{}, shiftTimes:{},
   day:{selected:[],assign:{}}, roster:{}, rauto:{}, rhalf:{}, rtime:{}, rmeta:{offDows:[],offDates:[]}
 };
 function todayISO(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
@@ -1085,6 +1109,7 @@ function loadMasters(){
     jset(K.meta,{...jget(K.meta,{}),seMig:true}); }
   const mn=jget(K.meta,{}).minStaff; S.minStaff=(mn==null?3:mn);
   S.shiftN=jget(K.meta,{}).shiftN||JSON.parse(JSON.stringify(DEF_SHIFTN[FSCOPE]||{}));
+  S.shiftTimes=jget(K.meta,{}).shiftTimes||JSON.parse(JSON.stringify(DEF_SHIFTTIMES[FSCOPE]||{}));
   { const nn=jget(K.meta,{}).nightN; S.nightN=(nn==null?(DEF_NIGHTN[FSCOPE]||0):nn); const nr=jget(K.meta,{}).nightRun; S.nightRun=(nr==null?2:nr); } // 夜勤を続けて入れられる最大回数（初期2）
   S.req=jget(K.meta,{}).req||JSON.parse(JSON.stringify(DEF_REQ[FSCOPE]||{}));
   let seeded=jget(K.meta,{}).seeded;
@@ -1220,7 +1245,7 @@ function offCount(sid){
   for(let d=1;d<=nd;d++){ n+=effOf(md,S.ym,sid,d,used).r; }
   return n;
 }
-const saveMeta=()=>jset(K.meta,{...jget(K.meta,{}),minStaff:S.minStaff,req:S.req,nightN:S.nightN,nightRun:S.nightRun,shiftN:S.shiftN});
+const saveMeta=()=>jset(K.meta,{...jget(K.meta,{}),minStaff:S.minStaff,req:S.req,nightN:S.nightN,nightRun:S.nightRun,shiftN:S.shiftN,shiftTimes:S.shiftTimes});
 const staffById=id=>S.staff.find(s=>s.id===id);
 const taskById=id=>S.tasks.find(t=>t.id===id);
 const statusByCode=c=>S.status.find(s=>s.code===c);
@@ -1393,7 +1418,7 @@ function renderLegend(){
     s.innerHTML=`<span class="sw" style="background:${tint(t.color,.18)};border-color:${t.color}"></span><span></span>`;
     s.querySelector('span:last-child').textContent=t.name;l.appendChild(s);});
 }
-function renderBoardAll(){$("#date").value=S.date;renderRosterPick();renderBoard();renderLegend();}
+function renderBoardAll(){ $("#shiftPrintBtns").hidden=FSCOPE!=="home";$("#date").value=S.date;renderRosterPick();renderBoard();renderLegend();}
 
 /* assign modal */
 let assignCtx=null;
@@ -1500,7 +1525,7 @@ function renderRoster(){
   const jobsRows=rowJobsOf();
   let foot='<tfoot>'+(jobsRows.length||SHIFTROWS_BY_DEPT[FSCOPE]?'':footRow('出勤数',minS,()=>true,true));
   jobsRows.forEach(j=>{foot+=footRow(escapeHtml(j.short),Number(S.req[j.id])||0,s=>inJob(j,s),false);});
-  (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st?escapeHtml(st.label.replace(c,'')):''),SHIFTROWS_MIN[FSCOPE]?minS:0,()=>true,false,c);});
+  (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st?escapeHtml(st.label.replace(c,'')):'')+(shiftTimeLabel(c)?`<span class="ftm">${shiftTimeLabel(c)}</span>`:''),SHIFTROWS_MIN[FSCOPE]?minS:0,()=>true,false,c);});
   foot+='</tfoot>';
   T.style.setProperty('--kou',(statusByCode('公')||{}).color||'#9AA3A0'); // 印刷時の「公」の色
   T.innerHTML=`<colgroup>${cols}</colgroup>`+head+bodyH+foot;
@@ -1885,6 +1910,12 @@ function openSettings(){
   $("#jobReqBox").hidden=!jobs.length;
   $("#nightReqBox").hidden=!nightDeptOn();
   $("#shiftReqBox").hidden=!shiftMixOn();
+  $("#shiftTimeBox").hidden=!DEF_SHIFTTIMES[FSCOPE];
+  const stl=$("#shiftTimeList"); stl.innerHTML="";
+  if(DEF_SHIFTTIMES[FSCOPE]) Object.keys(SHIFT_NAMES).forEach(c=>{ const t=S.shiftTimes[c]||DEF_SHIFTTIMES[FSCOPE][c]; const row=document.createElement('div'); row.className="edit-row";
+    row.innerHTML=`<span style="width:60px;flex:none;font-weight:700;font-size:13px">${SHIFT_NAMES[c]}</span><select class="st-s">${halfHourOpts(t.s)}</select><span>〜</span><select class="st-e">${halfHourOpts(t.e)}</select>`;
+    const upd=()=>{ const s0=row.querySelector(".st-s").value, e0=row.querySelector(".st-e").value; if(!s0||!e0)return; S.shiftTimes[c]={s:s0,e:e0}; saveMeta(); if(S.tab==="roster")renderRoster(); };
+    row.querySelector(".st-s").onchange=upd; row.querySelector(".st-e").onchange=upd; stl.appendChild(row); });
   const ein=$("#earlyNIn"), lin=$("#lateNIn"); ein.value=Number((S.shiftN||{}).early)||0; lin.value=Number((S.shiftN||{}).late)||0;
   ein.oninput=e=>{S.shiftN.early=e.target.value===''?0:Number(e.target.value);saveMeta();};
   lin.oninput=e=>{S.shiftN.late=e.target.value===''?0:Number(e.target.value);saveMeta();};
@@ -2141,7 +2172,48 @@ async function printAllDepartments(){
     btn.disabled=false; btn.textContent=origLabel;
   }
 }
+// ---- 時間帯別の印刷（訪問介護）：早番・日勤・遅番の勤務時間に入る列だけを、その時間帯に働く全員分、1枚で印刷 ----
+function shiftOverlap(a,b){ // a,b:{s,e}（"HH:MM"）。終わりが始まりより前なら翌日にまたぐ
+  const iv=t=>{const s=toMin(t.s); let e=toMin(t.e); if(e<=s)e+=1440; return [s,e];};
+  const [s1,e1]=iv(a),[s2,e2]=iv(b); return s1<e2&&s2<e1;
+}
+async function printBoardShift(code){
+  const win=(S.shiftTimes||{})[code]; if(!win||!win.s||!win.e)return;
+  const ym=S.date.slice(0,7), day=Number(S.date.slice(8,10)), md=monthData(ym), used=monthUsed(md.r,md.rm), hasR=!!used;
+  const codeOf=sid=>hasR?(effOf(md,ym,sid,day,used)||{}).code:"";
+  const staff=selectedStaff().filter(s=>{ if(!hasR)return true; const c=codeOf(s.id), t=S.shiftTimes[c]; return t?shiftOverlap(t,win):false; });
+  const cols=[]; S.times.forEach((tm,i)=>{ if(tm.time>=win.s&&tm.time<win.e)cols.push(i); });
+  if(!cols.length){toast("この時間帯に表示できる時間の列がありません");return;}
+  const lo=cols[0], hi=cols[cols.length-1];
+  const tbl=document.createElement('table'); tbl.className="board";
+  let h='<thead><tr><th class="staff-col">スタッフ</th>'+cols.map(i=>`<th class="time-head"><div class="t num">${escapeHtml(S.times[i].time)}</div></th>`).join("")+'</tr></thead><tbody>';
+  if(!staff.length)h+=`<tr><td class="staff-cell">―</td><td class="cell empty" colspan="${cols.length}" style="text-align:center">この時間帯に勤務するスタッフがいません</td></tr>`;
+  staff.forEach(s=>{
+    const c=codeOf(s.id), tg=SHIFT_NAMES[c]?`<span class="sh-tag">${SHIFT_NAMES[c]}</span>`:"";
+    h+=`<tr><td class="staff-cell"><div class="row-staff"><div class="bar" style="background:${s.color}"></div><div><span class="nm">${escapeHtml(s.name)}</span>${s.id===S.day.leader?'<span class="leader-tag">リーダー</span>':''}${tg}</div></div></td>`;
+    let ti=lo;
+    while(ti<=hi){ const tm=S.times[ti];
+      if(!worksAt(s,tm.time)){ h+='<td class="cell offhours"></td>'; ti++; continue; }
+      const a=(S.day.assign[tm.id]||{})[s.id], ids=cellTasks(a);
+      if(ids.length){ const span=Math.min(timeSpan(s,ti,ids),hi-ti+1);
+        h+=`<td class="cell"${span>1?` colspan="${span}"`:''}><div class="assign">`+ids.map(id=>{const t=taskById(id);return `<span class="tchip" style="--tc:${t.color};--tbg:${tint(t.color,.14)};--tink:${t.color}">${escapeHtml(t.name)}</span>`;}).join("")+(a&&a.note?`<div class="note">${escapeHtml(a.note)}</div>`:'')+'</div></td>';
+        ti+=span; continue; }
+      h+='<td class="cell empty"></td>'; ti++; }
+    h+='</tr>'; });
+  tbl.innerHTML=h+'</tbody>';
+  const [y,m,d]=S.date.split("-").map(Number);
+  $("#shiftPrint").innerHTML=`<div class="sp-page"><h2>${escapeHtml(FACILITY_NAME[FSCOPE])}　${y}年${m}月${d}日（${DOW[new Date(y,m-1,d).getDay()]}）　${SHIFT_NAMES[code]}の時間帯 ${shiftTimeLabel(code)}　役割分担表</h2><p class="sp-sub">この時間帯に勤務するスタッフ全員の予定です。（早番 ${shiftTimeLabel("早")}／日勤 ${shiftTimeLabel("日")}／遅番 ${shiftTimeLabel("遅")}／夜勤 ${shiftTimeLabel("夜")}）</p>${tbl.outerHTML}<div class="foot-legend">${$("#legend").innerHTML}</div></div>`;
+  document.body.classList.add('print-shift-mode');
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  await new Promise(r=>setTimeout(r,50));
+  window.print();
+}
+$$("#shiftPrintBtns [data-sp]").forEach(b=>b.onclick=()=>printBoardShift(b.dataset.sp));
 window.addEventListener('afterprint',()=>{
+  if(document.body.classList.contains('print-shift-mode')){
+    document.body.classList.remove('print-shift-mode');
+    $("#shiftPrint").innerHTML="";
+  }
   if(document.body.classList.contains('print-all-mode')){
     document.body.classList.remove('print-all-mode');
     $("#allDeptPrint").innerHTML="";
