@@ -72,6 +72,8 @@
   .gate-card select:focus-visible,.gate-card input:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
   .gate-go{width:100%;justify-content:center;padding:11px 14px;font-size:15px;margin-top:4px}
   .gate-lead{font-size:13px;color:var(--ink-soft);text-align:center;margin:0 0 18px;line-height:1.6}
+  .gate-dept{font-size:17px;color:var(--ink)}
+  .gate-who{font-size:12px;color:var(--ink-soft)}
   .gate-foot{font-size:11.5px;color:var(--ink-soft);text-align:center;margin-top:16px}
   @media (max-width:900px){ .gate-art{display:none} }
   @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .gate{--gate-ink:#A9B6E0} }
@@ -2319,10 +2321,19 @@ function lockRemain(){ try{const o=JSON.parse(localStorage.getItem(LOCK_KEY)||"{
 function lockFail(){ try{const o=JSON.parse(localStorage.getItem(LOCK_KEY)||"{}"); o.fails=(o.fails||0)+1; if(o.fails>=LOCK_MAX_FAILS){o.until=Date.now()+LOCK_MINUTES*60000;o.fails=0;} localStorage.setItem(LOCK_KEY,JSON.stringify(o)); return Math.max(0,(o.until||0)-Date.now());}catch(e){return 0;} }
 function lockClear(){ try{localStorage.removeItem(LOCK_KEY);}catch(e){} }
 const lockMsg=ms=>`試行回数が多いため一時的にロックされています。約${Math.ceil(ms/60000)}分後にもう一度お試しください。`;
-let pendingUser=null; // {email, role, hash}
+let pendingUser=null; // {email, role}
+// 区分のパスコードの確認は、Firebase側（Security Rules）で行う。正しい値を書き込めた人だけが、その区分のデータを読み書きできる（12時間有効）。
+async function tryUnlock(role,hash){
+  const {F,db,auth}=await fbInit();
+  try{
+    await F.setDoc(F.doc(db,"unlocks",auth.currentUser.uid+"_"+role),{dept:role,h:hash,t:F.serverTimestamp()});
+    return true;
+  }catch(e){ if(e&&e.code==="permission-denied")return false; throw e; }
+}
 function showPassStep(u){
   pendingUser=u; $("#gateGoogleBox").hidden=true; $("#gatePassBox").hidden=false;
-  $("#gatePassWho").textContent=`${u.email}（${ROLE_LABEL[u.role]}）でログイン中です。パスコードを入力してください。`;
+  $("#gatePassWho").innerHTML=`<b class="gate-dept"></b>のパスコードを入力してください。<br><span class="gate-who"></span>`;
+  $("#gatePassWho .gate-dept").textContent=ROLE_LABEL[u.role]; $("#gatePassWho .gate-who").textContent=u.email+" でログイン中";
   $("#gatePassInput").value=""; gateMsg(""); setTimeout(()=>$("#gatePassInput").focus(),50);
 }
 function showGoogleStep(){ pendingUser=null; $("#gatePassBox").hidden=true; $("#gateGoogleBox").hidden=false; }
@@ -2330,11 +2341,14 @@ async function submitPass(){
   if(!pendingUser)return;
   const rem=lockRemain(); if(rem>0){ gateMsg(lockMsg(rem)); return; }
   const code=$("#gatePassInput").value.trim();
-  if(code===""||await passHash(pendingUser.role,code)!==pendingUser.hash){
-    const l=lockFail(); gateMsg(l>0?lockMsg(l):"パスコードが違います"); return;
-  }
-  lockClear(); sessSet("yakuwari:gate:passok",pendingUser.email);
-  const u=pendingUser; showGoogleStep(); await enterApp(u.email,u.role);
+  $("#gatePassGo").disabled=true;
+  try{
+    const h=code===""?"x":await passHash(pendingUser.role,code);
+    if(!(await tryUnlock(pendingUser.role,h))){ const l=lockFail(); gateMsg(l>0?lockMsg(l):"パスコードが違います"); return; }
+    lockClear(); sessSet("yakuwari:gate:passok",JSON.stringify({e:pendingUser.email,h}));
+    const u=pendingUser; showGoogleStep(); await enterApp(u.email,u.role);
+  }catch(e){ gateMsg("確認できませんでした。ネットワークを確認して、もう一度お試しください。"); }
+  finally{ $("#gatePassGo").disabled=false; }
 }
 $("#gatePassGo").onclick=submitPass;
 $("#gatePassInput").addEventListener('keydown',e=>{if(e.key==="Enter")submitPass();});
@@ -2359,10 +2373,12 @@ async function onSignedIn(user){
       gateMsg(`${user.email} は、登録されていません。管理者に、このアドレスの登録を依頼してください。`);
       await Au.signOut(auth); return;
     }
-    let hash=null;
-    try{ const d=await F.getDoc(F.doc(db,"passcodes",role)); hash=d.exists()?d.data().h:null; }catch(e){ hash=null; }
-    if(hash&&sessGet("yakuwari:gate:passok")!==email){ showPassStep({email,role,hash}); return; }
-    await enterApp(email,role);
+    // 同じ画面を開いている間は、前に入力したパスコードで自動的に入る。パスコード未設定の区分は、そのまま入れる
+    let saved=null; try{ saved=JSON.parse(sessGet("yakuwari:gate:passok")||"null"); }catch(e){}
+    const h=saved&&saved.e===email?saved.h:"";
+    let ok=false; try{ ok=await tryUnlock(role,h); }catch(e){ gateMsg("確認できませんでした。ネットワークを確認して、もう一度お試しください。"); await Au.signOut(auth); return; }
+    if(!ok&&saved){ sessDel("yakuwari:gate:passok"); }
+    if(ok)await enterApp(email,role); else showPassStep({email,role});
   }finally{ entering=false; }
 }
 async function initGate(){
@@ -2411,8 +2427,8 @@ $("#btnLogout").onclick=()=>{
     // 別の人がこの端末を使うときに前の人のデータが残らないよう、端末内の保存データを消す（クラウドには保存済み）
     try{ Object.keys(localStorage).filter(k=>k.indexOf("yakuwari:")===0&&k!==K.theme).forEach(k=>localStorage.removeItem(k)); }catch(e){}
     sessDel("yakuwari:gate:facility"); sessDel("yakuwari:gate:passok");
-    ROLE=null; USER_EMAIL=null;
-    try{ const {Au,auth}=await fbInit(); await Au.signOut(auth); }catch(e){}
+    const ROLE_BEFORE=ROLE; ROLE=null; USER_EMAIL=null;
+    try{ const {F,db,Au,auth}=await fbInit(); try{ await F.deleteDoc(F.doc(db,"unlocks",auth.currentUser.uid+"_"+ROLE_BEFORE)); }catch(e){} await Au.signOut(auth); }catch(e){}
     $("#appRoot").hidden=true; $("#gate").hidden=false; gateMsg("");
   },"ログアウト");
 };
@@ -2451,6 +2467,7 @@ async function renderPasscodeList(){
       const v=row.querySelector('input').value.trim();
       try{ const {F,db}=await fbInit();
         if(v==="")await F.deleteDoc(F.doc(db,"passcodes",r)); else await F.setDoc(F.doc(db,"passcodes",r),{h:await passHash(r,v)});
+        if(r===ROLE){ const h=v===""?"":await passHash(r,v); await tryUnlock(r,h); sessSet("yakuwari:gate:passok",JSON.stringify({e:USER_EMAIL,h})); } // 自分の区分のパスコードを変えても、続けて使えるようにする
         toast(v===""?"パスコードをなしにしました":"パスコードを設定しました"); renderPasscodeList();
       }catch(e){ toast("設定できませんでした"); }
     };

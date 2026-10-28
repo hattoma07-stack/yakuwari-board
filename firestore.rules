@@ -1,9 +1,20 @@
 rules_version = '2';
 // CareRhythm のアクセス制限（Firebase コンソール → Firestore Database → ルール に貼り付けて「公開」）
-//   users/{メールアドレス}  : ログインを許可する人と区分（role: "admin" または 部署名）。管理者だけが一覧・追加・変更できる。
-//   kv/{保存キー}           : アプリのデータ。scope は "global"（全体共通）か部署名。
-//     管理者            : すべて読み書きできる
-//     各部署の人        : 自分の部署のデータと、全体共通のデータを読める。書き込めるのは自分の部署のデータだけ
+//
+// 入るまでの3つの壁
+//   1) Googleログイン             … ログインしていない人は、何も読めない
+//   2) 登録（users）              … 管理者が登録したGmailだけが、区分（管理者／部署）を持てる
+//   3) 区分のパスコード（unlocks） … 区分のパスコードを正しく入力した人だけが、その区分のデータを読み書きできる（12時間有効）
+//      ・パスコードを変更すると、それまでの入力は無効になる
+//      ・パスコードを設定していない区分は、パスコードなしで入れる
+//
+// データ
+//   users/{メールアドレス}  : 登録された人と区分（role: "admin" または 部署名）
+//   passcodes/{区分}        : パスコード（ハッシュ化した値）。管理者だけが読み書きできる
+//   unlocks/{uid_区分}      : パスコードを入力した記録。サーバー側で、正しい値かどうかを確認してから保存される
+//   kv/{保存キー}           : アプリのデータ。scope は "global"（全体共通）か部署名
+//     管理者        : すべて読み書きできる
+//     各部署の人    : 自分の部署のデータを読み書きできる。全体共通のデータは読むだけ
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -19,11 +30,29 @@ service cloud.firestore {
     function registered() {
       return signedIn() && exists(/databases/$(database)/documents/users/$(myEmail()));
     }
-    function isAdmin() {
-      return registered() && userDoc().data.role == 'admin';
-    }
     function myRole() {
       return userDoc().data.role;
+    }
+    function pcPath(dept) {
+      return /databases/$(database)/documents/passcodes/$(dept);
+    }
+    function currentHash(dept) {
+      return exists(pcPath(dept)) ? get(pcPath(dept)).data.h : '';
+    }
+    function unlockPath(dept) {
+      return /databases/$(database)/documents/unlocks/$(request.auth.uid + '_' + dept);
+    }
+    // その区分のパスコードを、いま有効な値で入力済みか（12時間以内）
+    function unlocked(dept) {
+      return exists(unlockPath(dept))
+          && get(unlockPath(dept)).data.h == currentHash(dept)
+          && get(unlockPath(dept)).data.t + duration.value(12, 'h') > request.time;
+    }
+    function isAdmin() {
+      return registered() && myRole() == 'admin' && unlocked('admin');
+    }
+    function isMyDept() {
+      return registered() && myRole() != 'admin' && unlocked(myRole());
     }
 
     match /users/{email} {
@@ -31,17 +60,26 @@ service cloud.firestore {
       allow list, create, update, delete: if isAdmin();
     }
 
-    // パスコード（ハッシュ化した値）。管理者は読み書き、各部署の人は自分の区分の分だけ読める
     match /passcodes/{role} {
-      allow read: if isAdmin() || (registered() && myRole() == role);
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
+    }
+
+    match /unlocks/{id} {
+      allow create, update: if registered()
+          && request.resource.data.keys().hasOnly(['dept', 'h', 't'])
+          && id == request.auth.uid + '_' + request.resource.data.dept
+          && myRole() == request.resource.data.dept
+          && request.resource.data.h == currentHash(request.resource.data.dept)
+          && request.resource.data.t == request.time;
+      allow delete: if signedIn() && id.matches(request.auth.uid + '_.*');
     }
 
     match /kv/{key} {
       allow read: if isAdmin()
-                  || (registered() && (resource.data.scope == myRole() || resource.data.scope == 'global'));
+                  || (registered() && resource.data.scope == 'global')
+                  || (isMyDept() && resource.data.scope == myRole());
       allow create, update: if isAdmin()
-                  || (registered()
+                  || (isMyDept()
                       && request.resource.data.scope == myRole()
                       && key.matches('yakuwari:' + myRole() + ':.*'));
       allow delete: if isAdmin();
