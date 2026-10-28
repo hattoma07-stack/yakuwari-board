@@ -1,0 +1,50 @@
+rules_version = '2';
+// CareRhythm のアクセス制限（Firebase コンソール → Firestore Database → ルール に貼り付けて「公開」）
+//   users/{メールアドレス}  : ログインを許可する人と区分（role: "admin" または 部署名）。管理者だけが一覧・追加・変更できる。
+//   kv/{保存キー}           : アプリのデータ。scope は "global"（全体共通）か部署名。
+//     管理者            : すべて読み書きできる
+//     各部署の人        : 自分の部署のデータと、全体共通のデータを読める。書き込めるのは自分の部署のデータだけ
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(myEmail()));
+    }
+    function registered() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(myEmail()));
+    }
+    function isAdmin() {
+      return registered() && userDoc().data.role == 'admin';
+    }
+    function myRole() {
+      return userDoc().data.role;
+    }
+
+    match /users/{email} {
+      allow get: if signedIn() && email == myEmail();
+      allow list, create, update, delete: if isAdmin();
+    }
+
+    // パスコード（ハッシュ化した値）。管理者は読み書き、各部署の人は自分の区分の分だけ読める
+    match /passcodes/{role} {
+      allow read: if isAdmin() || (registered() && myRole() == role);
+      allow write: if isAdmin();
+    }
+
+    match /kv/{key} {
+      allow read: if isAdmin()
+                  || (registered() && (resource.data.scope == myRole() || resource.data.scope == 'global'));
+      allow create, update: if isAdmin()
+                  || (registered()
+                      && request.resource.data.scope == myRole()
+                      && key.matches('yakuwari:' + myRole() + ':.*'));
+      allow delete: if isAdmin();
+    }
+  }
+}

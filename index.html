@@ -71,11 +71,12 @@
   .gate-card input{letter-spacing:.08em}
   .gate-card select:focus-visible,.gate-card input:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
   .gate-go{width:100%;justify-content:center;padding:11px 14px;font-size:15px;margin-top:4px}
+  .gate-lead{font-size:13px;color:var(--ink-soft);text-align:center;margin:0 0 18px;line-height:1.6}
   .gate-foot{font-size:11.5px;color:var(--ink-soft);text-align:center;margin-top:16px}
   @media (max-width:900px){ .gate-art{display:none} }
   @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .gate{--gate-ink:#A9B6E0} }
   :root[data-theme="dark"] .gate{--gate-ink:#A9B6E0}
-  .gate-error{color:var(--alert);font-size:12.5px;margin:-6px 0 12px;text-align:center}
+  .gate-error{color:var(--alert);font-size:12.5px;margin:0 0 12px;text-align:center;line-height:1.5}
 
   /* ---------- Facility switcher / session bar ---------- */
   .fac-switch{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--ink-soft)}
@@ -97,7 +98,7 @@
     border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:14px;
   }
   .brand{display:flex;align-items:center;gap:12px;min-width:0}
-  .brand .mark{width:40px;height:40px;border-radius:11px;flex:none;background:var(--accent-soft);
+  .brand .mark{width:40px;height:40px;border-radius:11px;flex:none;background:none;
     color:var(--accent-ink);display:grid;place-items:center;font-size:22px}
   .brand h1{font-size:20px;letter-spacing:.01em;line-height:1.15}
   .brand .sub{font-size:12px;color:var(--ink-soft);margin-top:2px}
@@ -182,8 +183,12 @@
   .spick input{accent-color:var(--accent);width:16px;height:16px}
   .spick.off{opacity:.45}
   .off-badge{font-weight:700;font-size:14px;line-height:1.2;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:999px;padding:7px 14px;white-space:nowrap}
-  .leader-tag{display:block;font-size:10px;font-weight:700;color:var(--accent-ink);
-    background:var(--accent-soft);border-radius:4px;padding:2px 6px;line-height:1.5;margin-top:8px;width:fit-content}
+  .leader-tag{display:block;font-size:9px;font-weight:700;color:var(--accent-ink);
+    background:var(--accent-soft);border-radius:3px;padding:0 4px;line-height:1.4;margin-top:12px;width:fit-content;white-space:nowrap}
+  table.board td.staff-cell{vertical-align:top;padding:7px 4px 6px 0}
+  td.staff-cell .bar{align-self:stretch}
+  td.staff-cell .nm{white-space:nowrap;display:block;line-height:1.3}
+  td.staff-cell .swapbtn{padding:1px 4px;font-size:11px;flex:none}
   .leadbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
   .leadlabel{font-size:13px;font-weight:700;color:var(--ink);display:inline-flex;align-items:center;gap:7px}
   .leadlabel select{font:inherit;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px}
@@ -198,9 +203,15 @@
   th.time-head .phase{font-size:10px;color:var(--ink-soft);margin-top:2px;line-height:1.2;font-weight:400}
   .staff-col{width:94px;min-width:94px;background:var(--surface-2);position:sticky;left:0;z-index:4}
   td.staff-cell{background:var(--surface-2);position:sticky;left:0;z-index:2;padding:8px 8px}
-  td.staff-cell .row-staff{display:flex;align-items:center;gap:7px}
+  td.staff-cell .row-staff{display:flex;align-items:flex-start;gap:7px}
   td.staff-cell .bar{width:5px;align-self:stretch;min-height:26px;border-radius:3px;background:var(--sc,#888)}
   td.staff-cell .nm{font-weight:700;font-size:14px}
+  td.staff-cell .swapbtn{margin-left:auto;border:1px solid var(--line,#ccc);background:var(--surface);color:var(--ink-soft);border-radius:6px;font-size:12px;padding:2px 6px;cursor:pointer;line-height:1.2}
+  td.staff-cell .swapbtn:hover{border-color:var(--accent);color:var(--accent-ink)}
+  tr.swap-from td.staff-cell{outline:2px solid var(--accent);outline-offset:-2px}
+  tr.swap-over td.staff-cell{outline:2px dashed var(--accent);outline-offset:-2px}
+  td.staff-cell[draggable=true]{cursor:grab}
+  @media print{td.staff-cell .swapbtn{display:none}}
   td.staff-cell .hrs{font-size:10px;color:var(--accent-ink);margin-top:3px;font-weight:700;line-height:1.2}
   td.cell{cursor:pointer;transition:background .1s;min-width:104px;height:52px}
   td.cell.offhours{cursor:default;background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 5px,transparent 5px,transparent 10px)}
@@ -471,13 +482,19 @@
     <div class="gate-art gate-art-l" aria-hidden="true"><svg class="gi"><use href="#ic-heart"/></svg><svg class="gi"><use href="#ic-clip"/></svg><svg class="gi"><use href="#ic-steth"/></svg><svg class="gi"><use href="#ic-bed"/></svg><svg class="gi"><use href="#ic-mask"/></svg><svg class="gi"><use href="#ic-pill"/></svg></div>
     <form class="gate-card" id="gateForm" onsubmit="return false">
       <h1>ログイン</h1>
-      <label class="gate-lbl" for="gateRoleSel">区分（部署）</label>
-      <select id="gateRoleSel" aria-label="区分（部署）"></select>
-      <label class="gate-lbl" for="gatePassInput">パスコード</label>
-      <input type="password" id="gatePassInput" inputmode="numeric" placeholder="パスコードを入力" autocomplete="off">
-      <p class="gate-error" id="gateError" hidden>パスコードが違います</p>
-      <button type="button" class="btn primary gate-go" id="gateEnter">ログイン</button>
-      <p class="gate-foot">パスコードを忘れた場合は、管理者にご連絡ください</p>
+      <div id="gateGoogleBox">
+        <p class="gate-lead">登録されたGoogleアカウントで、ログインします。</p>
+        <button type="button" class="btn primary gate-go" id="gateEnter">Googleでログイン</button>
+        <p class="gate-foot">ログインできない場合は、管理者にご連絡ください</p>
+      </div>
+      <div id="gatePassBox" hidden>
+        <p class="gate-lead" id="gatePassWho"></p>
+        <label class="gate-lbl" for="gatePassInput">パスコード</label>
+        <input type="password" id="gatePassInput" inputmode="numeric" placeholder="パスコードを入力" autocomplete="off">
+        <button type="button" class="btn primary gate-go" id="gatePassGo">入る</button>
+        <button type="button" class="btn ghost gate-go" id="gatePassBack">別のアカウントでログイン</button>
+      </div>
+      <p class="gate-error" id="gateError" hidden></p>
     </form>
     <div class="gate-art gate-art-r" aria-hidden="true"><svg class="gi"><use href="#ic-therm"/></svg><svg class="gi"><use href="#ic-syringe"/></svg><svg class="gi"><use href="#ic-clip"/></svg><svg class="gi"><use href="#ic-pill"/></svg><svg class="gi"><use href="#ic-heart"/></svg><svg class="gi"><use href="#ic-steth"/></svg></div>
   </div>
@@ -505,6 +522,7 @@
         </label>
         <span class="fac-badge" id="facBadge" hidden></span>
         <button class="btn ghost sm" id="btnPrintAll" hidden title="全部署の勤務表を1つにまとめて印刷">🖨 全部署まとめて印刷</button>
+        <div class="sync-status" id="syncStatus"></div>
         <button class="btn ghost sm" id="btnLogout">ログアウト</button>
       </div>
     </aside>
@@ -664,8 +682,8 @@
         <div class="setting-card">
           <div class="sc-icon">🔑</div>
           <div class="sc-body">
-            <h3>パスコードの変更</h3>
-            <p>管理者と各部署（デイサービス・訪問介護・事務・看護・栄養士厨房・リハビリ・居宅支援事業所）のログイン用パスコードを変更します。</p>
+            <h3>ログインできる人とパスコード</h3>
+            <p>ログインできるGoogleアカウント（Gmail）を登録し、管理者か、どの部署かを決めます。あわせて、区分ごとのパスコードも設定します。登録されていない人は、ログインできません。</p>
           </div>
           <button class="btn" id="stgPass">編集する</button>
         </div>
@@ -707,10 +725,18 @@
   <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
 </div></div>
 <div class="overlay" id="passOverlay"><div class="modal">
-  <div class="modal-head"><h3>パスコードの変更</h3><button class="x" data-close>×</button></div>
+  <div class="modal-head"><h3>ログインできる人とパスコード</h3><button class="x" data-close>×</button></div>
   <div class="modal-body">
     <div class="edit-list" id="passList"></div>
-    <p style="font-size:12px;color:var(--ink-soft)">※ このアプリの簡易的な区分わけです。厳密な個人認証ではありません。</p>
+    <div class="edit-row" style="margin-top:14px;flex-wrap:wrap">
+      <input type="email" id="userEmail" placeholder="例：name@gmail.com" autocomplete="off" style="flex:1;min-width:180px">
+      <select id="userRole"><option value="admin">管理者</option><option value="day">デイサービス</option><option value="home">訪問介護</option><option value="office">事務</option><option value="nursing">看護</option><option value="kitchen">栄養士・厨房</option><option value="rehab">リハビリ</option><option value="kyotaku">居宅支援事業所</option></select>
+      <button class="btn" id="userAdd">追加</button>
+    </div>
+    <h4 style="margin:20px 0 8px;font-size:14px">パスコード（Googleログインのあとに入力）</h4>
+    <div class="edit-list" id="passcodeList"></div>
+    <p style="font-size:12px;color:var(--ink-soft)">※ 設定していない区分は、パスコードなしで入れます。変更するときだけ、新しい数字を入れて「設定」を押します。空のまま「設定」を押すと、パスコードをなしにします。</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:14px">※ 追加した人は、そのGoogleアカウントでログインすると、選んだ区分の画面に入ります。</p>
   </div>
   <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
 </div></div>
@@ -815,7 +841,7 @@
 <div class="overlay" id="rolesOverlay"><div class="modal" style="width:min(560px,100%)">
   <div class="modal-head"><h3>役割セットの編集</h3><button class="x" data-close>×</button></div>
   <div class="modal-body">
-    <div class="mlabel">役割（1つを「リーダー」に指定できます）</div>
+    <div class="mlabel">役割</div>
     <div class="role-tabs" id="roleTabs"></div>
     <button class="btn sm" id="addRole">＋ 役割を追加</button>
     <div id="roleDetail"></div>
@@ -981,112 +1007,118 @@ const DEF_STATUS_ENABLED={
   kyotaku:["出","公","有","希"]
 };
 
-/* ---------- storage（ローカル保存＋Googleスプレッドシート同期） ---------- */
-// 同期（Googleスプレッドシート）は停止中。アドレスとトークンは、公開されるこのコードには書かないこと。
-// 空のままの間は、データは各端末のブラウザ内にだけ保存され、他の端末や部署とは共有されない。
-const SYNC_URL="";
-const SYNC_TOKEN="";
+/* ---------- storage（端末内に保存しつつ、Google Cloud（Firebase）と同期） ---------- */
+// 保存先：Firestore の「kv」コレクション（1件＝1つの保存キー）。アクセス制限は firestore.rules（Firebase側）で行う。
+// firebaseConfig は公開されても安全な接続情報（データを守るのは Security Rules とGoogleログイン）。
+const FB_CONFIG={apiKey:"AIzaSyDl-at51y7NvGnpM6aA5bqlf97uzGoAfGE",authDomain:"carerhythm.firebaseapp.com",projectId:"carerhythm",
+  storageBucket:"carerhythm.firebasestorage.app",messagingSenderId:"168485065343",appId:"1:168485065343:web:ed03666fe594e987a4254a"};
+const FB_BASE="https://www.gstatic.com/firebasejs/10.12.2/";
+let fb=null;
+async function fbInit(){
+  if(fb)return fb;
+  const [A,Au,F]=await Promise.all([import(FB_BASE+"firebase-app.js"),import(FB_BASE+"firebase-auth.js"),import(FB_BASE+"firebase-firestore.js")]);
+  const app=A.initializeApp(FB_CONFIG);
+  fb={app,Au,F,auth:Au.getAuth(app),db:F.getFirestore(app)};
+  return fb;
+}
 const jget=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
 const jset=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){} syncPush(k,v);};
 
-let syncTimer=null, syncFailCount=0;
+let SYNC_ON=false, SYNC_SCOPES=null; // SYNC_SCOPES: 書き込める部署（管理者は null＝すべて）
+let syncFailCount=0;
 function setSyncStatus(state){ // "ok" | "busy" | "error" | "off"
   const el=document.getElementById('syncStatus'); if(!el)return;
   el.dataset.state=state;
   el.textContent = state==="busy"?"🔄 同期中…" : state==="error"?"⚠ 同期待ち（自動で再送します）" : state==="off"?"": "☁ 同期済み";
 }
-// 通信が長時間固まらないよう、一定時間で打ち切って失敗扱いにする（再試行の対象になる）
-function fetchWithTimeout(url,opts,ms){
-  const ctrl=new AbortController();
-  const timer=setTimeout(()=>ctrl.abort(),ms);
-  return fetch(url,{...opts,signal:ctrl.signal}).finally(()=>clearTimeout(timer));
-}
+const keyScope=k=>{const m=/^yakuwari:(day|home|office|nursing|kitchen|rehab|kyotaku):/.exec(k);return m?m[1]:"global";};
+const syncable=k=>!!k&&k.indexOf("yakuwari:")===0&&k.indexOf("yakuwari:gate:")!==0&&k!==K.theme;
+const canWrite=k=>SYNC_SCOPES===null||keyScope(k)===SYNC_SCOPES;
 // 1件を裏で送信。失敗しても捨てず、成功するまで再試行し続ける（＝送信中のキーは pending として保持）。
 const syncQueue=[]; // {key,value} 待機中の書き込み
 const pendingKeys=new Set(); // まだサーバーへの反映が確認できていないキー（取得時の上書きから保護）
 let syncSending=false;
 function syncPush(key,value){
-  if(!SYNC_URL||!key||key.indexOf("yakuwari:")!==0)return; // アプリ自身のキーだけ同期
-  // 同じキーが既に列にあれば新しい値で置き換える（古い値を送って上書きしないように）
+  if(!SYNC_ON||!syncable(key)||!canWrite(key))return;
   const existing=syncQueue.find(it=>it.key===key);
   if(existing)existing.value=value; else syncQueue.push({key,value});
   pendingKeys.add(key);
   drainSyncQueue();
 }
 async function drainSyncQueue(){
-  if(syncSending)return; syncSending=true;
+  if(syncSending||!SYNC_ON)return; syncSending=true;
   try{
-    while(syncQueue.length){
-      const item=syncQueue[0]; // 成功するまで先頭に残す（他の項目を追い越して送らない）
-      let ok=false;
+    while(syncQueue.length&&SYNC_ON){
+      const item=syncQueue[0]; let ok=false, drop=false;
       try{
         setSyncStatus("busy");
-        const res=await fetchWithTimeout(SYNC_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-          body:JSON.stringify({key:item.key,value:item.value,token:SYNC_TOKEN})},15000);
-        const json=await res.json().catch(()=>null);
-        ok=!!(json&&json.ok);
-      }catch(err){ ok=false; }
-      if(ok){
+        const {F,db}=await fbInit();
+        await F.setDoc(F.doc(db,"kv",item.key),{v:JSON.stringify(item.value),scope:keyScope(item.key),by:(USER_EMAIL||""),t:F.serverTimestamp()});
+        ok=true;
+      }catch(err){ if(err&&err.code==="permission-denied")drop=true; }
+      if(ok||drop){
         syncQueue.shift();
-        // キューに他の待機がなければ pending 解除（同じキーが積み直されていれば残す）
         if(!syncQueue.some(it=>it.key===item.key))pendingKeys.delete(item.key);
-        syncFailCount=0; setSyncStatus("ok");
+        syncFailCount=0; setSyncStatus(drop?"error":"ok");
       } else {
         syncFailCount++; setSyncStatus("error");
-        const wait=Math.min(2000*Math.pow(1.6,Math.min(syncFailCount,6)),20000); // 指数バックオフ（最大20秒）
+        const wait=Math.min(2000*Math.pow(1.6,Math.min(syncFailCount,6)),20000);
         await new Promise(r=>setTimeout(r,wait));
       }
     }
   } finally { syncSending=false; }
 }
-// サーバーの最新値をすべて取得し、ローカルへ反映。表示中の画面に関係する変更があれば再描画する。
+// 保存データの変化を受け取る（最初に全件、その後は変更分だけ）。表示中の画面に関係する変更があれば再描画する。
+let syncUnsubs=[], syncListening=false;
+function applyRemote(docs){
+  let changed=false;
+  docs.forEach(d=>{
+    const key=d.id; if(!syncable(key)||pendingKeys.has(key))return;
+    let incoming; try{ incoming=JSON.stringify(JSON.parse(d.data().v)); }catch(e){ return; }
+    const current=localStorage.getItem(key);
+    if(current!==incoming){ try{localStorage.setItem(key,incoming);}catch(e){} changed=true; }
+  });
+  return changed;
+}
+function rerenderAfterSync(){
+  if(!ROLE)return;
+  if(S.tab==="board"){loadDay(S.date);renderBoardAll();}
+  else if(S.tab==="roster"){loadRoster(S.ym);renderRoster();}
+}
 async function syncPull(){
-  if(!SYNC_URL)return false;
-  setSyncStatus("busy");
+  if(!SYNC_ON||syncListening)return false;
+  syncListening=true; setSyncStatus("busy");
   try{
-    const res=await fetchWithTimeout(SYNC_URL+"?token="+encodeURIComponent(SYNC_TOKEN),{cache:"no-store"},15000);
-    const json=await res.json();
-    if(!json||!json.ok){ setSyncStatus("error"); return false; }
-    let changed=false;
-    Object.keys(json.data||{}).forEach(key=>{
-      if(key.indexOf("yakuwari:")!==0)return;
-      if(pendingKeys.has(key))return; // まだこちらの変更が届いていないキーは、古い値で上書きしない
-      const incoming=JSON.stringify(json.data[key]);
-      const current=localStorage.getItem(key);
-      if(current!==incoming){ localStorage.setItem(key,incoming); changed=true; }
+    const {F,db}=await fbInit();
+    const col=F.collection(db,"kv");
+    const queries=SYNC_SCOPES===null?[col]:[F.query(col,F.where("scope","==",SYNC_SCOPES)),F.query(col,F.where("scope","==","global"))];
+    const seen=new Set(); let firstLeft=queries.length, firstDone;
+    const first=new Promise(r=>firstDone=r);
+    queries.forEach(q=>{
+      let isFirst=true;
+      syncUnsubs.push(F.onSnapshot(q,snap=>{
+        const docs=[]; snap.docChanges().forEach(c=>{ if(c.type!=="removed"&&!c.doc.metadata.hasPendingWrites){ docs.push(c.doc); seen.add(c.doc.id); } });
+        const changed=applyRemote(docs);
+        if(isFirst){ isFirst=false; if(--firstLeft===0)firstDone(); }
+        else if(changed)rerenderAfterSync();
+        if(!syncQueue.length)setSyncStatus("ok");
+      },err=>{ setSyncStatus("error"); if(isFirst){isFirst=false; if(--firstLeft===0)firstDone();} }));
     });
-    // ローカルにしかない項目（初回起動時など）はサーバーへ送っておく
+    await Promise.race([first,new Promise(r=>setTimeout(r,15000))]);
+    // サーバーにまだ無い、この端末の保存データ（初回の移行など）はクラウドへ送る
     for(let i=0;i<localStorage.length;i++){
       const key=localStorage.key(i);
-      if(key&&key.indexOf("yakuwari:")===0&&!(key in (json.data||{}))&&!pendingKeys.has(key)){
+      if(syncable(key)&&!seen.has(key)&&!pendingKeys.has(key)&&canWrite(key)){
         try{ syncPush(key,JSON.parse(localStorage.getItem(key))); }catch(e){}
       }
     }
-    if(!syncQueue.length)setSyncStatus("ok");
-    return changed;
-  }catch(err){ setSyncStatus("error"); return false; }
+    return true;
+  }catch(err){ setSyncStatus("error"); syncListening=false; return false; }
 }
-function startSyncPolling(){
-  stopSyncPolling();
-  syncTimer=setInterval(async ()=>{
-    const changed=await syncPull();
-    if(changed&&ROLE){
-      if(S.tab==="board"){loadDay(S.date);renderBoardAll();}
-      else if(S.tab==="roster"){loadRoster(S.ym);renderRoster();}
-    }
-  },20000);
-}
-function stopSyncPolling(){ if(syncTimer){clearInterval(syncTimer);syncTimer=null;} }
-// タブレットの画面ロック解除・アプリ復帰時に、止まっていた同期をすぐ再開する
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==="visible"&&ROLE){
-    drainSyncQueue();
-    syncPull().then(changed=>{
-      if(changed){ if(S.tab==="board"){loadDay(S.date);renderBoardAll();}
-        else if(S.tab==="roster"){loadRoster(S.ym);renderRoster();} }
-    });
-  }
-});
+function startSyncPolling(){ /* 変更はリアルタイムに受信するため、定期取得は不要 */ }
+function stopSyncPolling(){ syncUnsubs.forEach(u=>{try{u();}catch(e){}}); syncUnsubs=[]; syncListening=false; }
+// タブレットの画面ロック解除・アプリ復帰時に、止まっていた送信をすぐ再開する
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==="visible"&&ROLE)drainSyncQueue(); });
 
 /* ---------- state ---------- */
 const S={
@@ -1362,6 +1394,24 @@ function renderLeaderSelect(){
   sel.innerHTML=`<option value="">（なし）</option>`+working.map(s=>`<option value="${s.id}" ${S.day.leader===s.id?'selected':''}>${escapeHtml(s.name)}</option>`).join("");
   sel.onchange=e=>{S.day.leader=e.target.value||null;saveDay();renderRosterPick();renderBoard();};
 }
+let swapFrom=null;
+// 2人の1日の予定を丸ごと入れ替える（両方が勤務している時間帯だけ）
+function swapDay(aId,bId){
+  const A=S.staff.find(x=>x.id===aId),B=S.staff.find(x=>x.id===bId); if(!A||!B)return;
+  let moved=0,skipped=0;
+  S.times.forEach(tm=>{
+    const row=S.day.assign[tm.id]; if(!row)return;
+    const ha=row[aId]&&cellTasks(row[aId]).length, hb=row[bId]&&cellTasks(row[bId]).length;
+    if(!ha&&!hb)return;
+    if(!worksAt(A,tm.time)||!worksAt(B,tm.time)){skipped++;return;}
+    const x=row[aId],y=row[bId];
+    if(y)row[aId]=y;else delete row[aId];
+    if(x)row[bId]=x;else delete row[bId];
+    moved++;
+  });
+  saveDay();renderBoard();renderLegend();
+  toast(`${A.name}さんと${B.name}さんの予定を入れ替えました`+(skipped?`（勤務時間が合わない${skipped}枠は、そのままです）`:""));
+}
 function renderBoard(){
   const head=$("#headRow"),body=$("#body");
   head.innerHTML=`<th class="staff-col">スタッフ</th>`;
@@ -1385,6 +1435,20 @@ function renderBoard(){
     sc.innerHTML=`<div class="row-staff"><div class="bar" style="background:${s.color}"></div><div><span class="nm"></span>${isLeader?'<span class="leader-tag">リーダー</span>':''}</div></div>${s.hours?'<div class="hrs"></div>':''}`;
     sc.querySelector('.nm').textContent=s.name;
     if(s.hours)sc.querySelector('.hrs').textContent=hoursLabel(s);
+    if(sel.length>1){
+      const sb=document.createElement('button');sb.type="button";sb.className="swapbtn";sb.textContent="⇄";sb.title="この人の1日の予定を、別の人と丸ごと入れ替えます（もう1人の「入替」を押すか、行をドラッグして重ねます）";
+      sb.onclick=e=>{e.stopPropagation();
+        if(!swapFrom){swapFrom=s.id;toast("入れ替える相手の「入替」を押してください（もう一度押すと取り消し）");renderBoard();}
+        else if(swapFrom===s.id){swapFrom=null;renderBoard();}
+        else {const a=swapFrom;swapFrom=null;swapDay(a,s.id);}};
+      sc.querySelector('.row-staff').appendChild(sb);
+      sc.draggable=true;
+      sc.ondragstart=e=>{e.dataTransfer.setData("text/plain",s.id);e.dataTransfer.effectAllowed="move";};
+      sc.ondragover=e=>{e.preventDefault();tr.classList.add('swap-over');};
+      sc.ondragleave=()=>tr.classList.remove('swap-over');
+      sc.ondrop=e=>{e.preventDefault();tr.classList.remove('swap-over');const a=e.dataTransfer.getData("text/plain");if(a&&a!==s.id)swapDay(a,s.id);};
+    }
+    if(swapFrom===s.id)tr.classList.add('swap-from');
     tr.appendChild(sc);
     let ti=0;
     while(ti<S.times.length){
@@ -1526,7 +1590,7 @@ function renderRoster(){
   const jobsRows=rowJobsOf();
   let foot='<tfoot>'+(jobsRows.length||SHIFTROWS_BY_DEPT[FSCOPE]?'':footRow('出勤数',minS,()=>true,true));
   jobsRows.forEach(j=>{foot+=footRow(escapeHtml(j.short),Number(S.req[j.id])||0,s=>inJob(j,s),false);});
-  (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st?escapeHtml(st.label.replace(c,'')):'')+(shiftTimeLabel(c)?`<span class="ftm">${shiftTimeLabel(c)}</span>`:''),SHIFTROWS_MIN[FSCOPE]?minS:0,()=>true,false,c);});
+  (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st?escapeHtml(st.label.replace(c,'')):''),SHIFTROWS_MIN[FSCOPE]?minS:0,()=>true,false,c);});
   foot+='</tfoot>';
   T.style.setProperty('--kou',(statusByCode('公')||{}).color||'#9AA3A0'); // 印刷時の「公」の色
   T.innerHTML=`<colgroup>${cols}</colgroup>`+head+bodyH+foot;
@@ -1755,14 +1819,12 @@ function renderRoleEditor(){
   d.innerHTML=`
     <div class="edit-row" style="margin-top:12px">
       <input type="text" class="rn-in" value="" style="flex:1">
-      <label class="wk"><input type="checkbox" class="rl-in" ${r.leader?'checked':''}>リーダー</label>
       <button class="del rd-in" title="この役割を削除">🗑</button>
     </div>
     <div class="mlabel" style="margin-top:12px">時間帯ごとの業務（タップで設定）</div>
     <div class="role-grid" id="roleGrid"></div>`;
   const rn=d.querySelector('.rn-in');rn.value=r.name;
   rn.oninput=e=>{r.name=e.target.value;saveRoles();const at=tabs.children[S.roles.indexOf(r)];if(at)at.textContent=r.name;};
-  d.querySelector('.rl-in').onchange=e=>{ if(e.target.checked){S.roles.forEach(x=>x.leader=false);r.leader=true;} else r.leader=false; saveRoles();renderRoleEditor(); };
   d.querySelector('.rd-in').onclick=()=>{ showConfirm(`役割「${r.name}」を削除しますか？`,()=>{
     S.roles=S.roles.filter(x=>x.id!==r.id);curRoleId=(S.roles[0]||{}).id;saveRoles();renderRoleEditor();
   },"削除する"); };
@@ -2228,79 +2290,90 @@ function toggleTheme(){const root=document.documentElement,cur=root.getAttribute
 $("#btnTheme").onclick=$("#btnTheme2").onclick=toggleTheme;
 (()=>{const th=jget(K.theme,null);if(th)document.documentElement.setAttribute('data-theme',th);})();
 
-/* ================= ログイン（管理者／デイサービス／訪問介護） ================= */
-const GK={pass:"yakuwari:gate:passcodes"};
-const DEF_PASS={admin:"1234",day:"0000",home:"1111",office:"2222",nursing:"3333",kitchen:"4444",rehab:"5555",kyotaku:"6666"};
+/* ================= ログイン（Googleアカウント。管理者が登録した人だけが入れる） ================= */
 const ROLE_LABEL={admin:"管理者",day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ",kyotaku:"居宅支援事業所"};
-function loadPasscodes(){const saved=jget(GK.pass,null); return {...DEF_PASS,...(saved||{})};} // 新しい部署が増えても既定値で補完
-function savePasscodes(p){jset(GK.pass,p);}
-let ROLE=null, pendingRole=null;
+let ROLE=null, USER_EMAIL=null, entering=false;
 function sessGet(k){try{return sessionStorage.getItem(k);}catch(e){return null;}}
 function sessSet(k,v){try{sessionStorage.setItem(k,v);}catch(e){}}
 function sessDel(k){try{sessionStorage.removeItem(k);}catch(e){}}
-
-// 区分（部署）の選択肢。最後に選んだ区分を、この端末だけに覚えておく（同期しない）
-(function buildGateRoles(){
-  const sel=$("#gateRoleSel"); let last=""; try{last=localStorage.getItem("cr_lastrole")||"";}catch(e){}
-  sel.innerHTML='<option value="">選択してください</option>'+Object.keys(ROLE_LABEL).map(k=>`<option value="${k}">${ROLE_LABEL[k]}</option>`).join("");
-  if(ROLE_LABEL[last])sel.value=last;
-})();
-function showGateRoles(){
-  $("#gateError").hidden=true; $("#gatePassInput").value=""; $("#gatePassInput").disabled=false; pendingRole=null;
-}
-$("#gatePassInput").addEventListener('focus',()=>{ $("#gateError").hidden=true; });
-// ---- ログイン試行回数のロック（総当たり対策） ----
-const LOCK_KEY="yakuwari:gate:lockstate";
-const LOCK_MAX_FAILS=5, LOCK_MINUTES=5;
-function loadLockState(){return jgetPlain(LOCK_KEY,{});}
-function jgetPlain(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}} // 同期対象外のローカル専用データ
-function saveLockState(s){try{localStorage.setItem(LOCK_KEY,JSON.stringify(s));}catch(e){}}
-function checkLock(role){
-  const st=loadLockState()[role]; if(!st||!st.lockedUntil)return 0;
-  const remain=st.lockedUntil-Date.now();
-  return remain>0?remain:0;
-}
-function registerFail(role){
-  const all=loadLockState(); const st=all[role]||{fails:0,lockedUntil:0};
-  st.fails=(st.fails||0)+1;
-  if(st.fails>=LOCK_MAX_FAILS){ st.lockedUntil=Date.now()+LOCK_MINUTES*60000; st.fails=0; }
-  all[role]=st; saveLockState(all);
-  return st.lockedUntil>Date.now() ? st.lockedUntil-Date.now() : 0;
-}
-function clearFails(role){
-  const all=loadLockState(); delete all[role]; saveLockState(all);
-}
-function lockMsg(ms){const m=Math.ceil(ms/60000);return `試行回数が多いため一時的にロックされています。約${m}分後にもう一度お試しください。`;}
-
+function gateMsg(t){ const e=$("#gateError"); e.textContent=t||""; e.hidden=!t; }
 async function attemptLogin(){
-  pendingRole=$("#gateRoleSel").value||null;
-  if(!pendingRole){ $("#gateError").textContent="区分（部署）を選んでください"; $("#gateError").hidden=false; return; }
-  const remain=checkLock(pendingRole);
-  if(remain>0){ $("#gateError").textContent=lockMsg(remain); $("#gateError").hidden=false; return; }
-  const codes=loadPasscodes();
-  const val=$("#gatePassInput").value.trim();
-  if(val===""||val!==codes[pendingRole]){
-    const lockedFor=registerFail(pendingRole);
-    $("#gateError").textContent = lockedFor>0 ? lockMsg(lockedFor) : "パスコードが違います";
-    $("#gateError").hidden=false;
-    return;
+  gateMsg(""); $("#gateEnter").disabled=true;
+  try{
+    const {Au,auth}=await fbInit();
+    const pr=new Au.GoogleAuthProvider(); pr.setCustomParameters({prompt:"select_account"});
+    await Au.signInWithPopup(auth,pr); // 成功すると onAuthStateChanged から画面に入る
+  }catch(e){
+    const c=e&&e.code||"";
+    if(c!=="auth/popup-closed-by-user"&&c!=="auth/cancelled-popup-request")
+      gateMsg(c==="auth/popup-blocked"?"ポップアップがブロックされました。許可してからもう一度お試しください。":"ログインできませんでした。もう一度お試しください。");
   }
-  clearFails(pendingRole);
-  ROLE=pendingRole;
-  try{localStorage.setItem("cr_lastrole",ROLE);}catch(e){}
-  sessSet("yakuwari:gate:role",ROLE);
-  FSCOPE = ROLE==="admin" ? "day" : ROLE; // admin は day から開始（切替可）。それ以外は自分の部署固定。
-  if(ROLE==="admin"){ const savedFac=sessGet("yakuwari:gate:facility"); if(savedFac)FSCOPE=savedFac; }
-  sessSet("yakuwari:gate:facility",FSCOPE);
-  $("#gate").hidden=true; $("#appRoot").hidden=false;
-  $("#gateEnter").disabled=true;
-  await syncPull();
   $("#gateEnter").disabled=false;
-  bootApp();
-  startSyncPolling();
 }
 $("#gateEnter").onclick=attemptLogin;
-$("#gatePassInput").addEventListener('keydown',e=>{if(e.key==="Enter")attemptLogin();});
+// ログインしたアカウントの区分（管理者／部署）を、登録名簿（users）から調べる。パスコードが設定されていれば、その入力も求める
+const sha256=async t=>[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t)))].map(b=>b.toString(16).padStart(2,"0")).join("");
+const passHash=(role,code)=>sha256("careRhythm:"+role+":"+code);
+const LOCK_KEY="yakuwari:gate:lock", LOCK_MAX_FAILS=5, LOCK_MINUTES=5;
+function lockRemain(){ try{const o=JSON.parse(localStorage.getItem(LOCK_KEY)||"{}"); return Math.max(0,(o.until||0)-Date.now());}catch(e){return 0;} }
+function lockFail(){ try{const o=JSON.parse(localStorage.getItem(LOCK_KEY)||"{}"); o.fails=(o.fails||0)+1; if(o.fails>=LOCK_MAX_FAILS){o.until=Date.now()+LOCK_MINUTES*60000;o.fails=0;} localStorage.setItem(LOCK_KEY,JSON.stringify(o)); return Math.max(0,(o.until||0)-Date.now());}catch(e){return 0;} }
+function lockClear(){ try{localStorage.removeItem(LOCK_KEY);}catch(e){} }
+const lockMsg=ms=>`試行回数が多いため一時的にロックされています。約${Math.ceil(ms/60000)}分後にもう一度お試しください。`;
+let pendingUser=null; // {email, role, hash}
+function showPassStep(u){
+  pendingUser=u; $("#gateGoogleBox").hidden=true; $("#gatePassBox").hidden=false;
+  $("#gatePassWho").textContent=`${u.email}（${ROLE_LABEL[u.role]}）でログイン中です。パスコードを入力してください。`;
+  $("#gatePassInput").value=""; gateMsg(""); setTimeout(()=>$("#gatePassInput").focus(),50);
+}
+function showGoogleStep(){ pendingUser=null; $("#gatePassBox").hidden=true; $("#gateGoogleBox").hidden=false; }
+async function submitPass(){
+  if(!pendingUser)return;
+  const rem=lockRemain(); if(rem>0){ gateMsg(lockMsg(rem)); return; }
+  const code=$("#gatePassInput").value.trim();
+  if(code===""||await passHash(pendingUser.role,code)!==pendingUser.hash){
+    const l=lockFail(); gateMsg(l>0?lockMsg(l):"パスコードが違います"); return;
+  }
+  lockClear(); sessSet("yakuwari:gate:passok",pendingUser.email);
+  const u=pendingUser; showGoogleStep(); await enterApp(u.email,u.role);
+}
+$("#gatePassGo").onclick=submitPass;
+$("#gatePassInput").addEventListener('keydown',e=>{if(e.key==="Enter")submitPass();});
+$("#gatePassInput").addEventListener('focus',()=>gateMsg(""));
+$("#gatePassBack").onclick=async ()=>{ showGoogleStep(); sessDel("yakuwari:gate:passok"); try{const {Au,auth}=await fbInit(); await Au.signOut(auth);}catch(e){} };
+async function enterApp(email,role){
+  USER_EMAIL=email; ROLE=role; SYNC_ON=true; SYNC_SCOPES=role==="admin"?null:role;
+  FSCOPE = ROLE==="admin" ? (sessGet("yakuwari:gate:facility")||"day") : ROLE;
+  sessSet("yakuwari:gate:facility",FSCOPE);
+  gateMsg(""); $("#gate").hidden=true; $("#appRoot").hidden=false;
+  await syncPull();
+  bootApp();
+}
+async function onSignedIn(user){
+  if(entering||ROLE)return; entering=true;
+  try{
+    const {F,db,Au,auth}=await fbInit();
+    const email=(user.email||"").toLowerCase();
+    let role=null;
+    try{ const d=await F.getDoc(F.doc(db,"users",email)); role=d.exists()?d.data().role:null; }catch(e){ role=null; }
+    if(!role||!ROLE_LABEL[role]){
+      gateMsg(`${user.email} は、登録されていません。管理者に、このアドレスの登録を依頼してください。`);
+      await Au.signOut(auth); return;
+    }
+    let hash=null;
+    try{ const d=await F.getDoc(F.doc(db,"passcodes",role)); hash=d.exists()?d.data().h:null; }catch(e){ hash=null; }
+    if(hash&&sessGet("yakuwari:gate:passok")!==email){ showPassStep({email,role,hash}); return; }
+    await enterApp(email,role);
+  }finally{ entering=false; }
+}
+async function initGate(){
+  try{
+    const {Au,auth}=await fbInit();
+    Au.onAuthStateChanged(auth,user=>{
+      if(user){ if(!ROLE)onSignedIn(user); }
+      else { ROLE=null; pendingUser=null; $("#appRoot").hidden=true; $("#gate").hidden=false; showGoogleStep(); }
+    });
+  }catch(e){ gateMsg("接続できませんでした。ネットワークを確認して、ページを開き直してください。"); }
+}
 
 const FACILITY_ICON={day:"📋",home:"🚶",office:"🗂️",nursing:"🩺",kitchen:"🍳",rehab:"🦵",kyotaku:"🏠"};
 function updateFacilityUI(){
@@ -2328,27 +2401,68 @@ function updateFacilityUI(){
 $("#facSwitchSel").onchange=async (e)=>{
   const v=e.target.value; if(FSCOPE===v)return;
   FSCOPE=v; sessSet("yakuwari:gate:facility",FSCOPE);
-  await syncPull();
   bootApp();
 };
 $("#btnLogout").onclick=()=>{
-  showConfirm("ログアウトしますか？",()=>{
-    stopSyncPolling();
-    sessDel("yakuwari:gate:role"); sessDel("yakuwari:gate:facility");
-    ROLE=null; $("#appRoot").hidden=true; $("#gate").hidden=false; showGateRoles();
+  showConfirm("ログアウトしますか？",async ()=>{
+    setSyncStatus("busy");
+    for(let i=0;i<30&&syncQueue.length;i++)await new Promise(r=>setTimeout(r,300)); // 送信待ちの分が届くのを少し待つ
+    stopSyncPolling(); SYNC_ON=false; SYNC_SCOPES=null; syncQueue.length=0; pendingKeys.clear();
+    // 別の人がこの端末を使うときに前の人のデータが残らないよう、端末内の保存データを消す（クラウドには保存済み）
+    try{ Object.keys(localStorage).filter(k=>k.indexOf("yakuwari:")===0&&k!==K.theme).forEach(k=>localStorage.removeItem(k)); }catch(e){}
+    sessDel("yakuwari:gate:facility"); sessDel("yakuwari:gate:passok");
+    ROLE=null; USER_EMAIL=null;
+    try{ const {Au,auth}=await fbInit(); await Au.signOut(auth); }catch(e){}
+    $("#appRoot").hidden=true; $("#gate").hidden=false; gateMsg("");
   },"ログアウト");
 };
 
-function renderPassList(){
-  const codes=loadPasscodes(); const w=$("#passList"); w.innerHTML="";
-  ["admin"].concat(ALL_FACILITIES).forEach(r=>{
+// ---- ログインできる人（Googleアカウント）の管理：管理者のみ ----
+async function renderUserList(){
+  const w=$("#passList"); w.innerHTML='<p style="font-size:13px;color:var(--ink-soft)">読み込み中…</p>';
+  try{
+    const {F,db}=await fbInit();
+    const snap=await F.getDocs(F.collection(db,"users"));
+    const rows=snap.docs.map(d=>({email:d.id,role:d.data().role})).sort((a,b)=>a.email<b.email?-1:1);
+    w.innerHTML="";
+    rows.forEach(u=>{
+      const row=document.createElement('div');row.className="edit-row";
+      row.innerHTML=`<span style="flex:1;min-width:0;font-size:13px;overflow-wrap:anywhere"></span><select style="flex:none">${Object.keys(ROLE_LABEL).map(k=>`<option value="${k}" ${u.role===k?"selected":""}>${ROLE_LABEL[k]}</option>`).join("")}</select><button class="del" title="この人を削除">🗑</button>`;
+      row.querySelector('span').textContent=u.email;
+      row.querySelector('select').onchange=async e=>{ try{ await F.setDoc(F.doc(db,"users",u.email),{role:e.target.value}); toast("変更しました"); }catch(x){ toast("変更できませんでした"); } };
+      row.querySelector('.del').onclick=()=>{
+        if(u.email===USER_EMAIL){ toast("ログイン中の自分は、削除できません"); return; }
+        showConfirm(`${u.email} を削除しますか？（この人はログインできなくなります）`,async ()=>{ try{ await F.deleteDoc(F.doc(db,"users",u.email)); renderUserList(); }catch(x){ toast("削除できませんでした"); } },"削除");
+      };
+      w.appendChild(row);
+    });
+    if(!rows.length)w.innerHTML='<p style="font-size:13px;color:var(--ink-soft)">登録されている人はいません</p>';
+  }catch(e){ w.innerHTML='<p style="font-size:13px;color:var(--alert)">読み込めませんでした（管理者でログインしているか、確認してください）</p>'; }
+}
+async function renderPasscodeList(){
+  const w=$("#passcodeList"); w.innerHTML="";
+  let have=new Set();
+  try{ const {F,db}=await fbInit(); (await F.getDocs(F.collection(db,"passcodes"))).docs.forEach(d=>have.add(d.id)); }catch(e){}
+  Object.keys(ROLE_LABEL).forEach(r=>{
     const row=document.createElement('div');row.className="edit-row";
     row.innerHTML=`<span style="width:110px;flex:none;font-weight:700;font-size:13px">${ROLE_LABEL[r]}</span>
-      <input type="text" inputmode="numeric" value="${codes[r]}" style="flex:1">`;
-    row.querySelector('input').oninput=e=>{const c=loadPasscodes();c[r]=e.target.value;savePasscodes(c);};
+      <input type="text" inputmode="numeric" placeholder="${have.has(r)?"設定済み（変更する場合のみ入力）":"未設定"}" style="flex:1;min-width:0" autocomplete="off"><button class="btn sm">設定</button>`;
+    row.querySelector('button').onclick=async ()=>{
+      const v=row.querySelector('input').value.trim();
+      try{ const {F,db}=await fbInit();
+        if(v==="")await F.deleteDoc(F.doc(db,"passcodes",r)); else await F.setDoc(F.doc(db,"passcodes",r),{h:await passHash(r,v)});
+        toast(v===""?"パスコードをなしにしました":"パスコードを設定しました"); renderPasscodeList();
+      }catch(e){ toast("設定できませんでした"); }
+    };
     w.appendChild(row);
   });
 }
+$("#userAdd").onclick=async ()=>{
+  const em=$("#userEmail").value.trim().toLowerCase(), role=$("#userRole").value;
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){ toast("メールアドレスを正しく入力してください"); return; }
+  try{ const {F,db}=await fbInit(); await F.setDoc(F.doc(db,"users",em),{role}); $("#userEmail").value=""; renderUserList(); toast("追加しました"); }
+  catch(e){ toast("追加できませんでした"); }
+};
 function renderOffAll(){
   const tb=$("#offTable"); const tbl=offTable();
   let h='<tr><th style="text-align:left;padding:4px 6px">部署</th>'+Array.from({length:12},(_,m)=>`<th style="padding:4px 2px">${m+1}月</th>`).join("")+'<th style="padding:4px 6px">年間</th></tr>';
@@ -2360,21 +2474,7 @@ function renderOffAll(){
     jset(K.offtable,m); tr.querySelector(".offtot").textContent=arr.reduce((a,b)=>a+(b||0),0); if(S.tab==="roster")renderRoster(); });
 }
 $("#stgOffAll").onclick=()=>{renderOffAll();openModal("#offAllOverlay");};
-$("#stgPass").onclick=()=>{renderPassList();openModal("#passOverlay");};
-
-async function initGate(){
-  const savedRole=sessGet("yakuwari:gate:role");
-  if(savedRole && ROLE_LABEL[savedRole]){
-    ROLE=savedRole;
-    FSCOPE = sessGet("yakuwari:gate:facility") || (ROLE==="admin"?"day":ROLE);
-    $("#gate").hidden=true; $("#appRoot").hidden=false;
-    await syncPull();
-    bootApp();
-    startSyncPolling();
-  } else {
-    showGateRoles();
-  }
-}
+$("#stgPass").onclick=()=>{renderUserList();renderPasscodeList();openModal("#passOverlay");};
 
 /* ================= boot（ログイン後・施設切替のたびに実行） ================= */
 function bootApp(){
