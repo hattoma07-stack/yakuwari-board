@@ -1,4 +1,13 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CareRhythm</title>
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#F5F4EF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CareRhythm">
 <meta name="description" content="デイサービスの月間勤務表と1日の役割分担表を作り、PDFで共有できるボード">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -56,6 +65,10 @@
     padding:20px;z-index:100;overflow:auto;--gate-ink:#3E4A6D}
   .gate[hidden]{display:none}
   .gate-top{display:flex;align-items:center;gap:10px;font-size:22px;font-weight:800;letter-spacing:.04em;color:var(--gate-ink)}
+  #gatePassBack[hidden]{display:none}
+  .gate-img{width:min(260px,70vw);height:auto;display:block}
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .gate-img{background:#fff;border-radius:22px;padding:6px} }
+  :root[data-theme="dark"] .gate-img{background:#fff;border-radius:22px;padding:6px}
   .gate-logo{width:36px;height:36px;border-radius:10px;background:var(--accent-soft);display:grid;place-items:center}
   .gate-logo .gi{width:24px;height:24px}
   .gi{width:68px;height:68px;fill:none;stroke:var(--gate-ink);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
@@ -479,22 +492,18 @@
 <!-- ============ LOGIN GATE ============ -->
 <div class="gate" id="gate">
   <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="ic-heart" viewBox="0 0 48 48"><path d="M24 42C11 31 6 24 6 17a9 9 0 0 1 18-3 9 9 0 0 1 18 3c0 7-5 14-18 25z"/><path d="M8 25h9l3-8 5 14 3-6h12"/></symbol><symbol id="ic-clip" viewBox="0 0 48 48"><rect x="10" y="9" width="28" height="34" rx="2"/><rect x="18" y="5" width="12" height="7" rx="2"/><path d="M24 19v12M18 25h12M17 37h14"/></symbol><symbol id="ic-steth" viewBox="0 0 48 48"><path d="M12 6v10a8 8 0 0 0 16 0V6M10 6h4M26 6h4M20 24v6a8 8 0 0 0 16 0v-5"/><circle cx="36" cy="21" r="4"/></symbol><symbol id="ic-syringe" viewBox="0 0 48 48"><path d="M29 7l12 12M27 11l10 10M11 29l16-16 10 10-16 16zM11 29l-5 5M8 41l6-6M17 25l4 4M21 21l4 4"/></symbol><symbol id="ic-bed" viewBox="0 0 48 48"><path d="M5 9v31M5 31h38v9M5 36h38M9 22a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v9H9zM23 31v-5h14a6 6 0 0 1 6 6"/></symbol><symbol id="ic-pill" viewBox="0 0 48 48"><g transform="rotate(-45 24 24)"><rect x="6" y="13" width="36" height="22" rx="5"/></g><circle cx="19" cy="19" r="2.5"/><circle cx="29" cy="29" r="2.5"/><circle cx="24" cy="24" r="2.5"/><circle cx="14" cy="24" r="2.5"/><circle cx="24" cy="34" r="2.5"/></symbol><symbol id="ic-mask" viewBox="0 0 48 48"><path d="M10 14h28v12c0 8-6 13-14 13s-14-5-14-13zM10 19H7v7h3M38 19h3v7h-3M15 22h18M15 26h18M17 30h14"/></symbol><symbol id="ic-therm" viewBox="0 0 48 48"><path d="M34 6l8 8-5 5-8-8zM29 11l-18 18 4 4 18-18M15 33l-7 7-2-2 7-7"/><path d="M20 20l4 4"/></symbol></defs></svg>
-  <div class="gate-top"><span class="gate-logo"><svg class="gi"><use href="#ic-heart"/></svg></span>CareRhythm</div>
+  <div class="gate-top"><img class="gate-img" src="icons/logo.png" alt="CareRhythm" width="260"></div>
   <div class="gate-stage">
     <div class="gate-art gate-art-l" aria-hidden="true"><svg class="gi"><use href="#ic-heart"/></svg><svg class="gi"><use href="#ic-clip"/></svg><svg class="gi"><use href="#ic-steth"/></svg><svg class="gi"><use href="#ic-bed"/></svg><svg class="gi"><use href="#ic-mask"/></svg><svg class="gi"><use href="#ic-pill"/></svg></div>
     <form class="gate-card" id="gateForm" onsubmit="return false">
       <h1>ログイン</h1>
       <div id="gateGoogleBox">
-        <p class="gate-lead">登録されたGoogleアカウントで、ログインします。</p>
-        <button type="button" class="btn primary gate-go" id="gateEnter">Googleでログイン</button>
-        <p class="gate-foot">ログインできない場合は、管理者にご連絡ください</p>
-      </div>
-      <div id="gatePassBox" hidden>
-        <p class="gate-lead" id="gatePassWho"></p>
+        <p class="gate-lead" id="gatePassWho">登録されたGoogleアカウントと、パスコードで、ログインします。</p>
         <label class="gate-lbl" for="gatePassInput">パスコード</label>
         <input type="password" id="gatePassInput" inputmode="numeric" placeholder="パスコードを入力" autocomplete="off">
-        <button type="button" class="btn primary gate-go" id="gatePassGo">入る</button>
-        <button type="button" class="btn ghost gate-go" id="gatePassBack">別のアカウントでログイン</button>
+        <button type="button" class="btn primary gate-go" id="gateEnter">Googleでログイン</button>
+        <button type="button" class="btn ghost gate-go" id="gatePassBack" hidden>別のアカウントでログイン</button>
+        <p class="gate-foot">ログインできない場合は、管理者にご連絡ください</p>
       </div>
       <p class="gate-error" id="gateError" hidden></p>
     </form>
@@ -2302,9 +2311,12 @@ function gateMsg(t){ const e=$("#gateError"); e.textContent=t||""; e.hidden=!t; 
 async function attemptLogin(){
   gateMsg(""); $("#gateEnter").disabled=true;
   try{
-    const {Au,auth}=await fbInit();
-    const pr=new Au.GoogleAuthProvider(); pr.setCustomParameters({prompt:"select_account"});
-    await Au.signInWithPopup(auth,pr); // 成功すると onAuthStateChanged から画面に入る
+    if(pendingUser){ await finishPass(pendingUser.email,pendingUser.role); }
+    else {
+      const {Au,auth}=await fbInit();
+      const pr=new Au.GoogleAuthProvider(); pr.setCustomParameters({prompt:"select_account"});
+      await Au.signInWithPopup(auth,pr); // 成功すると onAuthStateChanged から、パスコードの確認へ進む
+    }
   }catch(e){
     const c=e&&e.code||"";
     if(c!=="auth/popup-closed-by-user"&&c!=="auth/cancelled-popup-request")
@@ -2321,7 +2333,7 @@ function lockRemain(){ try{const o=JSON.parse(localStorage.getItem(LOCK_KEY)||"{
 function lockFail(){ try{const o=JSON.parse(localStorage.getItem(LOCK_KEY)||"{}"); o.fails=(o.fails||0)+1; if(o.fails>=LOCK_MAX_FAILS){o.until=Date.now()+LOCK_MINUTES*60000;o.fails=0;} localStorage.setItem(LOCK_KEY,JSON.stringify(o)); return Math.max(0,(o.until||0)-Date.now());}catch(e){return 0;} }
 function lockClear(){ try{localStorage.removeItem(LOCK_KEY);}catch(e){} }
 const lockMsg=ms=>`試行回数が多いため一時的にロックされています。約${Math.ceil(ms/60000)}分後にもう一度お試しください。`;
-let pendingUser=null; // {email, role}
+let pendingUser=null; // Googleにはログイン済みで、パスコードの確認待ちの人 {email, role}
 // 区分のパスコードの確認は、Firebase側（Security Rules）で行う。正しい値を書き込めた人だけが、その区分のデータを読み書きできる（12時間有効）。
 async function tryUnlock(role,hash){
   const {F,db,auth}=await fbInit();
@@ -2330,28 +2342,39 @@ async function tryUnlock(role,hash){
     return true;
   }catch(e){ if(e&&e.code==="permission-denied")return false; throw e; }
 }
-function showPassStep(u){
-  pendingUser=u; $("#gateGoogleBox").hidden=true; $("#gatePassBox").hidden=false;
-  $("#gatePassWho").innerHTML=`<b class="gate-dept"></b>のパスコードを入力してください。<br><span class="gate-who"></span>`;
+function showPassStep(u){ // Googleのログイン後、パスコードが合わなかった（または未入力だった）とき
+  pendingUser=u;
+  $("#gatePassWho").innerHTML=`<b class="gate-dept"></b>のパスコードを入力して、「ログイン」を押してください。<br><span class="gate-who"></span>`;
   $("#gatePassWho .gate-dept").textContent=ROLE_LABEL[u.role]; $("#gatePassWho .gate-who").textContent=u.email+" でログイン中";
-  $("#gatePassInput").value=""; gateMsg(""); setTimeout(()=>$("#gatePassInput").focus(),50);
+  $("#gateEnter").textContent="ログイン"; $("#gatePassBack").hidden=false;
+  $("#gatePassInput").value=""; setTimeout(()=>$("#gatePassInput").focus(),50);
 }
-function showGoogleStep(){ pendingUser=null; $("#gatePassBox").hidden=true; $("#gateGoogleBox").hidden=false; }
-async function submitPass(){
-  if(!pendingUser)return;
-  const rem=lockRemain(); if(rem>0){ gateMsg(lockMsg(rem)); return; }
-  const code=$("#gatePassInput").value.trim();
-  $("#gatePassGo").disabled=true;
-  try{
-    const h=code===""?"x":await passHash(pendingUser.role,code);
-    if(!(await tryUnlock(pendingUser.role,h))){ const l=lockFail(); gateMsg(l>0?lockMsg(l):"パスコードが違います"); return; }
-    lockClear(); sessSet("yakuwari:gate:passok",JSON.stringify({e:pendingUser.email,h}));
-    const u=pendingUser; showGoogleStep(); await enterApp(u.email,u.role);
-  }catch(e){ gateMsg("確認できませんでした。ネットワークを確認して、もう一度お試しください。"); }
-  finally{ $("#gatePassGo").disabled=false; }
+function showGoogleStep(){
+  pendingUser=null; $("#gatePassWho").textContent="登録されたGoogleアカウントと、パスコードで、ログインします。";
+  $("#gateEnter").textContent="Googleでログイン"; $("#gatePassBack").hidden=true;
 }
-$("#gatePassGo").onclick=submitPass;
-$("#gatePassInput").addEventListener('keydown',e=>{if(e.key==="Enter")submitPass();});
+const WRONG_PASS="パスコードが違います";
+// パスコード欄の入力（あれば）で確認する。未設定の区分は、空の値で通る
+async function unlockWithTyped(email,role,typed,fromSaved){
+  const cands=[];
+  if(typed!=="")cands.push(await passHash(role,typed));
+  if(fromSaved)cands.push(fromSaved);
+  cands.push("");
+  for(const h of cands){ if(await tryUnlock(role,h)){ sessSet("yakuwari:gate:passok",JSON.stringify({e:email,h})); return true; } }
+  return false;
+}
+async function finishPass(email,role){
+  const rem=lockRemain(); if(rem>0){ gateMsg(lockMsg(rem)); return false; }
+  const typed=$("#gatePassInput").value.trim();
+  let saved=null; try{ const o=JSON.parse(sessGet("yakuwari:gate:passok")||"null"); if(o&&o.e===email)saved=o.h; }catch(e){}
+  let ok=false;
+  try{ ok=await unlockWithTyped(email,role,typed,saved); }
+  catch(e){ gateMsg("確認できませんでした。ネットワークを確認して、もう一度お試しください。"); return false; }
+  if(ok){ lockClear(); showGoogleStep(); await enterApp(email,role); return true; }
+  if(typed!==""){ const l=lockFail(); gateMsg(l>0?lockMsg(l):WRONG_PASS); } else gateMsg("パスコードを入力してください");
+  showPassStep({email,role}); return false;
+}
+$("#gatePassInput").addEventListener('keydown',e=>{if(e.key==="Enter")attemptLogin();});
 $("#gatePassInput").addEventListener('focus',()=>gateMsg(""));
 $("#gatePassBack").onclick=async ()=>{ showGoogleStep(); sessDel("yakuwari:gate:passok"); try{const {Au,auth}=await fbInit(); await Au.signOut(auth);}catch(e){} };
 async function enterApp(email,role){
@@ -2373,12 +2396,7 @@ async function onSignedIn(user){
       gateMsg(`${user.email} は、登録されていません。管理者に、このアドレスの登録を依頼してください。`);
       await Au.signOut(auth); return;
     }
-    // 同じ画面を開いている間は、前に入力したパスコードで自動的に入る。パスコード未設定の区分は、そのまま入れる
-    let saved=null; try{ saved=JSON.parse(sessGet("yakuwari:gate:passok")||"null"); }catch(e){}
-    const h=saved&&saved.e===email?saved.h:"";
-    let ok=false; try{ ok=await tryUnlock(role,h); }catch(e){ gateMsg("確認できませんでした。ネットワークを確認して、もう一度お試しください。"); await Au.signOut(auth); return; }
-    if(!ok&&saved){ sessDel("yakuwari:gate:passok"); }
-    if(ok)await enterApp(email,role); else showPassStep({email,role});
+    await finishPass(email,role);
   }finally{ entering=false; }
 }
 async function initGate(){
