@@ -955,8 +955,9 @@ const JOBS_BY_DEPT={day:[
   {id:"nurse",name:"委託看護職員",short:"委託看護職員"},
   {id:"ft",name:"機能訓練指導員",short:"機能訓練指導員"},
   {id:"driver",name:"送迎職員",short:"送迎職員",drive:true},
+  {id:"hiace",name:"ハイエース運転可能者",short:"ハイエース運転可",hiace:true}, // 送迎職員の中の「ハイエースが運転　可能」な人（台帳のチェックで数える）
   {id:"drv",name:"ドライバー",short:"ドライバー",noRow:true}]}; // ドライバー：台帳で選ぶ職種（送迎職員にも数える。下の人数の行は出さない）
-const DEF_REQ={day:{care:8,counselor:1,nurse:1,ft:1,driver:3}};
+const DEF_REQ={day:{care:8,counselor:1,nurse:1,ft:1,driver:3,hiace:2}};
 const jobsOf=()=>JOBS_BY_DEPT[FSCOPE]||[];
 // 夜勤の振り分けを行う部署（スタッフ台帳の「夜勤が可能」にチェックした人だけが対象）と、1晩あたりの既定人数
 const NIGHT_DEPTS=["home","nursing"];
@@ -987,7 +988,7 @@ const SHIFT_NAMES={"早":"早番","日":"日勤","遅":"遅番","夜":"夜勤"};
 const shiftTimeLabel=c=>{const t=(S.shiftTimes||{})[c]; return t&&t.s&&t.e?`${t.s.replace(/^0/,"")}〜${t.e.replace(/^0/,"")}`:"";};
 const SHIFTROWS_MIN={office:true,rehab:true,kyotaku:true}; // この部署は記号別の行に「1日の最低出勤人数」の不足（赤）も出す
 // 送迎職員は「職種」ではなく、台帳の「送迎が可能」チェックで数える（兼任できる）。他の職種は職種の選択で数える
-const inJob=(j,s)=>j.drive?(!!s.canDrive||s.job==="drv"):s.job===j.id;
+const inJob=(j,s)=>j.hiace?(!!s.canDrive&&!!s.canHiace):j.drive?(!!s.canDrive||s.job==="drv"):s.job===j.id;
 const DEF_ROLES=[
   {id:"r_leader",name:"リーダー",leader:true,cells:{}},
   {id:"r_a",name:"役割A",leader:false,cells:{}},
@@ -1153,6 +1154,7 @@ function loadMasters(){
   S.shiftTimes=jget(K.meta,{}).shiftTimes||JSON.parse(JSON.stringify(DEF_SHIFTTIMES[FSCOPE]||{}));
   { const nn=jget(K.meta,{}).nightN; S.nightN=(nn==null?(DEF_NIGHTN[FSCOPE]||0):nn); const nr=jget(K.meta,{}).nightRun; S.nightRun=(nr==null?2:nr); } // 夜勤を続けて入れられる最大回数（初期2）
   S.req=jget(K.meta,{}).req||JSON.parse(JSON.stringify(DEF_REQ[FSCOPE]||{}));
+  if(FSCOPE==="day"&&S.req.hiace===undefined)S.req.hiace=DEF_REQ.day.hiace; // 既存の設定にも、ハイエース運転可能者の最低人数（2名）を足す
   let seeded=jget(K.meta,{}).seeded;
   if(!S.status) S.status=JSON.parse(JSON.stringify(DEF_STATUS));
   { // 廃止した記号（欠勤・研修・半休）を、記号一覧と各部署の使う記号から外す。半休は「公休」を続けてタップする方式に変更
@@ -1174,7 +1176,7 @@ function loadMasters(){
     seeded=false;
   }
   // migrate: ensure typeId / hours / task duration
-  S.staff.forEach(s=>{if(!s.typeId)s.typeId=S.types[0].id; if(s.off===undefined)s.off=null; if(s.hours===undefined)s.hours=null; if(FSCOPE==="day"&&s.hours&&!s.job)s.job="drv"; if(FSCOPE!=="day"&&s.hours)s.hours=null; if(s.job===undefined)s.job=""; if(s.canNight===undefined)s.canNight=false; if(s.nightOnly===undefined)s.nightOnly=false; if(s.nightCount===undefined)s.nightCount=null; if(s.workDays===undefined)s.workDays=null; if(s.canDrive===undefined){s.canDrive=(s.job==="driver"); if(s.job==="driver")s.job="";}});
+  S.staff.forEach(s=>{if(!s.typeId)s.typeId=S.types[0].id; if(s.off===undefined)s.off=null; if(s.hours===undefined)s.hours=null; if(FSCOPE==="day"&&s.hours&&!s.job)s.job="drv"; if(FSCOPE!=="day"&&s.hours)s.hours=null; if(s.job===undefined)s.job=""; if(s.canHiace===undefined)s.canHiace=false; if(s.canNight===undefined)s.canNight=false; if(s.nightOnly===undefined)s.nightOnly=false; if(s.nightCount===undefined)s.nightCount=null; if(s.workDays===undefined)s.workDays=null; if(s.canDrive===undefined){s.canDrive=(s.job==="driver"); if(s.job==="driver")s.job="";}});
   S.tasks.forEach(t=>{if(!t.dur)t.dur=30;});
   saveStaff();jset(K.status,S.status);jset(K.times,S.times);jset(K.tasks,S.tasks);jset(K.types,S.types);jset(K.roles,S.roles);
   return seeded;
@@ -1559,7 +1561,7 @@ function renderRoster(){
   const pcs=boxMode?sc.map((c,i)=>({c,i})).filter(x=>!x.c.blank):[]; // 画面では別枠に出す集計を、印刷では表の右端の列として出す
   if(boxMode)cols+='<col class="pcol">'.repeat(pcs.length+1);
   let head='<thead><tr><th class="rname">スタッフ</th>';
-  for(let d=1;d<=nd;d++){const w=dow(S.ym,d);head+=`<th class="dcol ${clsFor(d)}"><div class="dow">${DOW[w]}</div><div class="dn num">${d}</div>${isSetOff(d)?'<div class="rest">休</div>':''}</th>`;}
+  for(let d=1;d<=nd;d++){const w=dow(S.ym,d);head+=`<th class="dcol ${clsFor(d)}"><div class="dow">${DOW[w]}</div><div class="dn num">${d}</div></th>`;}
   const scR=i=>`right:${(sc.length-i)*SN_W}px`; // 右端から順に固定表示
   if(boxMode){ head+=pcs.map(x=>`<th class="pc">${x.c.label}</th>`).join("")+`<th class="pc pc-total">合計<div class="rt-sub">月${nd}日</div></th></tr></thead>`; }
   else if(sc){ sc.forEach((c,i)=>{if(!c.blank)head+=`<th class="sumcol sn" style="${scR(i)}">${c.label}</th>`;});
@@ -1595,7 +1597,7 @@ function renderRoster(){
       r+=`<td class="${clsFor(d)} num${low?' low':''}">${n?fmtN(n):''}</td>`;}
     return r+(boxMode?'<td class="pc"></td>'.repeat(pcs.length+1):'')+(sc?'<td class="sumcol sn"></td>'.repeat(nShow):'<td class="sumcol s-work"></td><td class="sumcol s-off"></td>')+'</tr>';
   };
-  const jobsRows=rowJobsOf();
+  const jobsRows=rowJobsOf().filter(j=>!j.hiace); // ハイエース運転可能者は最低人数の設定だけで、表の行には出さない
   let foot='<tfoot>'+(jobsRows.length||SHIFTROWS_BY_DEPT[FSCOPE]?'':footRow('出勤数',minS,()=>true,true));
   jobsRows.forEach(j=>{foot+=footRow(escapeHtml(j.short),Number(S.req[j.id])||0,s=>inJob(j,s),false);});
   (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st?escapeHtml(st.label.replace(c,'')):''),SHIFTROWS_MIN[FSCOPE]?minS:0,()=>true,false,c);});
@@ -1663,10 +1665,11 @@ function renderStaffList(){
         <button class="del" title="削除">🗑</button>
       </div>
       ${jobsOf().length?`<div class="line2">
-        <div class="fl" style="flex:1"><span>職種</span><div class="seg jobseg">${[{id:"",name:"未設定"}].concat(jobsOf().filter(j=>!j.drive)).map(j=>`<button class="segbtn" data-job="${j.id}" aria-pressed="${(s.job||"")===j.id}">${escapeHtml(j.name)}</button>`).join("")}</div></div>
+        <div class="fl" style="flex:1"><span>職種</span><div class="seg jobseg">${[{id:"",name:"未設定"}].concat(jobsOf().filter(j=>!j.drive&&!j.hiace)).map(j=>`<button class="segbtn" data-job="${j.id}" aria-pressed="${(s.job||"")===j.id}">${escapeHtml(j.name)}</button>`).join("")}</div></div>
       </div>`:""}
       ${hasDriveJob()?`<div class="line2">
-        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="drive-in" ${s.canDrive?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">送迎が可能（勤務表で「送迎職員」に数えます）</label>
+        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="drive-in" ${s.canDrive?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">送迎が可能（勤務表で「送迎職員」に数えます）</label>${s.canDrive?`
+        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="hiace-in" ${s.canHiace?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">ハイエースが運転　可能</label>`:""}
       </div>`:""}
       ${nightDeptOn()?`<div class="line2">
         <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="night-can" ${s.canNight?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">夜勤が可能（自動作成で夜勤を割り振る対象になります）</label>${(s.canNight||s.nightOnly)?`
@@ -1699,7 +1702,9 @@ function renderStaffList(){
     const ncnt=card.querySelector('.night-cnt');
     if(ncnt)ncnt.oninput=e=>{s.nightCount=e.target.value===''?null:Math.max(0,Number(e.target.value));saveStaff();};
     const dchk=card.querySelector('.drive-in');
-    if(dchk)dchk.onchange=e=>{s.canDrive=e.target.checked;saveStaff();if(S.tab==="roster")renderRoster();else refreshAll();};
+    if(dchk)dchk.onchange=e=>{s.canDrive=e.target.checked;if(!s.canDrive)s.canHiace=false;saveStaff();renderStaffList();if(S.tab==="roster")renderRoster();else refreshAll();};
+    const hchk=card.querySelector('.hiace-in');
+    if(hchk)hchk.onchange=e=>{s.canHiace=e.target.checked;saveStaff();};
     card.querySelectorAll('.jobseg .segbtn').forEach(b=>b.onclick=()=>{
       s.job=b.dataset.job;
       if(FSCOPE==="day"){ if(s.job==="drv"&&!s.hours)setHoursPreset(s,"both"); else if(s.job!=="drv")s.hours=null; } // ドライバーは朝夕を初期値に、ほかの職種は時間帯の制限なし
@@ -1734,7 +1739,7 @@ function renderStaffList(){
 }
 function addStaffMaster(){
   const n=$("#newStaffName").value.trim();if(!n)return;
-  const s={id:uid(),name:n,color:STAFF_COLORS[S.staff.length%STAFF_COLORS.length],typeId:S.types[0].id,off:null,hours:null,job:"",canDrive:false,canNight:false,nightOnly:false,nightCount:null};
+  const s={id:uid(),name:n,color:STAFF_COLORS[S.staff.length%STAFF_COLORS.length],typeId:S.types[0].id,off:null,hours:null,job:"",canDrive:false,canHiace:false,canNight:false,nightOnly:false,nightCount:null};
   S.staff.push(s);S.day.selected.push(s.id);saveStaff();saveDay();
   $("#newStaffName").value="";renderStaffList();refreshAll();$("#newStaffName").focus();
 }
