@@ -14,7 +14,7 @@ rules_version = '2';
 //   unlocks/{uid_区分}      : パスコードを入力した記録。サーバー側で、正しい値かどうかを確認してから保存される
 //   kv/{保存キー}           : アプリのデータ。scope は "global"（全体共通）か部署名
 //     管理者        : すべて読み書きできる
-//     各部署の人    : 自分の部署のデータを読み書きできる。全体共通のデータは読むだけ
+//     各部署の人    : 自分の部署のデータを読み書きできる（スタッフ台帳を除く）。全体共通のデータは読むだけ
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -81,7 +81,8 @@ service cloud.firestore {
       allow create, update: if isAdmin()
                   || (isMyDept()
                       && request.resource.data.scope == myRole()
-                      && key.matches('yakuwari:' + myRole() + ':.*'));
+                      && key.matches('yakuwari:' + myRole() + ':.*')
+                      && !key.matches('.*:staff'));   // スタッフ台帳は、管理者だけが変更できる
       allow delete: if isAdmin();
     }
   }

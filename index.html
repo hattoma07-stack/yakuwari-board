@@ -277,6 +277,7 @@
   table.roster td.rc .wish{color:#C62828}
   table.roster td.rc .hl{display:block;font-size:9px;font-weight:700;letter-spacing:-.3px;white-space:nowrap}
   table.roster td.rc .tm{display:block;letter-spacing:-.3px;font-size:7.5px;line-height:1.1;font-weight:700;color:#C62828;white-space:nowrap}
+  table.roster td.rc .ps{display:block;font-weight:700;letter-spacing:-.3px;white-space:nowrap;line-height:1.1} /* 非常勤の記号（A6.5など）は、長さに合わせて小さく表示 */
   table.roster td.rc .hm{display:block;font-size:8px;line-height:1;margin-top:1px}
   table.roster td.rc:hover{outline:2px solid var(--accent);outline-offset:-2px}
   table.roster col.sat,table.roster td.sat{background:var(--sat)}
@@ -322,6 +323,7 @@
   .overlay{position:fixed;inset:0;background:rgba(20,26,24,.45);backdrop-filter:blur(2px);display:none;place-items:center;z-index:50;padding:16px}
   #assignOverlay{z-index:60}
   .overlay.open{display:grid}
+  #confirmOverlay{z-index:60} /* 確認画面は、ほかの画面（台帳・勤務時間設定一覧など）の上に出す */
   .modal{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:min(480px,100%);max-height:88vh;overflow:auto}
   .modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
   .modal-head h3{font-size:16px}
@@ -681,6 +683,14 @@
       <h2 class="settings-group-title"><span class="sgt-ico">🔐</span>アクセスとログイン（管理者のみ）</h2>
       <div class="settings-grid">
         <div class="setting-card">
+          <div class="sc-icon">🕘</div>
+          <div class="sc-body">
+            <h3>勤務時間設定一覧</h3>
+            <p>常勤・非常勤・厨房・機能訓練士などの勤務の記号ごとに、開始・終了・休憩・実働時間を一覧で確認し、修正します。KOTとの照合に使います（CSVで書き出せます）。</p>
+          </div>
+          <button class="btn" id="stgShiftTbl">開く</button>
+        </div>
+        <div class="setting-card">
           <div class="sc-icon">📅</div>
           <div class="sc-body">
             <h3>年間休日（全部署）</h3>
@@ -724,6 +734,22 @@
 </div></div>
 
 <!-- Passcode modal -->
+<div class="overlay" id="shiftTblOverlay"><div class="modal" style="width:min(1120px,100%)">
+  <div class="modal-head"><h3>勤務時間設定一覧（管理者のみ）</h3><button class="x" data-close>×</button></div>
+  <div class="modal-body">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <select id="stCat" style="font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink)"></select>
+      <button class="btn sm" id="stAdd">＋ 行を追加</button>
+      <button class="btn sm" id="stCsv">CSVで保存</button>
+      <button class="btn sm" id="stReset" style="border-color:var(--line)">標準に戻す</button>
+      <span id="stCount" style="font-size:12px;color:var(--ink-soft)"></span>
+    </div>
+    <div style="overflow-x:auto"><table id="stTable" style="border-collapse:collapse;font-size:13px;width:100%"></table></div>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:10px">拘束時間と実働時間は、開始・終了・休憩から自動で計算します（終了が翌日の勤務は「翌日」を選びます）。時間のない記号（有休など）は、開始・終了を空欄にします。この一覧は、管理者だけが変更でき、ほかの画面の勤務時間には、まだ連動していません。</p>
+  </div>
+  <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
+</div></div>
+
 <div class="overlay" id="offAllOverlay"><div class="modal" style="width:min(860px,100%)">
   <div class="modal-head"><h3>年間休日（管理者のみ）</h3><button class="x" data-close>×</button></div>
   <div class="modal-body">
@@ -739,7 +765,7 @@
     <div class="edit-list" id="passList"></div>
     <div class="edit-row" style="margin-top:14px;flex-wrap:wrap">
       <input type="email" id="userEmail" placeholder="例：name@gmail.com" autocomplete="off" style="flex:1;min-width:180px">
-      <select id="userRole"><option value="admin">管理者</option><option value="day">デイサービス</option><option value="home">訪問介護</option><option value="office">事務</option><option value="nursing">看護</option><option value="kitchen">栄養士・厨房</option><option value="rehab">リハビリ</option><option value="kyotaku">居宅支援事業所</option></select>
+      <select id="userRole"><option value="admin">管理者</option><option value="day">デイサービス</option><option value="home">訪問介護</option><option value="office">事務</option><option value="nursing">看護</option><option value="kitchen">栄養士・厨房</option><option value="rehab">リハビリ</option><option value="kyotaku">居宅支援事業所</option><option value="support">サポート</option></select>
       <button class="btn" id="userAdd">追加</button>
     </div>
     <h4 style="margin:20px 0 8px;font-size:14px">パスコード（Googleログインのあとに入力）</h4>
@@ -763,12 +789,24 @@
 </div></div>
 
 <!-- Staff master modal -->
-<div class="overlay" id="staffOverlay"><div class="modal">
+<div class="overlay" id="staffOverlay"><div class="modal" id="staffModal">
   <div class="modal-head"><h3>スタッフ台帳</h3><button class="x" data-close>×</button></div>
   <div class="modal-body">
+    <div class="seg" id="stView" style="margin-bottom:12px"><button class="segbtn" data-v="one" aria-pressed="true">個人設定（この部署）</button><button class="segbtn" data-v="all" aria-pressed="false">全部署の一覧</button></div>
+    <div id="stOne">
     <div class="mlabel">名前・色／職種／雇用形態（非常勤は勤務時間・勤務できる曜日）</div>
     <div class="edit-list" id="staffList"></div>
     <div class="edit-row"><input type="text" id="newStaffName" placeholder="スタッフ名を追加" maxlength="12"><button class="btn sm" id="addStaff">＋ 追加</button></div>
+    </div>
+    <div id="stAll" hidden>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <select id="asDept" style="font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink)"></select>
+      <input type="search" id="asSearch" placeholder="氏名で検索" style="font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);min-width:160px">
+      <span id="asCount" style="align-self:center;font-size:12px;color:var(--ink-soft)"></span>
+    </div>
+    <div style="overflow-x:auto"><table id="asTable" style="border-collapse:collapse;font-size:13px;width:100%"></table></div>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:10px">表の中で直すと、その部署のスタッフ台帳にも反映されます。送迎・ハイエースはデイサービス、夜勤は訪問介護・看護だけの項目です（ほかの部署は空欄）。KOT従業員コードは、KOTに登録している番号を入れます（同じコードが2人に入ると赤枠になります）。追加・削除・勤務時間などは、「台帳を開く」から、その部署の個人設定で行います。</p>
+    </div>
   </div>
   <div class="modal-foot"><button class="btn primary" data-close>閉じる</button></div>
 </div></div>
@@ -896,9 +934,9 @@ const K={
   offtable:"yakuwari:offtable", // 年間休日の表（部署×1〜12月の公休日数）。管理者のみ設定
   theme:"yakuwari:theme" // 表示テーマも施設共通
 };
-const FACILITY_NAME={day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ",kyotaku:"居宅支援事業所"};
+const FACILITY_NAME={day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ",kyotaku:"居宅支援事業所",support:"サポート"};
 const BOARD_FACILITIES=["day","home"]; // 役割分担ボードを使う部署（それ以外は勤務表のみ）
-const ALL_FACILITIES=["day","home","office","nursing","kitchen","rehab","kyotaku"];
+const ALL_FACILITIES=["day","home","office","nursing","kitchen","rehab","kyotaku","support"];
 
 /* ---------- defaults ---------- */
 const STAFF_COLORS=["#3E7CB1","#C7803E","#5B9E7A","#8E6FB0","#C25E6E","#C9A227","#6E8FA6","#4C8C8C","#B2632F","#7C9A46"];
@@ -968,26 +1006,29 @@ const nightDeptOn=()=>NIGHT_DEPTS.includes(FSCOPE);
 const DEF_SHIFTN={home:{early:2,late:2},nursing:{early:2,late:2},kitchen:{early:2,late:2}}; // 訪問介護と看護は同じ作り
 const shiftMixOn=()=>!!DEF_SHIFTN[FSCOPE];
 const hasDriveJob=()=>jobsOf().some(j=>j.drive);
+// 勤務表のマスに入れる、ドライバー（送迎）の記号。時間は勤務時間設定一覧の「ドライバー」の区分（朝 8:00〜10:00／夕 16:00〜18:00／朝夕＝朝＋夕）。出勤1日として数える
+const DRV_SYMS=[{code:"朝",label:"送迎・朝",color:"#3E7CB1"},{code:"夕",label:"送迎・夕",color:"#B5762E"},{code:"朝夕",label:"送迎・朝夕",color:"#6C5BB0"}];
+const drvSymOf=c=>DRV_SYMS.find(x=>x.code===c);
 const rowJobsOf=()=>jobsOf().filter(j=>!j.noRow); // 下の人数の行・最低人数の設定の対象
 // 勤務表の右側に出す「記号ごとの日数」の列（指定した部署のみ）。合計が月の日数と一致するか確認できる
 const SUMCOLS_HOME=[
   {label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"夜",codes:["夜"]},
   {label:"休",codes:["公","希"]},{label:"有",codes:["有"]}];
 const SUMCOLS_OFFICE=[{label:"出",codes:["出"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 事務：早番・遅番・夜勤なし
-const SUMCOLS_DAY=[{label:"日",codes:["日","出"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // デイサービス：日勤（過去の「出」・半休・研修を含む）。早・遅・夜はなし
+const SUMCOLS_DAY=[{label:"日",codes:["日","出","朝","夕","朝夕"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // デイサービス：日勤（過去の「出」・半休・研修を含む）。早・遅・夜はなし
 const SUMCOLS_KITCHEN=[{label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 栄養士・厨房：夜勤なし
-const SUMCOLS_BY_DEPT={home:SUMCOLS_HOME,nursing:SUMCOLS_HOME,office:SUMCOLS_OFFICE,day:SUMCOLS_DAY,rehab:SUMCOLS_OFFICE,kitchen:SUMCOLS_KITCHEN,kyotaku:SUMCOLS_OFFICE};
+const SUMCOLS_BY_DEPT={home:SUMCOLS_HOME,nursing:SUMCOLS_HOME,office:SUMCOLS_OFFICE,day:SUMCOLS_DAY,rehab:SUMCOLS_OFFICE,kitchen:SUMCOLS_KITCHEN,kyotaku:SUMCOLS_OFFICE,support:SUMCOLS_OFFICE};
 // 合計の列は値を出さない（月の日数との照合・赤字表示は行わない）
-const SUMTOTAL_BOX={home:true,nursing:true,office:true,day:true,rehab:true,kitchen:true,kyotaku:true}; // 合計は表の外の別枠（右側）に出す
+const SUMTOTAL_BOX={home:true,nursing:true,office:true,day:true,rehab:true,kitchen:true,kyotaku:true,support:true}; // 合計は表の外の別枠（右側）に出す
 const sumColsOf=()=>SUMCOLS_BY_DEPT[FSCOPE]||null;
 // 勤務表の下に出す「日ごとの記号別スタッフ数」の行（指定した部署のみ）
-const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"],nursing:["早","日","遅","夜"],office:["出"],rehab:["出"],kitchen:["早","日","遅"],kyotaku:["出"]};
+const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"],nursing:["早","日","遅","夜"],office:["出"],rehab:["出"],kitchen:["早","日","遅"],kyotaku:["出"],support:["出"]};
 // 早番・日勤・遅番・夜勤の勤務時間（訪問介護・看護）。設定画面で変更できる
 const DEF_SHIFTTIMES={home:{"早":{s:"06:00",e:"15:00"},"日":{s:"08:30",e:"17:30"},"遅":{s:"13:00",e:"22:00"},"夜":{s:"21:00",e:"07:00"}}};
 DEF_SHIFTTIMES.nursing=DEF_SHIFTTIMES.home;
 const SHIFT_NAMES={"早":"早番","日":"日勤","遅":"遅番","夜":"夜勤"};
 const shiftTimeLabel=c=>{const t=(S.shiftTimes||{})[c]; return t&&t.s&&t.e?`${t.s.replace(/^0/,"")}〜${t.e.replace(/^0/,"")}`:"";};
-const SHIFTROWS_MIN={office:true,rehab:true,kyotaku:true}; // この部署は記号別の行に「1日の最低出勤人数」の不足（赤）も出す
+const SHIFTROWS_MIN={office:true,rehab:true,kyotaku:true,support:true}; // この部署は記号別の行に「1日の最低出勤人数」の不足（赤）も出す
 // 送迎職員は「職種」ではなく、台帳の「送迎が可能」チェックで数える（兼任できる）。他の職種は職種の選択で数える
 const inJob=(j,s)=>j.hiace?(!!s.canDrive&&!!s.canHiace):j.drive?(!!s.canDrive||s.job==="drv"):s.job===j.id;
 const DEF_ROLES=[
@@ -1014,7 +1055,8 @@ const DEF_STATUS_ENABLED={
   nursing:["日","早","遅","夜","公","有","希"],
   kitchen:["日","早","遅","公","有","希"],
   rehab:["出","公","有","希"],
-  kyotaku:["出","公","有","希"]
+  kyotaku:["出","公","有","希"],
+  support:["出","公","有","希"]
 };
 
 /* ---------- storage（端末内に保存しつつ、Google Cloud（Firebase）と同期） ---------- */
@@ -1041,7 +1083,7 @@ function setSyncStatus(state){ // "ok" | "busy" | "error" | "off"
   el.dataset.state=state;
   el.textContent = state==="busy"?"🔄 同期中…" : state==="error"?"⚠ 同期待ち（自動で再送します）" : state==="off"?"": "☁ 同期済み";
 }
-const keyScope=k=>{const m=/^yakuwari:(day|home|office|nursing|kitchen|rehab|kyotaku):/.exec(k);return m?m[1]:"global";};
+const keyScope=k=>{const m=/^yakuwari:(day|home|office|nursing|kitchen|rehab|kyotaku|support):/.exec(k);return m?m[1]:"global";};
 const syncable=k=>!!k&&k.indexOf("yakuwari:")===0&&k.indexOf("yakuwari:gate:")!==0&&k!==K.theme;
 const canWrite=k=>SYNC_SCOPES===null||keyScope(k)===SYNC_SCOPES;
 // 1件を裏で送信。失敗しても捨てず、成功するまで再試行し続ける（＝送信中のキーは pending として保持）。
@@ -1177,7 +1219,7 @@ function loadMasters(){
     seeded=false;
   }
   // migrate: ensure typeId / hours / task duration
-  S.staff.forEach(s=>{if(!s.typeId)s.typeId=S.types[0].id; if(s.off===undefined)s.off=null; if(s.hours===undefined)s.hours=null; if(FSCOPE==="day"&&s.hours&&!s.job)s.job="drv"; if(FSCOPE!=="day"&&s.hours)s.hours=null; if(s.job===undefined)s.job=""; if(s.canHiace===undefined)s.canHiace=false; if(s.canNight===undefined)s.canNight=false; if(s.nightOnly===undefined)s.nightOnly=false; if(s.nightCount===undefined)s.nightCount=null; if(s.workDays===undefined)s.workDays=null; if(s.canDrive===undefined){s.canDrive=(s.job==="driver"); if(s.job==="driver")s.job="";}});
+  S.staff.forEach(s=>{if(!s.typeId)s.typeId=S.types[0].id; if(s.off===undefined)s.off=null; if(s.hours===undefined)s.hours=null; if(FSCOPE==="day"&&s.hours&&!s.job)s.job="drv"; if(FSCOPE==="day"&&s.job==="drv"){const pt=S.types.find(x=>isPartTimeType(x)); if(pt)s.typeId=pt.id; s.workTime=null;} if(FSCOPE!=="day"&&s.hours)s.hours=null; if(s.job===undefined)s.job=""; if(s.canHiace===undefined)s.canHiace=false; if(s.canNight===undefined)s.canNight=false; if(s.nightOnly===undefined)s.nightOnly=false; if(s.nightCount===undefined)s.nightCount=null; if(s.workDays===undefined)s.workDays=null; if(s.canDrive===undefined){s.canDrive=(s.job==="driver"); if(s.job==="driver")s.job="";}});
   S.tasks.forEach(t=>{if(!t.dur)t.dur=30;});
   saveStaff();jset(K.status,S.status);jset(K.times,S.times);jset(K.tasks,S.tasks);jset(K.types,S.types);jset(K.roles,S.roles);
   return seeded;
@@ -1234,6 +1276,25 @@ const DOW_JP=["日","月","火","水","木","金","土"];
 function workDayOk(s,d){ if(!s.workDays||!isPartTimeType(typeById(s.typeId)))return true; return s.workDays.includes(dow(S.ym,d)); }
 function workTimeLabel(s){ const w=s.workTime; if(!w||!(w.s||w.e)||!isPartTimeType(typeById(s.typeId)))return"";
   const f=t=>t?t.replace(/^0/,""):""; return `<div class="wt">${f(w.s)}〜${f(w.e)}</div>`; }
+// 非常勤の勤務時間（台帳）から、勤務時間設定一覧の記号（A6・B4.5・P2 など）を求める。
+// 6時間・6.5時間だけは、休憩あり（A・B）／なし（C・D）を台帳のチェックで選ぶ。該当がなければ null
+function partDurHours(s){ const w=s&&s.workTime; if(!w||!w.s||!w.e)return null; const a=hmToMin(w.s), b=hmToMin(w.e); if(a==null||b==null||b===a)return null; return (b>a?b-a:b-a+1440)/60; } // 終了が開始より前なら、翌日の終了（夜勤など）
+const partTblRows=s=>{ const w=s.workTime, a=hmToMin(w.s), b=hmToMin(w.e); return shiftTblLoad().filter(r=>/^非常勤/.test(r.cat||"")&&hmToMin(r.s)===a&&hmToMin(r.e)===b); };
+// 6時間・6.5時間で、一覧に休憩あり／なしの両方の記号（A・B／C・D）がある時間のときだけ、休憩の選択を出す
+// 休憩の選択：6時間・6.5時間は「休憩あり／なし」（A・B／C・D）、7時間以上は「休憩45分／1時間」（A・B／E・F）。該当する記号が一覧にあるときだけ出す
+function partBreakKind(s){ if(!s||!isPartTimeType(typeById(s.typeId))||s.job==="drv"||partDurHours(s)==null)return null; const rows=partTblRows(s);
+  if(rows.some(r=>/休憩(あり|なし)/.test(r.cat)))return "yn"; if(rows.some(r=>/休憩(45分|1時間)/.test(r.cat)))return "len"; return null; }
+const partNeedsBreakChoice=s=>!!partBreakKind(s);
+function partSymbolOf(s){
+  if(s&&FSCOPE==="day"&&s.job==="drv"){ const h=hoursPreset(s); return h==="both"?"朝夕":h==="am"?"朝":h==="pm"?"夕":null; } // ドライバー：台帳で選んだ朝夕・朝のみ・夕のみ
+  if(!s||!isPartTimeType(typeById(s.typeId)))return null;
+  const d=partDurHours(s); if(d==null)return null;
+  let rows=partTblRows(s); const kind=partBreakKind(s);
+  if(kind==="yn"){ if(s.breakYes===true||s.breakYes===false)rows=rows.filter(r=>/休憩(あり|なし)/.test(r.cat)&&/休憩あり/.test(r.cat)===(s.breakYes===true)); else return null; }
+  else if(kind==="len"){ if(s.breakLong===true||s.breakLong===false)rows=rows.filter(r=>/休憩(45分|1時間)/.test(r.cat)&&/休憩1時間/.test(r.cat)===(s.breakLong===true)); else return null; }
+  if(rows.length)return rows[0].code;
+  return "P"+fmtH(d); // 一覧にない時間は、勤務時間（時間数）から P2・P4・P3.5 のように自動で付ける
+}
 // 希望休は勤務表に赤い「公」で表示（印刷・PDFでも赤）
 const WISH_RED="#C62828";
 const isWishStatus=st=>!!(st&&(st.code==="希"||/希望/.test(st.label||"")));
@@ -1275,7 +1336,7 @@ function effOf(md,ym,sid,day,used){
     const w=st?st.work:true;
     // w/r = 出勤・休みを何日分として数えるか（半日の記号は 0.5 日ずつ）
     const wf=st?(st.half?0.5:(st.work?1:0)):1, rf=st?(st.half?0.5:(st.work?0:1)):0;
-    return {code,color:st?st.color:'',work:w,rest:st?!st.work:false,w:wf,r:rf,auto};
+    return {code,color:st?st.color:((drvSymOf(code)||{}).color||''),work:w,rest:st?!st.work:false,w:wf,r:rf,auto};
   }
   if(off) return {code:cs.code,color:cs.color,work:false,rest:true,w:0,r:1,auto:true};
   return {code:'',color:'',work:used,rest:false,w:used?1:0,r:0,auto:false};
@@ -1539,6 +1600,10 @@ function renderBrushes(){
     b.innerHTML=`<span class="chip" style="background:${isWishStatus(st)?WISH_RED:st.color}">${isWishStatus(st)?"公":st.code}</span>${st.label}`;
     b.onclick=()=>{brush=st.code;renderBrushes();};w.appendChild(b);
   });
+  if(FSCOPE==="day"){ // ドライバーの送迎（1つのボタン。マスをタップするたびに 朝 → 夕 → 朝夕 → 消す）
+    const b=document.createElement('button');b.className="brush";b.id="btnDrvBrush";b.title="タップするたびに 朝 → 夕 → 朝夕 → 消す";b.setAttribute('aria-pressed',brush==="@drv");
+    b.innerHTML=`<span class="chip" style="background:#3E7CB1">送</span>送迎`;
+    b.onclick=()=>{brush="@drv";renderBrushes();};w.appendChild(b); }
   const er=document.createElement('button');er.className="brush eraser";er.setAttribute('aria-pressed',brush==="");
   er.innerHTML=`<span class="chip"></span>消す`;er.onclick=()=>{brush="";renderBrushes();};w.appendChild(er);
   if(S.staff.some(s=>isPartTimeType(typeById(s.typeId)))){ // 非常勤の「その日だけ」の勤務時間変更
@@ -1571,14 +1636,14 @@ function renderRoster(){
   else head+='<th class="sumcol s-work">出勤</th><th class="sumcol s-off">休/目標</th></tr></thead>';
   let bodyH='<tbody>'; const boxRows=[];
   S.staff.forEach(s=>{
-    let work=0; const cnt=sc?sc.map(()=>0):null;
+    let work=0; const cnt=sc?sc.map(()=>0):null; const psym=partSymbolOf(s); // 非常勤は、勤務時間に合う記号（A6など）で表示
     bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}${workTimeLabel(s)}</td>`;
     for(let d=1;d<=nd;d++){const e=eff(s.id,d);work+=e.w;
       if(sc){ if(e.hr){ const kr=sc.findIndex(c=>c.codes.includes(e.code)), kw=sc.findIndex(c=>c.codes.includes("日")||c.codes.includes("出")); if(kr>=0)cnt[kr]+=0.5; if(kw>=0)cnt[kw]+=0.5; }
         else { const k=sc.findIndex(c=>c.codes.includes(e.code)); if(k>=0)cnt[k]+=1; } }
       const tmk=timeMark(s,d,e); // 時間変更した日は、記号（日勤など）を出さず、時間だけを赤で表示
-      const hs=e.code&&statusByCode(e.code),hv=(S.rhalf[s.id]||{})[d],hm=(hs&&hs.half&&hv)?`<span class="hm">${hv==='pm'?'後':'前'}</span>`:'';
-      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${tmk||(e.hr?`<span class="hl">${e.hr==='pm'?'PM':'AM'}${e.code==='公'?'休':e.code}</span>`:((hs&&isWishStatus(hs)?'<span class="wish">公</span>':e.code)+hm))}</td>`;}
+      const hs=e.code&&statusByCode(e.code),hv=(S.rhalf[s.id]||{})[d],shown=(psym&&hs&&hs.work&&!hs.half&&(e.code==="日"||e.code==="出"))?psym:e.code,hm=(hs&&hs.half&&hv)?`<span class="hm">${hv==='pm'?'後':'前'}</span>`:'';
+      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}" data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${tmk||(e.hr?`<span class="hl">${e.hr==='pm'?'PM':'AM'}${e.code==='公'?'休':e.code}</span>`:((hs&&isWishStatus(hs)?'<span class="wish">公</span>':((shown!==e.code||(drvSymOf(e.code)&&e.code.length>1))?`<span class="ps" style="font-size:${shown.length<=2?11:shown.length===3?10:shown.length<=5?9:5.5}px">${escapeHtml(shown)}</span>`:shown))+hm))}</td>`;}
     const off=offCount(s.id),tgt=staffTarget(s);
     const cls=tgt==null?'ok':off<tgt?'under':off>tgt?'over':'ok';
     if(sc){ const tot=cnt.reduce((a,b)=>a+b,0); boxRows.push({cnt,tot,off,tgt});
@@ -1621,14 +1686,21 @@ function renderRoster(){
   $$("td.rc",T).forEach(td=>{td.onclick=()=>{
     const sid=td.dataset.sid,day=+td.dataset.day;if(!S.roster[sid])S.roster[sid]={};
     if(brush==="@time"){ openTimeEdit(sid,day); return; }
+    const stf=S.staff.find(x=>x.id===sid), noHalf=!!(stf&&isPartTimeType(typeById(stf.typeId))); // 非常勤は半休（AM／PM）を取れない
+    const hb=brush&&statusByCode(brush); if(noHalf&&hb&&hb.half){ toast("非常勤スタッフの半休は入力できません"); return; }
     pushUndo();
     if(!S.rhalf[sid])S.rhalf[sid]={};
     if(S.rtime[sid])delete S.rtime[sid][day]; // 記号を変えたら、その日の時間変更は解除
     const bst=brush&&statusByCode(brush);
-    if(bst&&!bst.work&&!isWishStatus(bst)){ // 公休・有休：続けてタップ＝1回目 全日 → 2回目 AM → 3回目 PM → 4回目 消す
+    if(brush==="@drv"){ // 送迎：タップするたびに 朝 → 夕 → 朝夕 → 消す
+      const order=DRV_SYMS.map(x=>x.code), k=order.indexOf(S.roster[sid][day]);
+      if(k===order.length-1)delete S.roster[sid][day]; else S.roster[sid][day]=order[k+1]; // k=-1（ほかの記号・空欄）なら 朝
+      delete S.rhalf[sid][day];
+    } else if(bst&&!bst.work&&!isWishStatus(bst)){ // 公休・有休：続けてタップ＝1回目 全日 → 2回目 AM → 3回目 PM → 4回目 消す
       if(S.roster[sid][day]===brush){
         const h=S.rhalf[sid][day];
-        if(!h)S.rhalf[sid][day]="am"; else if(h==="am")S.rhalf[sid][day]="pm";
+        if(noHalf){delete S.roster[sid][day];delete S.rhalf[sid][day];} // 非常勤は、全日の休みか、消すかのみ
+        else if(!h)S.rhalf[sid][day]="am"; else if(h==="am")S.rhalf[sid][day]="pm";
         else {delete S.roster[sid][day];delete S.rhalf[sid][day];}
       } else {S.roster[sid][day]=brush;delete S.rhalf[sid][day];}
     } else if(bst&&bst.half){ // 半日の記号：タップするたびに 前(AM)→後(PM)→消す
@@ -1654,7 +1726,7 @@ function renderStaffList(){
   S.staff.forEach((s,i)=>{
     const card=document.createElement('div');card.className="staff-edit";
     const segs=S.types.map(t=>`<button class="segbtn" data-ty="${t.id}" aria-pressed="${s.typeId===t.id}">${escapeHtml(t.name)}</button>`).join("");
-    const preset=hoursPreset(s);
+    const preset=hoursPreset(s), isDrv=FSCOPE==="day"&&s.job==="drv"; // ドライバーは非常勤。勤務時間は入力せず、朝夕・朝のみ・夕のみから選ぶ
     const hbtns=(FSCOPE==="day"?[["both","朝夕"],["am","朝のみ"],["pm","夕のみ"]]:[["full","終日"],["both","朝夕"],["am","朝のみ"],["pm","夕のみ"]]).concat(nightDeptOn()?[["night","夜勤のみ"]]:[])
       .map(([v,l])=>`<button class="segbtn" data-h="${v}" aria-pressed="${preset===v}">${l}</button>`).join("");
     const bandRow=(k,l,b)=>b?`<div class="hrow" data-band="${k}"><span>${l}</span><input type="time" class="hs" value="${b.s}"><span>–</span><input type="time" class="he" value="${b.e}"></div>`:"";
@@ -1678,13 +1750,18 @@ function renderStaffList(){
         <label style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;margin-top:6px">月の夜勤回数
           <input type="number" class="night-cnt" min="0" max="31" placeholder="指定なし" value="${s.nightCount==null?'':s.nightCount}" style="width:84px;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:5px 8px">回</label>`:""}
       </div>`:""}
-      <div class="line2">
+      ${isDrv?`<div class="line2"><div style="font-size:12px;color:var(--ink-soft)">雇用形態：非常勤（ドライバーは非常勤です）</div></div>`:`<div class="line2">
         <div class="fl"><span>雇用形態</span><div class="seg tyseg">${segs}</div></div>
-      </div>
-      ${isPartTimeType(typeById(s.typeId))?`<div class="line2">
+      </div>`}
+      ${isPartTimeType(typeById(s.typeId))?`${isDrv?"":`<div class="line2">
         <div class="fl"><span>勤務時間（非常勤）</span>
           <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">${timePartSelects("wt-s",(s.workTime||{}).s)}<span style="margin:0 4px">–</span>${timePartSelects("wt-e",(s.workTime||{}).e)}</div></div>
       </div>
+      ${partNeedsBreakChoice(s)?(()=>{ const k=partBreakKind(s), yn=k==="yn", cur=yn?s.breakYes:s.breakLong; const lb=`display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px`, ck=`width:18px;height:18px;accent-color:var(--accent)`;
+        return `<div class="line2"><div class="fl"><span>${yn?"休憩（6時間・6.5時間の勤務）":"休憩（7時間以上の勤務）"}</span>
+          <div style="display:flex;gap:16px;flex-wrap:wrap"><label class="wk" style="${lb}"><input type="checkbox" class="brk-a" data-k="${yn?"breakYes":"breakLong"}" data-v="${yn?"1":"0"}"${cur===(yn?true:false)?" checked":""} style="${ck}">${yn?"休憩あり":"45分"}</label>
+          <label class="wk" style="${lb}"><input type="checkbox" class="brk-b" data-k="${yn?"breakYes":"breakLong"}" data-v="${yn?"0":"1"}"${cur===(yn?false:true)?" checked":""} style="${ck}">${yn?"休憩なし":"1時間"}</label></div></div></div>`; })():""}
+      ${partDurHours(s)!=null?`<div class="line2"><div style="font-size:12px;color:var(--ink-soft)">勤務表に出る記号：<b>${partSymbolOf(s)?escapeHtml(partSymbolOf(s)):"該当なし"}</b>${partNeedsBreakChoice(s)&&!partSymbolOf(s)?(partBreakKind(s)==="yn"?"（休憩あり・なしを選ぶと決まります）":"（45分・1時間を選ぶと決まります）"):""}</div></div>`:""}`}
       <div class="line2">
         <div class="fl" style="flex:1"><span>勤務できる曜日（非常勤）</span>
           <div class="seg wdseg">${DOW.map((w,i)=>`<button class="segbtn" data-wd="${i}" aria-pressed="${!s.workDays||s.workDays.includes(i)}">${w}</button>`).join("")}</div></div>
@@ -1709,6 +1786,7 @@ function renderStaffList(){
     card.querySelectorAll('.jobseg .segbtn').forEach(b=>b.onclick=()=>{
       s.job=b.dataset.job;
       if(FSCOPE==="day"){ if(s.job==="drv"&&!s.hours)setHoursPreset(s,"both"); else if(s.job!=="drv")s.hours=null; } // ドライバーは朝夕を初期値に、ほかの職種は時間帯の制限なし
+      if(FSCOPE==="day"&&s.job==="drv"){ const pt=S.types.find(x=>isPartTimeType(x)); if(pt)s.typeId=pt.id; s.workTime=null; } // ドライバーは非常勤（時間は入力しない）
       saveStaff();renderStaffList();
       if(S.tab==="roster")renderRoster();else refreshAll();});
     card.querySelectorAll('.tyseg .segbtn').forEach(b=>b.onclick=()=>{
@@ -1726,11 +1804,13 @@ function renderStaffList(){
       cur.sort((a,c)=>a-c); s.workDays=cur.length===7?null:cur; saveStaff(); renderStaffList(); if(S.tab==="roster")renderRoster(); });
     if(card.querySelector('.wt-s-h')){
       const val=p=>{const h=card.querySelector('.'+p+'-h').value, m=card.querySelector('.'+p+'-m').value; return h?h+":"+(m||"00"):"";};
-      const upd=()=>{ const a=val('wt-s'), b=val('wt-e'); s.workTime=(a||b)?{s:a,e:b}:null; saveStaff(); };
+      const upd=()=>{ const a=val('wt-s'), b=val('wt-e'); s.workTime=(a||b)?{s:a,e:b}:null; saveStaff(); renderStaffList(); if(S.tab==="roster")renderRoster(); };
       // 時だけ選んだ場合は分を00にそろえる
       card.querySelectorAll('.wt-s-h,.wt-e-h').forEach(sel=>{sel.onchange=()=>{const m=card.querySelector('.'+sel.className.replace('-h','-m')); if(sel.value&&!m.value)m.value="00"; if(!sel.value)m.value=""; upd();};});
       card.querySelectorAll('.wt-s-m,.wt-e-m').forEach(sel=>{sel.onchange=()=>{const h=card.querySelector('.'+sel.className.replace('-m','-h')); if(sel.value&&!h.value){sel.value="";} upd();};});
     }
+    const ba=card.querySelector('.brk-a'), bb=card.querySelector('.brk-b'); // 休憩の選択（どちらか一方）
+    if(ba&&bb){ [ba,bb].forEach(el=>{ el.onchange=()=>{ const other=el===ba?bb:ba; if(el.checked)other.checked=false; const key=el.dataset.k; s[key]=el.checked?(el.dataset.v==="1"):(other.checked?(other.dataset.v==="1"):null); saveStaff(); renderStaffList(); if(S.tab==="roster")renderRoster(); }; }); }
     card.querySelector('.del').onclick=()=>{showConfirm(`${s.name} を台帳から削除しますか？`,()=>{
       S.staff.splice(i,1);S.day.selected=S.day.selected.filter(x=>x!==s.id);
       Object.values(S.day.assign).forEach(r=>delete r[s.id]);saveStaff();saveDay();renderStaffList();refreshAll();
@@ -2204,12 +2284,12 @@ $("#doAuto").onclick=()=>{
   if(warn.length)parts.push(`休日数が目標未達 → ${warn.join("、")}`);
   toast(parts.length?`作成しました｜要確認：${parts.join(" ／ ")}`:"休日数に合わせて作成しました");
 };
-$("#btnStaffMgr").onclick=$("#stgStaff").onclick=()=>{renderStaffList();openModal("#staffOverlay");};
+$("#btnStaffMgr").onclick=$("#stgStaff").onclick=()=>{ if(ROLE!=="admin"){toast("スタッフ台帳は、管理者のみ変更できます");return;} setStaffView("one");openModal("#staffOverlay");};
 $("#btnTplSave").onclick=openTplSave;$("#btnTplLoad").onclick=openTplLoad;
 $("#btnPrintBoard").onclick=$("#btnPrintRoster").onclick=()=>window.print();
 
 // ---- 管理者：全部署の勤務表をまとめて印刷（A3横・4枚） ----
-const PRINT_PAGES=[["day"],["kyotaku","office","kitchen"],["home"],["nursing","rehab"]];
+const PRINT_PAGES=[["day"],["kyotaku","office","kitchen"],["home"],["nursing","rehab","support"]];
 async function printAllDepartments(){
   const btn=$("#btnPrintAll"); const origLabel=btn.textContent;
   btn.disabled=true; btn.textContent="🖨 準備中…";
@@ -2305,7 +2385,7 @@ $("#btnTheme").onclick=$("#btnTheme2").onclick=toggleTheme;
 (()=>{const th=jget(K.theme,null);if(th)document.documentElement.setAttribute('data-theme',th);})();
 
 /* ================= ログイン（Googleアカウント。管理者が登録した人だけが入れる） ================= */
-const ROLE_LABEL={admin:"管理者",day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ",kyotaku:"居宅支援事業所"};
+const ROLE_LABEL={admin:"管理者",day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ",kyotaku:"居宅支援事業所",support:"サポート"};
 let ROLE=null, USER_EMAIL=null, entering=false;
 function sessGet(k){try{return sessionStorage.getItem(k);}catch(e){return null;}}
 function sessSet(k,v){try{sessionStorage.setItem(k,v);}catch(e){}}
@@ -2412,12 +2492,13 @@ async function initGate(){
   }catch(e){ gateMsg("接続できませんでした。ネットワークを確認して、ページを開き直してください。"); }
 }
 
-const FACILITY_ICON={day:"📋",home:"🚶",office:"🗂️",nursing:"🩺",kitchen:"🍳",rehab:"🦵",kyotaku:"🏠"};
+const FACILITY_ICON={day:"📋",home:"🚶",office:"🗂️",nursing:"🩺",kitchen:"🍳",rehab:"🦵",kyotaku:"🏠",support:"🤝"};
 function updateFacilityUI(){
   const isAdmin=ROLE==="admin";
   $("#facSwitch").hidden=!isAdmin;
   $("#facBadge").hidden=isAdmin;
   $("#btnPrintAll").hidden=!isAdmin;
+  $("#btnStaffMgr").hidden=!isAdmin; $("#stgStaff").hidden=!isAdmin; // スタッフ台帳の編集は管理者のみ
   if(isAdmin){
     const sel=$("#facSwitchSel");
     if(!sel.dataset.built){
@@ -2511,6 +2592,107 @@ function renderOffAll(){
   tb.querySelectorAll("input").forEach(inp=>inp.oninput=()=>{ const tr=inp.closest("tr"), f=tr.dataset.f; const m={...offTable()}; const arr=Array.from({length:12},(_,k)=>{const x=tr.querySelector(`input[data-m="${k}"]`).value; return x===""?null:Number(x);}); m[f]=arr;
     jset(K.offtable,m); tr.querySelector(".offtot").textContent=arr.reduce((a,b)=>a+(b||0),0); if(S.tab==="roster")renderRoster(); });
 }
+
+// ---- 管理者：全部署のスタッフ一覧（確認とまとめての修正） ----
+const staffKeyOf=f=>`yakuwari:${f}:staff`;
+const staffListOf=f=>f===FSCOPE?S.staff:jget(staffKeyOf(f),[]);
+const saveStaffOf=(f,arr)=>{ if(f===FSCOPE){saveStaff();refreshAll();} else jset(staffKeyOf(f),arr); };
+function renderAllStaff(){
+  const dsel=$("#asDept"); if(!dsel.dataset.built){ dsel.innerHTML='<option value="">全部署</option>'+ALL_FACILITIES.map(f=>`<option value="${f}">${FACILITY_ICON[f]} ${FACILITY_NAME[f]}</option>`).join(""); dsel.dataset.built="1"; dsel.onchange=renderAllStaff; $("#asSearch").oninput=renderAllStaff; }
+  const only=dsel.value, q=$("#asSearch").value.trim();
+  const sel=(cls,opts,cur)=>`<select class="${cls}" style="font:inherit;padding:4px 6px;border-radius:6px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink)">${opts.map(([v,l])=>`<option value="${escapeHtml(String(v))}"${v===cur?" selected":""}>${escapeHtml(l)}</option>`).join("")}</select>`;
+  const chk=(cls,on,ok,blank)=>ok?`<input type="checkbox" class="${cls}"${on?" checked":""} style="width:18px;height:18px;accent-color:var(--accent)">`:(blank?'':'<span style="color:var(--ink-soft)">－</span>');
+  let rows="", n=0; const refs=[];
+  const kotCnt={}; ALL_FACILITIES.forEach(f=>staffListOf(f).forEach(s=>{const c=(s.kotCode||"").trim(); if(c)kotCnt[c]=(kotCnt[c]||0)+1;})); // 同じコードが2人以上に入っていないか
+  ALL_FACILITIES.filter(f=>!only||f===only).forEach(f=>{
+    const arr=staffListOf(f); const types=(f===FSCOPE?S.types:jget(`yakuwari:${f}:types`,null))||DEF_TYPES; const jobs=(JOBS_BY_DEPT[f]||[]).filter(j=>!j.drive&&!j.hiace);
+    arr.forEach(s=>{ if(q&&!(s.name||"").includes(q))return; n++; const i=refs.length; refs.push({f,s,arr});
+      rows+=`<tr data-i="${i}" style="border-top:1px solid var(--line)">
+        <td style="padding:6px 8px;white-space:nowrap">${FACILITY_ICON[f]} ${escapeHtml(FACILITY_NAME[f])}</td>
+        <td style="padding:6px 8px;white-space:nowrap"><input type="color" class="as-color" value="${s.color||"#888888"}" style="width:26px;height:26px;border:none;padding:0;background:none;vertical-align:middle"> <input type="text" class="as-name" value="${escapeHtml(s.name||"")}" maxlength="12" style="font:inherit;width:120px;padding:4px 6px;border-radius:6px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink)"></td>
+        <td style="padding:6px 8px">${sel("as-type",types.map(ty=>[ty.id,ty.name]),s.typeId)}</td>
+        <td style="padding:6px 8px">${jobs.length?sel("as-job",[["","未設定"]].concat(jobs.map(j=>[j.id,j.name])),s.job||""):'<span style="color:var(--ink-soft)">－</span>'}</td>
+        <td style="padding:6px 8px"><input type="text" class="as-kot" value="${escapeHtml(s.kotCode||"")}" maxlength="20" inputmode="numeric" placeholder="未入力" style="font:inherit;width:96px;padding:4px 6px;border-radius:6px;border:1px solid ${kotCnt[(s.kotCode||"").trim()]>1?"var(--alert)":"var(--line-strong)"};background:var(--surface);color:var(--ink)"></td>
+        <td style="padding:6px 8px;text-align:center">${chk("as-drive",!!s.canDrive,f==="day")}</td>
+        <td style="padding:6px 8px;text-align:center">${chk("as-hiace",!!s.canHiace,f==="day"&&!!s.canDrive,true)}</td>
+        <td style="padding:6px 8px;text-align:center">${chk("as-night",!!s.canNight,NIGHT_DEPTS.includes(f),true)}</td>
+        <td style="padding:6px 8px"><button class="btn sm as-open">台帳を開く</button></td></tr>`; });
+  });
+  $("#asTable").innerHTML=`<thead><tr style="text-align:left;color:var(--ink-soft);font-size:12px"><th style="padding:6px 8px">部署</th><th style="padding:6px 8px">氏名</th><th style="padding:6px 8px">雇用形態</th><th style="padding:6px 8px">職種</th><th style="padding:6px 8px">KOT従業員コード</th><th style="padding:6px 8px;text-align:center">送迎可</th><th style="padding:6px 8px;text-align:center">ハイエース可</th><th style="padding:6px 8px;text-align:center">夜勤可</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="9" style="padding:14px;color:var(--ink-soft)">該当するスタッフがいません</td></tr>'}</tbody>`;
+  $("#asCount").textContent=`${n}名`;
+  $$("#asTable tbody tr[data-i]").forEach(tr=>{ const {f,s,arr}=refs[Number(tr.dataset.i)]; const on=(cls,fn)=>{const el=tr.querySelector("."+cls); if(el)el.onchange=el.oninput=e=>{fn(e.target); saveStaffOf(f,arr);};};
+    on("as-color",el=>{s.color=el.value;}); on("as-name",el=>{s.name=el.value;});
+    on("as-type",el=>{s.typeId=el.value;});
+    { const kel=tr.querySelector(".as-kot"); if(kel){ kel.oninput=e=>{s.kotCode=e.target.value.trim(); saveStaffOf(f,arr);}; kel.onchange=()=>renderAllStaff(); } } // 入力を終えたとき、重複の赤枠を更新
+    on("as-job",el=>{ s.job=el.value; if(f==="day"){ if(s.job==="drv"&&!s.hours)setHoursPreset(s,"both"); else if(s.job!=="drv")s.hours=null; } });
+    on("as-drive",el=>{s.canDrive=el.checked; if(!s.canDrive)s.canHiace=false; setTimeout(renderAllStaff,0);});
+    on("as-hiace",el=>{s.canHiace=el.checked;}); on("as-night",el=>{s.canNight=el.checked; if(!s.canNight){s.nightOnly=false;s.nightCount=null;}});
+    tr.querySelector(".as-open").onclick=async()=>{ if(f!==FSCOPE){ const fs=$("#facSwitchSel"); fs.value=f; await fs.onchange({target:fs}); } setStaffView("one"); };
+  });
+}
+function setStaffView(v){ // 個人設定（この部署）／全部署の一覧 の切り替え
+  $("#stOne").hidden=v!=="one"; $("#stAll").hidden=v!=="all";
+  $$("#stView .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===v)));
+  $("#staffModal").style.width=v==="all"?"min(1040px,100%)":"";
+  if(v==="all")renderAllStaff(); else renderStaffList();
+}
+$$("#stView .segbtn").forEach(b=>b.onclick=()=>setStaffView(b.dataset.v));
+
+// ---- 管理者：勤務時間設定一覧（記号ごとの開始・終了・休憩・実働。全部署で共通の控え。まだ他の画面とは連動しない） ----
+const SHIFTTBL_KEY="yakuwari:shifttable";
+const SHIFTTBL_SEED=[["常勤","日勤A","08:30","17:30",0,60,"12:00〜13:00","非常勤のA9と同じ時間"],["常勤","日勤B","09:00","18:00",0,60,"12:00〜13:00","非常勤のB9と同じ時間"],["常勤","早","06:00","15:00",0,60,"10:00〜11:00",""],["常勤","遅","13:00","22:00",0,60,"17:00〜18:00","訪問介護の12:00〜21:00の扱いは未決"],["常勤","夜","21:00","07:00",1,120,"1:00〜3:00","休憩2時間"],["常勤","AM休","08:30","12:30",0,0,"","非常勤のA4と同じ時間"],["常勤","PM休","13:30","17:30",0,0,"",""],["常勤の有休（案）","有休","","",0,0,"","1日休み（時間なし）"],["常勤の有休（案）","AM有","","",0,0,"","午前を休み、午後は半日・午後に出勤（案）"],["常勤の有休（案）","PM有","","",0,0,"","午後を休み、午前は半日・午前に出勤（案）"],["非常勤（6時間未満）","A4","08:30","12:30",0,0,"","6時間未満は休憩なし"],["非常勤（6時間未満）","A4.5","08:30","13:00",0,0,"","6時間未満は休憩なし"],["非常勤（6時間未満）","A5","08:30","13:30",0,0,"","6時間未満は休憩なし"],["非常勤（6時間未満）","A5.5","08:30","14:00",0,0,"","6時間未満は休憩なし"],["非常勤（休憩あり）","A6","08:30","14:30",0,30,"12:00〜12:30","6時間は休憩30分"],["非常勤（休憩あり）","A6.5","08:30","15:00",0,30,"12:00〜12:30","6.5時間は30分（仮）"],["非常勤（休憩45分）","A7","08:30","15:30",0,45,"12:00〜12:45",""],["非常勤（休憩45分）","A7.5","08:30","16:00",0,45,"12:00〜12:45",""],["非常勤（休憩45分）","A8","08:30","16:30",0,45,"12:00〜12:45",""],["非常勤（休憩45分）","A8.5","08:30","17:00",0,45,"12:00〜12:45",""],["非常勤（休憩45分）","A9","08:30","17:30",0,45,"12:00〜12:45",""],["非常勤（休憩45分）","A9.5","08:30","18:00",0,45,"12:00〜12:45",""],["非常勤（6時間未満）","B3.5","09:00","12:30",0,0,"","6時間未満は休憩なし"],["非常勤（6時間未満）","B4","09:00","13:00",0,0,"","6時間未満は休憩なし"],["非常勤（6時間未満）","B4.5","09:00","13:30",0,0,"","6時間未満は休憩なし"],["非常勤（6時間未満）","B5","09:00","14:00",0,0,"","6時間未満は休憩なし"],["非常勤（6時間未満）","B5.5","09:00","14:30",0,0,"","6時間未満は休憩なし"],["非常勤（休憩あり）","B6","09:00","15:00",0,30,"12:00〜12:30","6時間は休憩30分"],["非常勤（休憩あり）","B6.5","09:00","15:30",0,30,"12:00〜12:30","6.5時間は30分（仮）"],["非常勤（休憩45分）","B7","09:00","16:00",0,45,"12:00〜12:45",""],["非常勤（休憩45分）","B7.5","09:00","16:30",0,45,"12:00〜12:45",""],["非常勤（休憩45分）","B8","09:00","17:00",0,45,"12:00〜12:45",""],["非常勤（休憩45分）","B8.5","09:00","17:30",0,45,"12:00〜12:45",""],["非常勤（休憩45分）","B9","09:00","18:00",0,45,"12:00〜12:45",""],["非常勤（休憩なし）","C6","08:30","14:30",0,0,"","6時間で休憩なし"],["非常勤（休憩なし）","C6.5","08:30","15:00",0,0,"","6.5時間で休憩なし"],["非常勤（休憩なし）","D6","09:00","15:00",0,0,"","6時間で休憩なし"],["非常勤（休憩なし）","D6.5","09:00","15:30",0,0,"","6.5時間で休憩なし"],["非常勤（休憩1時間）","E7","08:30","15:30",0,60,"12:00〜13:00",""],["非常勤（休憩1時間）","E7.5","08:30","16:00",0,60,"12:00〜13:00",""],["非常勤（休憩1時間）","E8","08:30","16:30",0,60,"12:00〜13:00",""],["非常勤（休憩1時間）","E8.5","08:30","17:00",0,60,"12:00〜13:00",""],["非常勤（休憩1時間）","E9","08:30","17:30",0,60,"12:00〜13:00",""],["非常勤（休憩1時間）","E9.5","08:30","18:00",0,60,"12:00〜13:00",""],["非常勤（休憩1時間）","F7","09:00","16:00",0,60,"12:00〜13:00",""],["非常勤（休憩1時間）","F7.5","09:00","16:30",0,60,"12:00〜13:00",""],["非常勤（休憩1時間）","F8","09:00","17:00",0,60,"12:00〜13:00",""],["非常勤（休憩1時間）","F8.5","09:00","17:30",0,60,"12:00〜13:00",""],["非常勤（休憩1時間）","F9","09:00","18:00",0,60,"12:00〜13:00",""],["非常勤（そのほか）","P1.5","14:00","15:30",0,0,"",""],["非常勤（そのほか）","P2","10:00","12:00",0,0,"",""],["非常勤（そのほか）","P4","10:00","14:00",0,0,"",""],["非常勤（そのほか）","P9","12:00","21:00",0,60,"12:00〜13:00",""],["非常勤（そのほか）","P10","21:00","07:00",1,120,"1:00〜3:00","非常勤の夜勤（休憩2時間）"],["厨房","朝","06:00","09:00",0,0,"",""],["厨房","朝日","06:00","15:00",0,60,"12:00〜13:00",""],["厨房","早","09:00","13:00",0,0,"",""],["厨房","遅","11:00","15:00",0,0,"",""],["厨房","日","09:00","15:00",0,0,"",""],["厨房","日夜","09:00","18:00",0,60,"12:00〜13:00",""],["厨房","夜","15:00","18:00",0,0,"",""],["ドライバー","朝","08:00","10:00",0,0,"","朝の送迎"],["ドライバー","夕","16:00","18:00",0,0,"","夕の送迎"],["ドライバー","朝夕","08:00","18:00",0,360,"10:00〜16:00（勤務なし）","朝（8:00〜10:00）＋夕（16:00〜18:00）。実働4時間"],["機能訓練士（案）","機PM 1330-1530","13:30","15:30",0,0,"",""]]; // [区分, 記号, 開始, 終了, 翌日(1/0), 休憩(分), 休憩の時間枠, 備考]
+const shiftTblSeed=()=>SHIFTTBL_SEED.map(a=>({id:uid(),cat:a[0],code:a[1],s:a[2],e:a[3],nx:a[4],brk:a[5],slot:a[6],note:a[7]}));
+function shiftTblLoad(){ let r=jget(SHIFTTBL_KEY,null); if(!Array.isArray(r)){ r=shiftTblSeed(); } return r; }
+let shiftTbl=null;
+const shiftTblSave=()=>jset(SHIFTTBL_KEY,shiftTbl);
+const hmToMin=v=>{const m=/^(\d{1,2}):(\d{2})$/.exec(v||"");return m?Number(m[1])*60+Number(m[2]):null;};
+const fmtH=h=>Number.isInteger(h)?String(h):String(Math.round(h*100)/100);
+function shiftTblCalc(r){ const a=hmToMin(r.s), b=hmToMin(r.e); if(a==null||b==null)return null;
+  let d=b-a+(r.nx?1440:0); if(d<0)d+=1440; const k=d/60; return {kosoku:k, jitsu:k-(Number(r.brk)||0)/60}; }
+function renderShiftTbl(){
+  if(!shiftTbl)shiftTbl=shiftTblLoad();
+  const cats=[...new Set(shiftTbl.map(r=>r.cat))]; const cs=$("#stCat"), keep=cs.value;
+  cs.innerHTML='<option value="">すべての区分</option>'+cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join(""); cs.value=cats.includes(keep)?keep:""; cs.onchange=renderShiftTbl;
+  const fld="font:inherit;padding:4px 6px;border-radius:6px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink)";
+  const inp=(cls,v,w,ex="")=>`<input type="text" class="${cls}" value="${escapeHtml(String(v==null?"":v))}" style="${fld};width:${w}px" ${ex}>`;
+  const tin=(cls,v)=>`<input type="time" class="${cls}" value="${v||""}" style="${fld}">`;
+  let rows="", n=0;
+  shiftTbl.forEach((r,i)=>{ if(cs.value&&r.cat!==cs.value)return; n++; const c=shiftTblCalc(r);
+    rows+=`<tr data-i="${i}" style="border-top:1px solid var(--line)">
+      <td style="padding:5px 6px">${inp("st-cat",r.cat,150)}</td>
+      <td style="padding:5px 6px">${inp("st-code",r.code,110)}</td>
+      <td style="padding:5px 6px">${tin("st-s",r.s)}</td>
+      <td style="padding:5px 6px">${tin("st-e",r.e)}</td>
+      <td style="padding:5px 6px"><select class="st-nx" style="${fld}"><option value="0"${r.nx?"":" selected"}>当日</option><option value="1"${r.nx?" selected":""}>翌日</option></select></td>
+      <td class="st-kosoku num" style="padding:5px 6px;text-align:right">${c?fmtH(c.kosoku):""}</td>
+      <td style="padding:5px 6px"><input type="number" class="st-brk" min="0" max="600" step="5" value="${r.brk||0}" style="${fld};width:64px"></td>
+      <td style="padding:5px 6px">${inp("st-slot",r.slot,120)}</td>
+      <td class="st-jitsu num" style="padding:5px 6px;text-align:right;font-weight:700">${c?fmtH(c.jitsu):""}</td>
+      <td style="padding:5px 6px">${inp("st-note",r.note,200)}</td>
+      <td style="padding:5px 6px;white-space:nowrap"><button class="btn sm st-up" title="1つ上へ" style="border-color:var(--line)">▲</button> <button class="btn sm st-dn" title="1つ下へ" style="border-color:var(--line)">▼</button> <button class="btn sm st-del" title="削除" style="border-color:var(--line)">🗑</button></td></tr>`; });
+  const th=(l,al)=>`<th style="padding:5px 6px${al?";text-align:"+al:""}">${l}</th>`;
+  $("#stTable").innerHTML=`<thead><tr style="text-align:left;color:var(--ink-soft);font-size:12px;white-space:nowrap">${th("区分")}${th("記号")}${th("開始")}${th("終了")}${th("終了の日")}${th("拘束（時間）","right")}${th("休憩（分）")}${th("休憩の時間枠")}${th("実働（時間）","right")}${th("備考")}<th></th></tr></thead><tbody>${rows||'<tr><td colspan="11" style="padding:14px;color:var(--ink-soft)">該当する行がありません</td></tr>'}</tbody>`;
+  $("#stCount").textContent=`${n}行`;
+  $$("#stTable tbody tr[data-i]").forEach(tr=>{ const r=shiftTbl[Number(tr.dataset.i)];
+    const upd=()=>{ shiftTblSave(); const c=shiftTblCalc(r); tr.querySelector(".st-kosoku").textContent=c?fmtH(c.kosoku):""; tr.querySelector(".st-jitsu").textContent=c?fmtH(c.jitsu):""; };
+    const bind=(cls,fn)=>{const el=tr.querySelector("."+cls); el.oninput=el.onchange=e=>{fn(e.target.value); upd();};};
+    bind("st-cat",v=>{r.cat=v;}); bind("st-code",v=>{r.code=v;}); bind("st-s",v=>{r.s=v;});
+    bind("st-e",v=>{r.e=v; const a=hmToMin(r.s), b=hmToMin(v); if(a!=null&&b!=null){ r.nx=b<=a?1:0; tr.querySelector(".st-nx").value=String(r.nx); }});
+    bind("st-nx",v=>{r.nx=Number(v);}); bind("st-brk",v=>{r.brk=Math.max(0,Number(v)||0);}); bind("st-slot",v=>{r.slot=v;}); bind("st-note",v=>{r.note=v;});
+    tr.querySelector(".st-cat").addEventListener("change",()=>renderShiftTbl());
+    const mv=dir=>{ const vis=[]; shiftTbl.forEach((x,k)=>{ if(!cs.value||x.cat===cs.value)vis.push(k); }); const pos=vis.indexOf(shiftTbl.indexOf(r)), to=pos+dir; if(to<0||to>=vis.length)return;
+      const a=vis[pos], b=vis[to]; [shiftTbl[a],shiftTbl[b]]=[shiftTbl[b],shiftTbl[a]]; shiftTblSave(); renderShiftTbl();
+      const row=document.querySelector(`#stTable tbody tr[data-i="${b}"]`); if(row)row.scrollIntoView({block:"nearest"}); }; // 区分で絞り込み中は、見えている行の中で入れ替える
+    tr.querySelector(".st-up").onclick=()=>mv(-1); tr.querySelector(".st-dn").onclick=()=>mv(1);
+    tr.querySelector(".st-del").onclick=()=>showConfirm(`「${r.code||"(記号なし)"}」の行を削除しますか？`,()=>{shiftTbl=shiftTbl.filter(x=>x!==r);shiftTblSave();renderShiftTbl();});
+  });
+}
+$("#stAdd").onclick=()=>{ if(!shiftTbl)shiftTbl=shiftTblLoad(); shiftTbl.push({id:uid(),cat:$("#stCat").value||"常勤",code:"",s:"",e:"",nx:0,brk:0,slot:"",note:""}); shiftTblSave(); renderShiftTbl(); const rows=document.querySelectorAll("#stTable tbody tr[data-i]"), last=rows[rows.length-1]; if(last){last.scrollIntoView({block:"center"}); const c=last.querySelector(".st-code"); if(c)c.focus();} };
+$("#stReset").onclick=()=>showConfirm("勤務時間設定一覧を、標準の内容に戻します。いまの修正は消えます。よろしいですか？",()=>{shiftTbl=shiftTblSeed();shiftTblSave();renderShiftTbl();});
+$("#stCsv").onclick=()=>{ const q=v=>{v=String(v==null?"":v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}; const f=v=>{const m=hmToMin(v);return m==null?"":Math.floor(m/60)+":"+String(m%60).padStart(2,"0");};
+  const lines=[["区分","記号","開始","終了","終了の日","拘束時間（時間）","休憩（分）","休憩の時間枠","実働時間（時間）","備考"]].concat((shiftTbl||shiftTblLoad()).map(r=>{const c=shiftTblCalc(r); return [r.cat,r.code,f(r.s),f(r.e),c?(r.nx?"翌日":"当日"):"",c?fmtH(c.kosoku):"",c?(r.brk||0):"",r.slot,c?fmtH(c.jitsu):"",r.note];}));
+  const blob=new Blob(["﻿"+lines.map(l=>l.map(q).join(",")).join("\r\n")+"\r\n"],{type:"text/csv;charset=utf-8"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="勤務時間設定一覧.csv"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); };
+$("#stgShiftTbl").onclick=()=>{ if(ROLE!=="admin")return; shiftTbl=null; renderShiftTbl(); openModal("#shiftTblOverlay"); };
 $("#stgOffAll").onclick=()=>{renderOffAll();openModal("#offAllOverlay");};
 $("#stgPass").onclick=()=>{renderUserList();renderPasscodeList();openModal("#passOverlay");};
 
