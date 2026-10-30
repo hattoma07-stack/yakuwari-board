@@ -66,6 +66,7 @@
   .gate[hidden]{display:none}
   .gate-top{display:flex;align-items:center;gap:10px;font-size:22px;font-weight:800;letter-spacing:.04em;color:var(--gate-ink)}
   #gatePassBack[hidden]{display:none}
+  #gateGoogleBox.step1 .gate-lbl,#gateGoogleBox.step1 #gatePassInput{display:none} /* 最初はGoogleログインだけ。パスコード欄は、ログイン後に出す */
   .gate-logo{width:36px;height:36px;border-radius:10px;background:var(--accent-soft);display:grid;place-items:center}
   .gate-logo .gi{width:24px;height:24px}
   .gi{width:68px;height:68px;fill:none;stroke:var(--gate-ink);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
@@ -494,8 +495,8 @@
     <div class="gate-art gate-art-l" aria-hidden="true"><svg class="gi"><use href="#ic-heart"/></svg><svg class="gi"><use href="#ic-clip"/></svg><svg class="gi"><use href="#ic-steth"/></svg><svg class="gi"><use href="#ic-bed"/></svg><svg class="gi"><use href="#ic-mask"/></svg><svg class="gi"><use href="#ic-pill"/></svg></div>
     <form class="gate-card" id="gateForm" onsubmit="return false">
       <h1>ログイン</h1>
-      <div id="gateGoogleBox">
-        <p class="gate-lead" id="gatePassWho">登録されたGoogleアカウントと、パスコードで、ログインします。</p>
+      <div id="gateGoogleBox" class="step1">
+        <p class="gate-lead" id="gatePassWho">登録されたGoogleアカウントで、ログインします。</p>
         <label class="gate-lbl" for="gatePassInput">パスコード</label>
         <input type="password" id="gatePassInput" inputmode="numeric" placeholder="パスコードを入力" autocomplete="off">
         <button type="button" class="btn primary gate-go" id="gateEnter">Googleでログイン</button>
@@ -2345,14 +2346,14 @@ async function tryUnlock(role,hash){
   }catch(e){ if(e&&e.code==="permission-denied")return false; throw e; }
 }
 function showPassStep(u){ // Googleのログイン後、パスコードが合わなかった（または未入力だった）とき
-  pendingUser=u;
+  pendingUser=u; $("#gateGoogleBox").classList.remove("step1");
   $("#gatePassWho").innerHTML=`<b class="gate-dept"></b>のパスコードを入力して、「ログイン」を押してください。<br><span class="gate-who"></span>`;
   $("#gatePassWho .gate-dept").textContent=ROLE_LABEL[u.role]; $("#gatePassWho .gate-who").textContent=u.email+" でログイン中";
   $("#gateEnter").textContent="ログイン"; $("#gatePassBack").hidden=false;
   $("#gatePassInput").value=""; setTimeout(()=>$("#gatePassInput").focus(),50);
 }
 function showGoogleStep(){
-  pendingUser=null; $("#gatePassWho").textContent="登録されたGoogleアカウントと、パスコードで、ログインします。";
+  pendingUser=null; $("#gatePassWho").textContent="登録されたGoogleアカウントで、ログインします。"; $("#gateGoogleBox").classList.add("step1");
   $("#gateEnter").textContent="Googleでログイン"; $("#gatePassBack").hidden=true;
 }
 const WRONG_PASS="パスコードが違います";
@@ -2367,13 +2368,13 @@ async function unlockWithTyped(email,role,typed,fromSaved){
 }
 async function finishPass(email,role){
   const rem=lockRemain(); if(rem>0){ gateMsg(lockMsg(rem)); return false; }
-  const typed=$("#gatePassInput").value.trim();
+  const typed=$("#gatePassInput").value.trim(), firstTry=!pendingUser; // firstTry＝Googleログイン直後（まだパスコード欄を見せていない）
   let saved=null; try{ const o=JSON.parse(sessGet("yakuwari:gate:passok")||"null"); if(o&&o.e===email)saved=o.h; }catch(e){}
   let ok=false;
   try{ ok=await unlockWithTyped(email,role,typed,saved); }
   catch(e){ gateMsg("確認できませんでした。ネットワークを確認して、もう一度お試しください。"); return false; }
   if(ok){ lockClear(); showGoogleStep(); await enterApp(email,role); return true; }
-  if(typed!==""){ const l=lockFail(); gateMsg(l>0?lockMsg(l):WRONG_PASS); } else gateMsg("パスコードを入力してください");
+  if(typed!==""){ const l=lockFail(); gateMsg(l>0?lockMsg(l):WRONG_PASS); } else if(!firstTry)gateMsg("パスコードを入力してください");
   showPassStep({email,role}); return false;
 }
 $("#gatePassInput").addEventListener('keydown',e=>{if(e.key==="Enter")attemptLogin();});
