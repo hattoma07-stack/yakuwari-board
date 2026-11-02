@@ -721,6 +721,7 @@
   <div class="modal-body">
     <div class="mlabel">この日だけの勤務時間（通常：<span id="timeEditUsual"></span>）</div>
     <div id="timeEditSel" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"></div>
+    <div id="timeEditBrk" style="margin-top:12px"></div>
   </div>
   <div class="modal-foot"><button class="btn" id="timeEditReset">通常に戻す</button><button class="btn primary" id="timeEditSave">決定</button></div>
 </div></div>
@@ -1274,10 +1275,15 @@ function timePartSelects(prefix,cur){ const c=snapHalfHour(cur), [ch,cm]=c?c.spl
 function halfHourOpts(cur){ const c=snapHalfHour(cur); let o=`<option value=""${c?"":" selected"}>--:--</option>`;
   for(let h=0;h<24;h++)for(const m of ["00","30"]){const v=String(h).padStart(2,"0")+":"+m; o+=`<option value="${v}"${v===c?" selected":""}>${v}</option>`;} return o; }
 // その日だけの勤務時間変更（非常勤）。通常と違う項目だけをマスに小さく表示
+// その日だけの時間変更（と休憩の選択）を反映したスタッフ。記号の決定に使う
+const staffOfDay=(s,o)=>({...s,workTime:{s:(o&&o.s)||(s.workTime||{}).s||"",e:(o&&o.e)||(s.workTime||{}).e||""},breakYes:(o&&o.by!=null)?o.by:s.breakYes,breakLong:(o&&o.bl!=null)?o.bl:s.breakLong});
 function timeMark(s,d,e){ const o=(S.rtime[s.id]||{})[d]; if(!o||!e.work)return"";
   const u=s.workTime||{}, f=t=>t?t.replace(/^0/,""):"";
-  if(!((o.s&&o.s!==u.s)||(o.e&&o.e!==u.e)))return"";
+  const brkChg=(o.by!=null&&o.by!==s.breakYes)||(o.bl!=null&&o.bl!==s.breakLong);
+  if(!((o.s&&o.s!==u.s)||(o.e&&o.e!==u.e)||brkChg))return"";
   const st=o.s||u.s, en=o.e||u.e; // 開始〜終了をそろえて表示（変更していない側は通常の時刻）
+  const sym=(st&&en)?partSymbolOf(staffOfDay(s,o)):null; // 変更後の時間と休憩に合う記号（A6・B7・P4など）。休憩の選択が済んでいないときなどで決まらなければ、時間を出す
+  if(sym)return `<span class="ps" style="font-size:${sym.length<=2?11:sym.length===3?10:sym.length<=5?9:5.5}px">${escapeHtml(sym)}</span>`;
   return `<span class="tm">${f(st)}〜<br>${f(en)}</span>`; }
 let timeEditCtx=null;
 function openTimeEdit(sid,day){
@@ -1293,14 +1299,29 @@ function openTimeEdit(sid,day){
   ["te-s","te-e"].forEach(p=>{const h=root.querySelector('.'+p+'-h'), m=root.querySelector('.'+p+'-m');
     h.onchange=()=>{if(h.value&&!m.value)m.value="00"; if(!h.value)m.value="";};
     m.onchange=()=>{if(m.value&&!h.value)m.value="";}; });
+  const o0=(S.rtime[sid]||{})[day]||{}; timeEditCtx.brk={by:o0.by!=null?o0.by:(s.breakYes!=null?s.breakYes:null),bl:o0.bl!=null?o0.bl:(s.breakLong!=null?s.breakLong:null)};
+  ["te-s","te-e"].forEach(p=>{ ["h","m"].forEach(k=>{ const el=root.querySelector('.'+p+'-'+k), prev=el.onchange; el.onchange=()=>{prev&&prev(); renderTimeBrk();}; }); });
+  renderTimeBrk();
   openModal("#timeEditOverlay");
 }
+// 時間変更の休憩の選択（6時間・6.5時間は あり／なし、7時間以上は 45分／1時間）
+function renderTimeBrk(){ const box=$("#timeEditBrk"), c=timeEditCtx; if(!c)return; const s=staffById(c.sid), a=readTimeEdit("te-s"), b=readTimeEdit("te-e");
+  const tmp={...s,workTime:{s:a||(s.workTime||{}).s||"",e:b||(s.workTime||{}).e||""}}, kind=partBreakKind(tmp);
+  if(!kind){ box.innerHTML=""; return; }
+  const yn=kind==="yn", key=yn?"by":"bl", cur=c.brk[key], lb="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px", ck="width:18px;height:18px;accent-color:var(--accent)";
+  box.innerHTML=`<div class="mlabel">${yn?"休憩（6時間・6.5時間の勤務）":"休憩（7時間以上の勤務）"}</div><div style="display:flex;gap:16px;flex-wrap:wrap">
+    <label style="${lb}"><input type="checkbox" class="teb-a"${cur===(yn?true:false)?" checked":""} style="${ck}">${yn?"休憩あり":"45分"}</label>
+    <label style="${lb}"><input type="checkbox" class="teb-b"${cur===(yn?false:true)?" checked":""} style="${ck}">${yn?"休憩なし":"1時間"}</label></div>`;
+  const A=box.querySelector('.teb-a'), B=box.querySelector('.teb-b');
+  A.onchange=()=>{ if(A.checked)B.checked=false; c.brk[key]=A.checked?(yn?true:false):(B.checked?(yn?false:true):null); };
+  B.onchange=()=>{ if(B.checked)A.checked=false; c.brk[key]=B.checked?(yn?false:true):(A.checked?(yn?true:false):null); }; }
 function readTimeEdit(p){const root=$("#timeEditSel"),h=root.querySelector('.'+p+'-h').value,m=root.querySelector('.'+p+'-m').value;return h?h+":"+(m||"00"):"";}
 function commitTimeEdit(clear){
   if(!timeEditCtx)return; pushUndo(); const {sid,day}=timeEditCtx, s=staffById(sid), u=s.workTime||{};
   if(!S.rtime[sid])S.rtime[sid]={};
   const a=clear?"":readTimeEdit("te-s"), b=clear?"":readTimeEdit("te-e");
-  if(clear||(!a&&!b)||(a===(u.s||"")&&b===(u.e||"")))delete S.rtime[sid][day]; else S.rtime[sid][day]={s:a,e:b};
+  const bk=(timeEditCtx.brk)||{}, by=(bk.by!=null&&bk.by!==s.breakYes)?bk.by:null, bl=(bk.bl!=null&&bk.bl!==s.breakLong)?bk.bl:null; // 休憩の選択が、台帳の設定と違うときだけ保存
+  if(clear||((!a&&!b)||(a===(u.s||"")&&b===(u.e||"")))&&by==null&&bl==null)delete S.rtime[sid][day]; else { const o={s:a,e:b}; if(by!=null)o.by=by; if(bl!=null)o.bl=bl; S.rtime[sid][day]=o; }
   saveRoster();renderRoster();closeModal("#timeEditOverlay");timeEditCtx=null;
   toast(clear?"通常の勤務時間に戻しました":"この日の勤務時間を設定しました");
 }
@@ -2800,7 +2821,7 @@ function kotTimes(f,s,code,half,tm,shiftTimes){
   if(f==="day"&&s.job==="drv"&&["日","出"].includes(code)){ const sym=partSymbolOf(s); return sym?mk(kotRowOf(sym,c=>c==="ドライバー")):{err:"ドライバーの勤務時間帯（朝夕・朝のみ・夕のみ）が未設定です"}; } // ドライバー：台帳で選んだ朝夕・朝のみ・夕のみ
   const isPart=isPartTimeType(typeById(s.typeId)), w0=s.workTime;
   if(isPart&&["日","出","早","遅","夜"].includes(code)&&w0&&w0.s&&w0.e){ // 非常勤：台帳の勤務時間（その日だけの時間変更を含む）から記号を決め、一覧の休憩を使う
-    const w={s:(tm&&tm.s)||w0.s,e:(tm&&tm.e)||w0.e}, sym=partSymbolOf({...s,workTime:w}), r=sym&&kotRowOf(sym,c=>/^非常勤/.test(c));
+    const w={s:(tm&&tm.s)||w0.s,e:(tm&&tm.e)||w0.e}, sym=partSymbolOf(staffOfDay(s,tm)), r=sym&&kotRowOf(sym,c=>/^非常勤/.test(c));
     return r?mk(r,w):{st:normHM(w.s),en:normHM(w.e),bs:"",be:""}; }
   if(isPart&&["日","出"].includes(code))return {err:"非常勤の勤務時間が未設定です"};
   if(f==="kitchen"&&["早","日","遅"].includes(code))return mk(kotRowOf(code,c=>c==="厨房"));
