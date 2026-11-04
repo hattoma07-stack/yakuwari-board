@@ -1385,6 +1385,10 @@ function partSymbolOf(s){
   if(rows.length)return rows[0].code;
   return "P"+fmtH(d); // 一覧にない時間は、勤務時間（時間数）から P2・P4・P3.5 のように自動で付ける
 }
+// 台帳の「勤務表に出る記号」に添える、実働時間（勤務時間設定一覧の休憩を引いた時間）。例：C6（実働6時間）
+function symActualText(s){ const sym=partSymbolOf(s); if(!sym)return""; const row=shiftTblLoad().find(r=>r.code===sym&&/^非常勤/.test(r.cat||"")); let h=null;
+  if(row){ const c=shiftTblCalc(row); if(c)h=c.jitsu; } else { h=partDurHours(s); } // 一覧にない記号（P3.5など）は、休憩なしの勤務時間
+  return h==null?"":`（実働${fmtH(h)}時間）`; }
 // 希望休は勤務表に赤い「公」で表示（印刷・PDFでも赤）
 const WISH_RED="#C62828";
 const isWishStatus=st=>!!(st&&(st.code==="希"||/希望/.test(st.label||"")));
@@ -1951,7 +1955,7 @@ function renderStaffList(){
         return `<div class="line2"><div class="fl"><span>${yn?"休憩（6時間・6.5時間の勤務）":"休憩（7時間以上の勤務）"}</span>
           <div style="display:flex;gap:16px;flex-wrap:wrap"><label class="wk" style="${lb}"><input type="checkbox" class="brk-a" data-k="${yn?"breakYes":"breakLong"}" data-v="${yn?"1":"0"}"${cur===(yn?true:false)?" checked":""} style="${ck}">${yn?"休憩あり":"45分"}</label>
           <label class="wk" style="${lb}"><input type="checkbox" class="brk-b" data-k="${yn?"breakYes":"breakLong"}" data-v="${yn?"0":"1"}"${cur===(yn?false:true)?" checked":""} style="${ck}">${yn?"休憩なし":"1時間"}</label></div></div></div>`; })():""}
-      ${partDurHours(s)!=null?`<div class="line2"><div style="font-size:12px;color:var(--ink-soft)">勤務表に出る記号：<b>${partSymbolOf(s)?escapeHtml(partSymbolOf(s)):"該当なし"}</b>${partNeedsBreakChoice(s)&&!partSymbolOf(s)?(partBreakKind(s)==="yn"?"（休憩あり・なしを選ぶと決まります）":"（45分・1時間を選ぶと決まります）"):""}</div></div>`:""}`}
+      ${partDurHours(s)!=null?`<div class="line2"><div style="font-size:12px;color:var(--ink-soft)">勤務表に出る記号：<b>${partSymbolOf(s)?escapeHtml(partSymbolOf(s))+escapeHtml(symActualText(s)):"該当なし"}</b>${partNeedsBreakChoice(s)&&!partSymbolOf(s)?(partBreakKind(s)==="yn"?"（休憩あり・なしを選ぶと決まります）":"（45分・1時間を選ぶと決まります）"):""}</div></div>`:""}`}
       <div class="line2">
         <div class="fl" style="flex:1"><span>勤務できる曜日</span>
           <div class="seg wdseg">${DOW.map((w,i)=>`<button class="segbtn" data-wd="${i}" aria-pressed="${!s.workDays||s.workDays.includes(i)}">${w}</button>`).join("")}${holidaySetOn(s)?`<button class="segbtn" data-hol="1" title="祝日・祭日に出勤できる" aria-pressed="${holidayOkOf(s)}">祝</button>`:""}</div></div>
