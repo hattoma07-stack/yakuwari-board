@@ -1411,6 +1411,9 @@ const offTable=()=>jget(K.offtable,{})||{};
 const NO_OFF_TABLE=["support"]; // 年間休日を設けない部署（サポート：別会社のため）。休日数の目標・赤の表示は、なし
 function monthOffOf(fac,ym){ if(NO_OFF_TABLE.includes(fac))return null; const arr=offTable()[fac]; const v=arr?arr[Number(ym.split("-")[1])-1]:undefined; if(v===undefined)return DEF_OFF_MONTH; return (v===null||v==="")?null:Number(v); }
 function staffTarget(s){ const t=typeById(s.typeId); if(isPartTimeType(t))return null; return monthOffOf(FSCOPE,S.ym); }
+// 早番・遅番が可能か（訪問介護・看護）。台帳で選んでいなければ、月給は可能、契約・時給は不可
+const canEarlyOf=s=>(s.canEarly===undefined||s.canEarly===null)?!isPartTimeType(typeById(s.typeId)):!!s.canEarly;
+const canLateOf=s=>(s.canLate===undefined||s.canLate===null)?!isPartTimeType(typeById(s.typeId)):!!s.canLate;
 function typeName(s){const t=typeById(s.typeId);return t?t.name:"";}
 // 勤務時間帯（ドライバー等）: s.hours=null→終日 / {am:{s,e}|null, pm:{s,e}|null}
 const AM_DEF={s:"08:00",e:"10:00"}, PM_DEF={s:"16:00",e:"18:00"};
@@ -1924,10 +1927,10 @@ function renderStaffList(){
         <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="drive-in" ${s.canDrive?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">送迎が可能（勤務表で「送迎職員」に数えます）</label>${s.canDrive?`
         <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="hiace-in" ${s.canHiace?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">ハイエースが運転　可能</label>`:""}
       </div>`:""}
-      ${nightDeptOn()?`<div class="line2">${typeName(s)==="契約"?`
-        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="early-can" ${s.canEarly?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">早番が可能（自動作成で早番を割り振る対象になります）</label>
-        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;margin-top:6px"><input type="checkbox" class="late-can" ${s.canLate?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">遅番が可能（自動作成で遅番を割り振る対象になります）</label>`:""}
-        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px${typeName(s)==="契約"?";margin-top:6px":""}"><input type="checkbox" class="night-can" ${s.canNight?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">夜勤が可能（自動作成で夜勤を割り振る対象になります）</label>${(s.canNight||s.nightOnly)?`
+      ${nightDeptOn()?`<div class="line2">
+        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="early-can" ${canEarlyOf(s)?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">早番が可能（自動作成で早番を割り振る対象になります）</label>
+        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;margin-top:6px"><input type="checkbox" class="late-can" ${canLateOf(s)?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">遅番が可能（自動作成で遅番を割り振る対象になります）</label>
+        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;margin-top:6px"><input type="checkbox" class="night-can" ${s.canNight?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">夜勤が可能（自動作成で夜勤を割り振る対象になります）</label>${(s.canNight||s.nightOnly)?`
         <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;margin-top:6px"><input type="checkbox" class="night-only" ${s.nightOnly?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">夜勤のみ（夜勤だけに入り、夜勤以外の日は休みにします）</label>`:""}${(s.canNight||s.nightOnly)?`
         <label style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;margin-top:6px">月の夜勤回数
           <input type="number" class="night-cnt" min="0" max="31" placeholder="指定なし" value="${s.nightCount==null?'':s.nightCount}" style="width:84px;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:5px 8px">回</label>`:""}
@@ -2448,7 +2451,7 @@ $("#doAuto").onclick=()=>{
       const cnt={}; S.staff.forEach(s=>{cnt[s.id]={"早":0,"遅":0};for(let d=1;d<=nd;d++){const c=S.roster[s.id][d];if(c==="早"||c==="遅")cnt[s.id][c]++;}});
       for(let d=1;d<=nd;d++){
         const pool=S.staff.filter(s=>S.roster[s.id][d]===wcode&&(S.rauto[s.id]||{})[d]);
-        const elig=(s,code)=>!isPartTimeType(typeById(s.typeId))||(code==="早"?!!s.canEarly:!!s.canLate); // 契約・時給は、台帳で「早番可能」「遅番可能」にチェックした人だけ
+        const elig=(s,code)=>code==="早"?canEarlyOf(s):canLateOf(s); // 台帳の「早番が可能」「遅番が可能」にチェックした人だけ（未選択のときは、月給は可能、契約・時給は不可）
         const have=c=>S.staff.filter(s=>S.roster[s.id][d]===c).length;
         const pick=(code,need,other)=>{ while(need>0){
           if(!pool.some(s=>elig(s,code))){(code==="早"?shortE:shortL).push(d);return;}
