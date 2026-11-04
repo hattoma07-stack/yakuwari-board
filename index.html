@@ -1960,7 +1960,7 @@ function renderStaffList(){
         <div class="fl" style="flex:1"><span>勤務時間帯（ドライバー）</span><div class="seg hseg">${hbtns}</div></div>
       </div>`:""}
       ${hdetail}
-      ${FSCOPE==="kitchen"?`<div class="line2"><label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="rd-in" ${s.rdQual?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">管理栄養士（資格あり）</label></div>`:""}
+      ${FSCOPE==="kitchen"?`<div class="line2"><label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="rd-in" ${s.rdQual?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">管理栄養士</label></div>`:""}
       ${(!isDrv&&!isPartTimeType(typeById(s.typeId))&&(FSCOPE==="home"||FSCOPE==="nursing"))?`<div class="line2"><div class="fl"><span>日勤の開始時間（KOT用）</span>
         <div style="display:flex;gap:16px;flex-wrap:wrap"><label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="ds-a"${s.dayStart==="09:00"?"":" checked"} style="width:18px;height:18px;accent-color:var(--accent)">8:30（日勤A　8:30〜17:30）</label>
         <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="ds-b"${s.dayStart==="09:00"?" checked":""} style="width:18px;height:18px;accent-color:var(--accent)">9:00（日勤B　9:00〜18:00）</label></div></div></div>`:""}`;
