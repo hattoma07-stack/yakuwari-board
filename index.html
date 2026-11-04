@@ -1358,7 +1358,10 @@ function commitTimeEdit(clear){
 // 非常勤の勤務時間帯を氏名の下に表示（例：8:00〜14:30）
 // 非常勤の「勤務できる曜日」。未設定（null）なら制限なし
 const DOW_JP=["日","月","火","水","木","金","土"];
-function workDayOk(s,d){ if(!s.workDays||!isPartTimeType(typeById(s.typeId)))return true; return s.workDays.includes(dow(S.ym,d)); }
+// 祝日・祭日に出勤できるか（契約・時給）。台帳の「祝」で決める。未設定は、出勤できる
+const holidaySetOn=s=>["契約","時給"].includes(typeName(s));
+const holidayOkOf=s=>s.holOk!==false;
+function workDayOk(s,d){ if(holidaySetOn(s)&&!holidayOkOf(s)&&jpHoliday(S.ym,d))return false; if(!s.workDays||!isPartTimeType(typeById(s.typeId)))return true; return s.workDays.includes(dow(S.ym,d)); }
 function workTimeLabel(s){ const w=s.workTime; if(!w||!(w.s||w.e)||!isPartTimeType(typeById(s.typeId)))return"";
   const f=t=>t?t.replace(/^0/,""):""; return `<div class="wt">${f(w.s)}〜${f(w.e)}</div>`; }
 // 非常勤の勤務時間（台帳）から、勤務時間設定一覧の記号（A6・B4.5・P2 など）を求める。
@@ -1405,7 +1408,7 @@ function jpHolidays(y){ if(JPH[y])return JPH[y]; const h={}, add=(m,d,n)=>{h[m+"
   return JPH[y]=h; }
 const jpHoliday=(ym,day)=>{ const [y,m]=ym.split("-").map(Number); return jpHolidays(y)[m+"-"+day]||""; };
 const holidayOffMap=()=>jget(K.holidayoff,{})||{};
-const holidayClosed=(ym,day)=>!!holidayOffMap()[FSCOPE]&&!!jpHoliday(ym,day); // その部署が「祝日を休業日にする」で、その日が祝日
+const holidayClosed=(ym,day)=>false; // 祝日は、シフト上で、自動では休みにしない。出勤できるかは、スタッフ台帳（契約・時給）の「祝」で決める
 const DEF_OFF_MONTH=9;
 const offTable=()=>jget(K.offtable,{})||{};
 const NO_OFF_TABLE=["support"]; // 年間休日を設けない部署（サポート：別会社のため）。休日数の目標・赤の表示は、なし
@@ -1949,7 +1952,7 @@ function renderStaffList(){
       ${partDurHours(s)!=null?`<div class="line2"><div style="font-size:12px;color:var(--ink-soft)">勤務表に出る記号：<b>${partSymbolOf(s)?escapeHtml(partSymbolOf(s)):"該当なし"}</b>${partNeedsBreakChoice(s)&&!partSymbolOf(s)?(partBreakKind(s)==="yn"?"（休憩あり・なしを選ぶと決まります）":"（45分・1時間を選ぶと決まります）"):""}</div></div>`:""}`}
       <div class="line2">
         <div class="fl" style="flex:1"><span>勤務できる曜日</span>
-          <div class="seg wdseg">${DOW.map((w,i)=>`<button class="segbtn" data-wd="${i}" aria-pressed="${!s.workDays||s.workDays.includes(i)}">${w}</button>`).join("")}</div></div>
+          <div class="seg wdseg">${DOW.map((w,i)=>`<button class="segbtn" data-wd="${i}" aria-pressed="${!s.workDays||s.workDays.includes(i)}">${w}</button>`).join("")}${holidaySetOn(s)?`<button class="segbtn" data-hol="1" title="祝日・祭日に出勤できる" aria-pressed="${holidayOkOf(s)}">祝</button>`:""}</div></div>
       </div>`:""}
       ${(FSCOPE==="day"&&(s.job==="drv"||s.hours))?`<div class="line2">
         <div class="fl" style="flex:1"><span>勤務時間帯（ドライバー）</span><div class="seg hseg">${hbtns}</div></div>
@@ -1990,6 +1993,7 @@ function renderStaffList(){
       row.querySelector('.hs').onchange=e=>{s.hours[band].s=e.target.value;saveStaff();if(S.tab==="board")renderBoard();};
       row.querySelector('.he').onchange=e=>{s.hours[band].e=e.target.value;saveStaff();if(S.tab==="board")renderBoard();};});
     card.querySelectorAll('.wdseg .segbtn').forEach(b=>b.onclick=()=>{ // 勤務できる曜日の切り替え（全曜日＝制限なし）
+      if(b.dataset.hol){ s.holOk=!holidayOkOf(s); saveStaff(); renderStaffList(); if(S.tab==="roster")renderRoster(); return; } // 祝日・祭日に出勤できるか
       const wd=+b.dataset.wd; let cur=s.workDays?s.workDays.slice():[0,1,2,3,4,5,6];
       if(cur.includes(wd)){ if(cur.length===1){toast("勤務できる曜日を、1つ以上選んでください");return;} cur=cur.filter(x=>x!==wd); } else cur.push(wd);
       cur.sort((a,c)=>a-c); s.workDays=cur.length===7?null:cur; saveStaff(); renderStaffList(); if(S.tab==="roster")renderRoster(); });
@@ -2780,11 +2784,9 @@ $("#userAdd").onclick=async ()=>{
 function renderHolidayBox(){ const box=$("#holBox"), map=holidayOffMap(), yNow=new Date().getFullYear(); const ysel=box.dataset.y||String(yNow);
   const ys=[yNow-1,yNow,yNow+1,yNow+2], hs=jpHolidays(Number(ysel)), keys=Object.keys(hs).sort((a,b)=>{const [am,ad]=a.split("-").map(Number),[bm,bd]=b.split("-").map(Number);return am*100+ad-(bm*100+bd);});
   const dw=k=>{const [m,d]=k.split("-").map(Number);return DOW[new Date(Number(ysel),m-1,d).getDay()];};
-  box.innerHTML=`<div style="font-size:13px;font-weight:700;margin:4px 0 6px">祝日を休業日にする部署（チェックした部署は、祝日が、全員の公休になります）</div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px 18px;margin-bottom:12px">${ALL_FACILITIES.map(f=>`<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700"><input type="checkbox" class="hol-f" data-f="${f}"${map[f]?" checked":""} style="width:18px;height:18px;accent-color:var(--accent)">${FACILITY_ICON[f]} ${escapeHtml(FACILITY_NAME[f])}</label>`).join("")}</div>
+  box.innerHTML=`<div style="font-size:12.5px;color:var(--ink-soft);margin:2px 0 10px">祝日は、シフトで、自動では休みになりません。祝日・祭日に出勤できるかは、スタッフ台帳（契約・時給）の、曜日の隣の「祝」で、1人ずつ設定します。祝日の列は、勤務表で、日曜と同じ色で出ます。</div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:13px;font-weight:700">祝日の一覧</span><select id="holYear" style="font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink)">${ys.map(y=>`<option value="${y}"${String(y)===ysel?" selected":""}>${y}年</option>`).join("")}</select></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:2px 16px;font-size:12.5px">${keys.map(k=>{const [m,d]=k.split("-");return `<div style="display:flex;gap:8px"><span style="min-width:74px;font-variant-numeric:tabular-nums">${m}月${d}日（${dw(k)}）</span><span>${escapeHtml(hs[k])}</span></div>`;}).join("")}</div>`;
-  box.querySelectorAll(".hol-f").forEach(c=>c.onchange=()=>{ const m={...holidayOffMap()}; m[c.dataset.f]=c.checked; jset(K.holidayoff,m); if(S.tab==="roster")renderRoster(); });
   $("#holYear").onchange=e=>{ box.dataset.y=e.target.value; renderHolidayBox(); }; }
 function renderOffAll(){
   renderHolidayBox();
