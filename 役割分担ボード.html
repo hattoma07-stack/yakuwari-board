@@ -699,6 +699,14 @@
           <button class="btn" id="stgOffAll">編集する</button>
         </div>
         <div class="setting-card">
+          <div class="sc-icon">💾</div>
+          <div class="sc-body">
+            <h3>データのバックアップ（全部署）</h3>
+            <p>スタッフ台帳・勤務表・予定・設定を、1つのファイルに書き出します。万一、データが消えたときは、このファイルから復元できます。更新の前や、月末に、書き出しておくと安心です。</p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="stgBackup">書き出す</button><button class="btn" id="stgRestore">復元する</button><input type="file" id="restoreFile" accept="application/json,.json" hidden></div>
+        </div>
+        <div class="setting-card">
           <div class="sc-icon">🔑</div>
           <div class="sc-body">
             <h3>ログインできる人とパスコード</h3>
@@ -1260,7 +1268,8 @@ function loadMasters(){
   { const nt=normTypes(S.types); if(JSON.stringify(nt)!==JSON.stringify(S.types)){ S.types=nt; jset(K.types,S.types); } else S.types=nt; } // 雇用形態の名前を、月給・契約・時給にそろえる
   if(!S.roles) S.roles=JSON.parse(JSON.stringify(DEF_ROLES));
   if(!S.staff){
-    S.staff=["佐藤","鈴木","高橋","田中","渡辺"].map((n,i)=>({id:uid(),name:n,color:STAFF_COLORS[i],typeId:S.types[0].id,off:null}));
+    // ログイン中（クラウドと同期する本番）は、見本のスタッフを作らず、空の台帳から始める。見本の名前が、実データと混ざるのを防ぐ
+    S.staff=SYNC_ON?[]:["佐藤","鈴木","高橋","田中","渡辺"].map((n,i)=>({id:uid(),name:n,color:STAFF_COLORS[i],typeId:S.types[0].id,off:null}));
     seeded=false;
   }
   // migrate: ensure typeId / hours / task duration
@@ -1389,7 +1398,8 @@ const holidayOffMap=()=>jget(K.holidayoff,{})||{};
 const holidayClosed=(ym,day)=>!!holidayOffMap()[FSCOPE]&&!!jpHoliday(ym,day); // その部署が「祝日を休業日にする」で、その日が祝日
 const DEF_OFF_MONTH=9;
 const offTable=()=>jget(K.offtable,{})||{};
-function monthOffOf(fac,ym){ const arr=offTable()[fac]; const v=arr?arr[Number(ym.split("-")[1])-1]:undefined; if(v===undefined)return DEF_OFF_MONTH; return (v===null||v==="")?null:Number(v); }
+const NO_OFF_TABLE=["support"]; // 年間休日を設けない部署（サポート：別会社のため）。休日数の目標・赤の表示は、なし
+function monthOffOf(fac,ym){ if(NO_OFF_TABLE.includes(fac))return null; const arr=offTable()[fac]; const v=arr?arr[Number(ym.split("-")[1])-1]:undefined; if(v===undefined)return DEF_OFF_MONTH; return (v===null||v==="")?null:Number(v); }
 function staffTarget(s){ const t=typeById(s.typeId); if(isPartTimeType(t))return null; return monthOffOf(FSCOPE,S.ym); }
 function typeName(s){const t=typeById(s.typeId);return t?t.name:"";}
 // 勤務時間帯（ドライバー等）: s.hours=null→終日 / {am:{s,e}|null, pm:{s,e}|null}
@@ -2761,7 +2771,7 @@ function renderOffAll(){
   renderHolidayBox();
   const tb=$("#offTable"); const tbl=offTable();
   let h='<tr><th style="text-align:left;padding:4px 6px">部署</th>'+Array.from({length:12},(_,m)=>`<th style="padding:4px 2px">${m+1}月</th>`).join("")+'<th style="padding:4px 6px">年間</th></tr>';
-  ALL_FACILITIES.forEach(f=>{ const arr=tbl[f]||[]; let tot=0;
+  ALL_FACILITIES.filter(f=>!NO_OFF_TABLE.includes(f)).forEach(f=>{ const arr=tbl[f]||[]; let tot=0;
     h+=`<tr data-f="${f}"><td style="padding:4px 6px;font-weight:700;white-space:nowrap">${escapeHtml(FACILITY_NAME[f])}</td>`+Array.from({length:12},(_,m)=>{ const v=arr[m]===undefined?DEF_OFF_MONTH:arr[m]; tot+=Number(v)||0;
       return `<td style="padding:2px"><input type="number" min="0" max="31" data-m="${m}" value="${v??""}" style="width:44px;font:inherit;text-align:center;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:6px;padding:4px 2px"></td>`; }).join("")+`<td class="offtot" style="padding:4px 6px;text-align:center;font-weight:700">${tot}</td></tr>`; });
   tb.innerHTML=h;
@@ -2926,6 +2936,19 @@ $("#kotMonth").onchange=renderKot;
 $("#kotGo").onclick=()=>{ if(!kotCur||!kotCur.rows.length)return; const q=v=>{v=String(v==null?"":v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
   const lines=($("#kotHead").checked?[["勤務日","従業員コード","勤務開始時刻","勤務終了時刻","休憩開始予定","休憩終了予定"]]:[]).concat(kotCur.rows);
   const blob=new Blob(["﻿"+lines.map(l=>l.map(q).join(",")).join("\r\n")+"\r\n"],{type:"text/csv;charset=utf-8"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`KOT取込用_${$("#kotMonth").value}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); };
+
+// ---- 管理者：データのバックアップと復元（全部署の保存データを1つのファイルに） ----
+const backupKeys=()=>{ const ks=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(syncable(k))ks.push(k); } return ks.sort(); };
+$("#stgBackup").onclick=()=>{ if(ROLE!=="admin")return; const data={}; backupKeys().forEach(k=>{ try{ data[k]=JSON.parse(localStorage.getItem(k)); }catch(e){} });
+  const blob=new Blob([JSON.stringify({app:"CareRhythm",version:1,savedAt:new Date().toISOString(),data},null,1)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); const d=new Date(); a.download=`CareRhythm_バックアップ_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  toast(`バックアップを書き出しました（${Object.keys(data).length}項目）`); };
+$("#stgRestore").onclick=()=>{ if(ROLE!=="admin")return; $("#restoreFile").value=""; $("#restoreFile").click(); };
+$("#restoreFile").onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(!f)return; const rd=new FileReader();
+  rd.onload=()=>{ let o=null; try{ o=JSON.parse(rd.result); }catch(err){} if(!o||o.app!=="CareRhythm"||!o.data){ toast("このファイルは、CareRhythmのバックアップではありません"); return; }
+    const keys=Object.keys(o.data).filter(syncable);
+    showConfirm(`バックアップ（${(o.savedAt||"").slice(0,10)}、${keys.length}項目）から復元します。いまの保存データは、同じ項目が、バックアップの内容に置き換わります。よろしいですか？`,()=>{ keys.forEach(k=>jset(k,o.data[k])); toast("復元しました。画面を読み込み直します"); setTimeout(()=>location.reload(),1200); }); };
+  rd.readAsText(f); };
 $("#stgOffAll").onclick=()=>{renderOffAll();openModal("#offAllOverlay");};
 $("#stgPass").onclick=()=>{renderUserList();renderPasscodeList();openModal("#passOverlay");};
 
