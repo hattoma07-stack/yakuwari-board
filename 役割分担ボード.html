@@ -807,7 +807,7 @@
     <div class="edit-list" id="passList"></div>
     <div class="edit-row" style="margin-top:14px;flex-wrap:wrap">
       <input type="email" id="userEmail" placeholder="例：name@gmail.com" autocomplete="off" style="flex:1;min-width:180px">
-      <select id="userRole"><option value="admin">管理者</option><option value="day">デイサービス</option><option value="home">訪問介護</option><option value="office">事務</option><option value="nursing">看護</option><option value="kitchen">栄養士・厨房</option><option value="rehab">リハビリ</option><option value="kyotaku">居宅支援事業所</option><option value="support">サポート</option></select>
+      <select id="userRole"><option value="admin">管理者</option><option value="day">デイサービス</option><option value="home">訪問介護</option><option value="office">本部・事務</option><option value="nursing">看護</option><option value="kitchen">栄養士・厨房</option><option value="rehab">リハビリ</option><option value="kyotaku">居宅支援事業所</option><option value="support">サポート</option></select>
       <button class="btn" id="userAdd">追加</button>
     </div>
     <h4 style="margin:20px 0 8px;font-size:14px">パスコード（Googleログインのあとに入力）</h4>
@@ -977,7 +977,7 @@ const K={
   offtable:"yakuwari:offtable", // 年間休日の表（部署×1〜12月の公休日数）。管理者のみ設定
   theme:"yakuwari:theme" // 表示テーマも施設共通
 };
-const FACILITY_NAME={day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ",kyotaku:"居宅支援事業所",support:"サポート"};
+const FACILITY_NAME={day:"デイサービス",home:"訪問介護",office:"本部・事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ",kyotaku:"居宅支援事業所",support:"サポート"};
 const BOARD_FACILITIES=["day","home"]; // 役割分担ボードを使う部署（それ以外は勤務表のみ）
 const ALL_FACILITIES=["day","home","office","nursing","kitchen","rehab","kyotaku","support"];
 
@@ -1960,6 +1960,7 @@ function renderStaffList(){
         <div class="fl" style="flex:1"><span>勤務時間帯（ドライバー）</span><div class="seg hseg">${hbtns}</div></div>
       </div>`:""}
       ${hdetail}
+      ${FSCOPE==="office"?`<div class="line2"><label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="hq-in" ${s.hq?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">本部所属</label></div>`:""}
       ${FSCOPE==="kitchen"?`<div class="line2"><label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="rd-in" ${s.rdQual?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">管理栄養士</label></div>`:""}
       ${(!isDrv&&!isPartTimeType(typeById(s.typeId))&&(FSCOPE==="home"||FSCOPE==="nursing"))?`<div class="line2"><div class="fl"><span>日勤の開始時間（KOT用）</span>
         <div style="display:flex;gap:16px;flex-wrap:wrap"><label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="ds-a"${s.dayStart==="09:00"?"":" checked"} style="width:18px;height:18px;accent-color:var(--accent)">8:30（日勤A　8:30〜17:30）</label>
@@ -1969,6 +1970,7 @@ function renderStaffList(){
     card.querySelector('.nm-in').oninput=e=>{s.name=e.target.value;saveStaff();refreshAll();};
     const nchk=card.querySelector('.night-can');
     if(nchk){ nchk.onchange=e=>{s.canNight=e.target.checked;if(!s.canNight){s.nightOnly=false;s.nightCount=null;}saveStaff();renderStaffList();}; }
+    const hqc=card.querySelector('.hq-in'); if(hqc)hqc.onchange=e=>{s.hq=e.target.checked;saveStaff();}; // 本部・事務：本部所属のスタッフ
     const rdc=card.querySelector('.rd-in'); if(rdc)rdc.onchange=e=>{s.rdQual=e.target.checked;saveStaff();renderStaffList();refreshAll();}; // 栄養士・厨房：管理栄養士の資格者
     const ech=card.querySelector('.early-can'), lch=card.querySelector('.late-can'); // 契約：早番・遅番が可能か（訪問介護・看護）
     if(ech)ech.onchange=e=>{s.canEarly=e.target.checked;saveStaff();};
@@ -2588,7 +2590,7 @@ $("#btnTheme").onclick=$("#btnTheme2").onclick=toggleTheme;
 (()=>{const th=jget(K.theme,null);if(th)document.documentElement.setAttribute('data-theme',th);})();
 
 /* ================= ログイン（Googleアカウント。管理者が登録した人だけが入れる） ================= */
-const ROLE_LABEL={admin:"管理者",day:"デイサービス",home:"訪問介護",office:"事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ",kyotaku:"居宅支援事業所",support:"サポート"};
+const ROLE_LABEL={admin:"管理者",day:"デイサービス",home:"訪問介護",office:"本部・事務",nursing:"看護",kitchen:"栄養士・厨房",rehab:"リハビリ",kyotaku:"居宅支援事業所",support:"サポート"};
 let ROLE=null, USER_EMAIL=null, entering=false;
 function sessGet(k){try{return sessionStorage.getItem(k);}catch(e){return null;}}
 function sessSet(k,v){try{sessionStorage.setItem(k,v);}catch(e){}}
@@ -2713,7 +2715,7 @@ function updateFacilityUI(){
     $("#facBadge").textContent=FACILITY_ICON[FSCOPE]+" "+FACILITY_NAME[FSCOPE];
   }
   $("#grpAccess").hidden=!isAdmin;
-  // 役割分担ボードを使わない部署（事務・看護・栄養士/厨房）は勤務表のみ
+  // 役割分担ボードを使わない部署（本部・事務、看護、栄養士・厨房）は勤務表のみ
   const usesBoard=BOARD_FACILITIES.includes(FSCOPE);
   $("#tabBoard").hidden=!usesBoard;
   $$(".settings-group[data-board-only]").forEach(g=>g.hidden=!usesBoard);
