@@ -1048,12 +1048,14 @@ const JOBS_BY_DEPT={day:[
 const DEF_REQ={day:{care:8,counselor:1,nurse:1,ft:1,driver:3,hiace:2}};
 const jobsOf=()=>JOBS_BY_DEPT[FSCOPE]||[];
 // デイサービスは、スタッフを職種ごとにまとめて並べる（生活相談員→介護職員→委託看護職員→機能訓練指導員→ドライバー→職種未設定）。台帳の並びが、そのまま、勤務表の並びになる
-const JOB_GROUPS=[{id:"counselor",name:"生活相談員"},{id:"care",name:"介護職員"},{id:"nurse",name:"委託看護職員"},{id:"ft",name:"機能訓練指導員"},{id:"drv",name:"ドライバー"},{id:"",name:"職種未設定"}];
-const groupedDept=()=>FSCOPE==="day";
-const jobKeyOf=s=>{ const j=s.job||""; return JOB_GROUPS.some(g=>g.id===j)?j:""; };
-const jobRank=s=>JOB_GROUPS.findIndex(g=>g.id===jobKeyOf(s));
+const JOB_GROUPS_DAY=[{id:"counselor",name:"生活相談員"},{id:"care",name:"介護職員"},{id:"nurse",name:"委託看護職員"},{id:"ft",name:"機能訓練指導員"},{id:"drv",name:"ドライバー"},{id:"",name:"職種未設定"}];
+const JOB_GROUPS_KITCHEN=[{id:"rd",name:"管理栄養士"},{id:"",name:"その他"}]; // 栄養士・厨房：管理栄養士の資格者を、上に並べる
+const jobGroups=()=>FSCOPE==="kitchen"?JOB_GROUPS_KITCHEN:JOB_GROUPS_DAY;
+const groupedDept=()=>FSCOPE==="day"||FSCOPE==="kitchen";
+const jobKeyOf=s=>{ if(FSCOPE==="kitchen")return s.rdQual?"rd":""; const j=s.job||""; return jobGroups().some(g=>g.id===j)?j:""; };
+const jobRank=s=>jobGroups().findIndex(g=>g.id===jobKeyOf(s));
 function sortStaffByJob(){ if(!groupedDept())return false; const before=S.staff.map(s=>s.id).join(","); S.staff=S.staff.map((s,i)=>({s,i})).sort((a,b)=>jobRank(a.s)-jobRank(b.s)||a.i-b.i).map(x=>x.s); return before!==S.staff.map(s=>s.id).join(","); }
-function rosterGroups(){ if(!groupedDept())return [{name:"",list:S.staff}]; return JOB_GROUPS.map(g=>({name:g.name,list:S.staff.filter(s=>jobKeyOf(s)===g.id)})).filter(g=>g.list.length); }
+function rosterGroups(){ if(!groupedDept())return [{name:"",list:S.staff}]; return jobGroups().map(g=>({name:g.name,list:S.staff.filter(s=>jobKeyOf(s)===g.id)})).filter(g=>g.list.length); }
 // 夜勤の振り分けを行う部署（スタッフ台帳の「夜勤が可能」にチェックした人だけが対象）と、1晩あたりの既定人数
 const NIGHT_DEPTS=["home","nursing"];
 const DEF_NIGHTN={home:1,nursing:1};
@@ -1908,7 +1910,7 @@ function renderStaffList(){
   const w=$("#staffList");w.innerHTML=""; if(sortStaffByJob())saveStaff();
   let lastGrp=null;
   S.staff.forEach((s,i)=>{
-    if(groupedDept()){ const gk=jobKeyOf(s); if(gk!==lastGrp){ lastGrp=gk; const h=document.createElement('div'); h.className='mlabel'; h.style.marginTop=i?'14px':'0'; h.textContent=(JOB_GROUPS.find(x=>x.id===gk)||{}).name; w.appendChild(h); } }
+    if(groupedDept()){ const gk=jobKeyOf(s); if(gk!==lastGrp){ lastGrp=gk; const h=document.createElement('div'); h.className='mlabel'; h.style.marginTop=i?'14px':'0'; h.textContent=(jobGroups().find(x=>x.id===gk)||{}).name; w.appendChild(h); } }
     const card=document.createElement('div');card.className="staff-edit";
     const segs=S.types.map(t=>`<button class="segbtn" data-ty="${t.id}" aria-pressed="${s.typeId===t.id}">${escapeHtml(t.name)}</button>`).join("");
     const preset=hoursPreset(s), isDrv=FSCOPE==="day"&&s.job==="drv"; // ドライバーは非常勤。勤務時間は入力せず、朝夕・朝のみ・夕のみから選ぶ
@@ -1958,6 +1960,7 @@ function renderStaffList(){
         <div class="fl" style="flex:1"><span>勤務時間帯（ドライバー）</span><div class="seg hseg">${hbtns}</div></div>
       </div>`:""}
       ${hdetail}
+      ${FSCOPE==="kitchen"?`<div class="line2"><label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="rd-in" ${s.rdQual?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">管理栄養士（資格あり）</label></div>`:""}
       ${(!isDrv&&!isPartTimeType(typeById(s.typeId))&&(FSCOPE==="home"||FSCOPE==="nursing"))?`<div class="line2"><div class="fl"><span>日勤の開始時間（KOT用）</span>
         <div style="display:flex;gap:16px;flex-wrap:wrap"><label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="ds-a"${s.dayStart==="09:00"?"":" checked"} style="width:18px;height:18px;accent-color:var(--accent)">8:30（日勤A　8:30〜17:30）</label>
         <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="ds-b"${s.dayStart==="09:00"?" checked":""} style="width:18px;height:18px;accent-color:var(--accent)">9:00（日勤B　9:00〜18:00）</label></div></div></div>`:""}`;
@@ -1966,6 +1969,7 @@ function renderStaffList(){
     card.querySelector('.nm-in').oninput=e=>{s.name=e.target.value;saveStaff();refreshAll();};
     const nchk=card.querySelector('.night-can');
     if(nchk){ nchk.onchange=e=>{s.canNight=e.target.checked;if(!s.canNight){s.nightOnly=false;s.nightCount=null;}saveStaff();renderStaffList();}; }
+    const rdc=card.querySelector('.rd-in'); if(rdc)rdc.onchange=e=>{s.rdQual=e.target.checked;saveStaff();renderStaffList();refreshAll();}; // 栄養士・厨房：管理栄養士の資格者
     const ech=card.querySelector('.early-can'), lch=card.querySelector('.late-can'); // 契約：早番・遅番が可能か（訪問介護・看護）
     if(ech)ech.onchange=e=>{s.canEarly=e.target.checked;saveStaff();};
     if(lch)lch.onchange=e=>{s.canLate=e.target.checked;saveStaff();};
