@@ -309,6 +309,8 @@
   .rwrap2 .rtable-wrap{flex:1;min-width:0}
   .rtotal{flex:none;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
   .rtotal[hidden]{display:none}
+  table.roster tr.jobhead td.jobhdr{background:var(--surface-2);font-size:11px;font-weight:700;color:var(--ink-soft);text-align:left;padding:3px 8px;height:22px;position:sticky;left:0}
+  table.rtot tr.jobhead td{background:var(--surface-2);height:22px}
   table.rtot{border-collapse:collapse}
   table.rtot th,table.rtot td{min-width:34px}
   table.rtot .rt-total{border-left:2px solid var(--line-strong)}
@@ -1045,6 +1047,13 @@ const JOBS_BY_DEPT={day:[
   {id:"drv",name:"ドライバー",short:"ドライバー",noRow:true}]}; // ドライバー：台帳で選ぶ職種（送迎職員にも数える。下の人数の行は出さない）
 const DEF_REQ={day:{care:8,counselor:1,nurse:1,ft:1,driver:3,hiace:2}};
 const jobsOf=()=>JOBS_BY_DEPT[FSCOPE]||[];
+// デイサービスは、スタッフを職種ごとにまとめて並べる（介護職員→生活相談員→委託看護職員→機能訓練指導員→ドライバー→職種未設定）。台帳の並びが、そのまま、勤務表の並びになる
+const JOB_GROUPS=[{id:"care",name:"介護職員"},{id:"counselor",name:"生活相談員"},{id:"nurse",name:"委託看護職員"},{id:"ft",name:"機能訓練指導員"},{id:"drv",name:"ドライバー"},{id:"",name:"職種未設定"}];
+const groupedDept=()=>FSCOPE==="day";
+const jobKeyOf=s=>{ const j=s.job||""; return JOB_GROUPS.some(g=>g.id===j)?j:""; };
+const jobRank=s=>JOB_GROUPS.findIndex(g=>g.id===jobKeyOf(s));
+function sortStaffByJob(){ if(!groupedDept())return false; const before=S.staff.map(s=>s.id).join(","); S.staff=S.staff.map((s,i)=>({s,i})).sort((a,b)=>jobRank(a.s)-jobRank(b.s)||a.i-b.i).map(x=>x.s); return before!==S.staff.map(s=>s.id).join(","); }
+function rosterGroups(){ if(!groupedDept())return [{name:"",list:S.staff}]; return JOB_GROUPS.map(g=>({name:g.name,list:S.staff.filter(s=>jobKeyOf(s)===g.id)})).filter(g=>g.list.length); }
 // 夜勤の振り分けを行う部署（スタッフ台帳の「夜勤が可能」にチェックした人だけが対象）と、1晩あたりの既定人数
 const NIGHT_DEPTS=["home","nursing"];
 const DEF_NIGHTN={home:1,nursing:1};
@@ -1274,6 +1283,7 @@ function loadMasters(){
   }
   // migrate: ensure typeId / hours / task duration
   S.staff.forEach(s=>{if(!s.typeId)s.typeId=S.types[0].id; if(s.off===undefined)s.off=null; if(s.hours===undefined)s.hours=null; if(FSCOPE==="day"&&s.hours&&!s.job)s.job="drv"; if(FSCOPE==="day"&&s.job==="drv"){const pt=hourlyType(); if(pt)s.typeId=pt.id; s.workTime=null;} if(FSCOPE!=="day"&&s.hours)s.hours=null; if(s.job===undefined)s.job=""; if(s.canHiace===undefined)s.canHiace=false; if(s.canNight===undefined)s.canNight=false; if(s.nightOnly===undefined)s.nightOnly=false; if(s.nightCount===undefined)s.nightCount=null; if(s.workDays===undefined)s.workDays=null; if(s.canDrive===undefined){s.canDrive=(s.job==="driver"); if(s.job==="driver")s.job="";}});
+  sortStaffByJob(); // デイサービス：職種ごとにまとめる
   S.tasks.forEach(t=>{if(!t.dur)t.dur=30;});
   saveStaff();jset(K.status,S.status);jset(K.times,S.times);jset(K.tasks,S.tasks);jset(K.types,S.types);jset(K.roles,S.roles);
   return seeded;
@@ -1792,7 +1802,8 @@ function renderRoster(){
     head+='</tr></thead>'; }
   else head+='<th class="sumcol s-work">出勤</th><th class="sumcol s-off">休/目標</th></tr></thead>';
   let bodyH='<tbody>'; const boxRows=[];
-  S.staff.forEach(s=>{
+  rosterGroups().forEach(g=>{ // 職種ごとにまとめて並べる（見出しの行は出さない）
+  g.list.forEach(s=>{
     let work=0; const cnt=sc?sc.map(()=>0):null; const psym=partSymbolOf(s); // 非常勤は、勤務時間に合う記号（A6など）で表示
     bodyH+=`<tr><td class="rname" style="border-left:5px solid ${s.color}">${escapeHtml(s.name)}${workTimeLabel(s)}</td>`;
     for(let d=1;d<=nd;d++){const e=eff(s.id,d);work+=e.w;
@@ -1811,7 +1822,7 @@ function renderRoster(){
       else bodyH+=`<td class="sumcell sn sn-total num${tot<nd?' short':' full'}" style="right:0" title="${tot<nd?`月の日数（${nd}日）に${nd-tot}日足りません`:'月の日数と一致'}">${tot}</td></tr>`;
       return; }
     bodyH+=`<td class="sumcell s-work num">${fmtN(work)}</td><td class="sumcell s-off num ${cls}"><span class="cnt">${fmtN(off)}</span>${tgt==null?'':'/'+tgt}</td></tr>`;
-  });
+  }); });
   { // 応援に来る人（もう一方の部署からの応援）の行。出勤の数には入れない
     const from=ASSIST_TO[FSCOPE], rec=from?jget(`yakuwari:assist:${S.ym}:${from}`,null):null;
     if(rec&&rec.to===FSCOPE&&(rec.people||[]).length){ const filler=(boxMode?'<td class="pc"></td>'.repeat(pcs.length+1):'')+(sc?'<td class="sumcol sn"></td>'.repeat(nShow):'<td class="sumcol s-work"></td><td class="sumcol s-off"></td>');
@@ -1840,7 +1851,7 @@ function renderRoster(){
     const cs=sc.map((c,i)=>({c,i})).filter(x=>!x.c.blank);
     rt.innerHTML=`<table class="rtot"><thead><tr>`+cs.map(x=>`<th>${x.c.label}</th>`).join("")+
       `<th class="rt-total" title="月の日数（${nd}日）と一致すれば正常">合計<div class="rt-sub">月${nd}日</div></th></tr></thead><tbody>`+
-      boxRows.map(r=>`<tr>`+cs.map(x=>{ const isOff=x.c.label==="休"; const bad=isOff&&r.tgt!=null&&Math.abs(r.cnt[x.i]-r.tgt)>1e-9; /* 赤にするのは、公休（希望休を含む）の数が目標とずれたときだけ。有休は含めない */ // 休日数が目標に満たない／超える場合は赤
+      boxRows.map(r=>r.blank?`<tr class="jobhead"><td colspan="${cs.length+1}"></td></tr>`:`<tr>`+cs.map(x=>{ const isOff=x.c.label==="休"; const bad=isOff&&r.tgt!=null&&Math.abs(r.cnt[x.i]-r.tgt)>1e-9; /* 赤にするのは、公休（希望休を含む）の数が目標とずれたときだけ。有休は含めない */ // 休日数が目標に満たない／超える場合は赤
         return `<td class="num${bad?' bad':''}"${isOff&&r.tgt!=null?` title="公休 ${fmtN(r.cnt[x.i])}日（目標 ${r.tgt}日）"`:''}>${r.cnt[x.i]?fmtN(r.cnt[x.i]):''}</td>`; }).join("")+
         `<td class="num rt-total ${r.tot<nd?'short':'full'}" title="${r.tot<nd?`月の日数（${nd}日）に${nd-r.tot}日足りません`:'月の日数と一致'}">${r.tot}</td></tr>`).join("")+`</tbody></table>`;
     const mr=[...T.querySelectorAll('thead tr, tbody tr')], sr=[...rt.querySelectorAll('thead tr, tbody tr')];
@@ -1888,8 +1899,10 @@ function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>
 
 /* ================= editors ================= */
 function renderStaffList(){
-  const w=$("#staffList");w.innerHTML="";
+  const w=$("#staffList");w.innerHTML=""; if(sortStaffByJob())saveStaff();
+  let lastGrp=null;
   S.staff.forEach((s,i)=>{
+    if(groupedDept()){ const gk=jobKeyOf(s); if(gk!==lastGrp){ lastGrp=gk; const h=document.createElement('div'); h.className='mlabel'; h.style.marginTop=i?'14px':'0'; h.textContent=(JOB_GROUPS.find(x=>x.id===gk)||{}).name; w.appendChild(h); } }
     const card=document.createElement('div');card.className="staff-edit";
     const segs=S.types.map(t=>`<button class="segbtn" data-ty="${t.id}" aria-pressed="${s.typeId===t.id}">${escapeHtml(t.name)}</button>`).join("");
     const preset=hoursPreset(s), isDrv=FSCOPE==="day"&&s.job==="drv"; // ドライバーは非常勤。勤務時間は入力せず、朝夕・朝のみ・夕のみから選ぶ
@@ -1901,6 +1914,7 @@ function renderStaffList(){
       <div class="line1">
         <input type="color" value="${s.color}" title="色">
         <input type="text" class="nm-in" placeholder="スタッフ名" value="">
+        <button class="mv-up" title="職種の中で、1つ上へ" style="border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 8px;cursor:pointer;color:var(--ink)">▲</button><button class="mv-dn" title="職種の中で、1つ下へ" style="border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 8px;cursor:pointer;color:var(--ink)">▼</button>
         <button class="del" title="削除">🗑</button>
       </div>
       ${jobsOf().length?`<div class="line2">
@@ -1987,6 +2001,8 @@ function renderStaffList(){
       if(da&&db){ da.onchange=()=>{ s.dayStart=da.checked?"08:30":"09:00"; saveStaff(); renderStaffList(); }; db.onchange=()=>{ s.dayStart=db.checked?"09:00":"08:30"; saveStaff(); renderStaffList(); }; } }
     const ba=card.querySelector('.brk-a'), bb=card.querySelector('.brk-b'); // 休憩の選択（どちらか一方）
     if(ba&&bb){ [ba,bb].forEach(el=>{ el.onchange=()=>{ const other=el===ba?bb:ba; if(el.checked)other.checked=false; const key=el.dataset.k; s[key]=el.checked?(el.dataset.v==="1"):(other.checked?(other.dataset.v==="1"):null); saveStaff(); renderStaffList(); if(S.tab==="roster")renderRoster(); }; }); }
+    { const mv=dir=>{ const gk=jobKeyOf(s); let j=i+dir; while(j>=0&&j<S.staff.length&&groupedDept()&&jobKeyOf(S.staff[j])!==gk)j+=dir; if(j<0||j>=S.staff.length)return; if(groupedDept()&&jobKeyOf(S.staff[j])!==gk)return; [S.staff[i],S.staff[j]]=[S.staff[j],S.staff[i]]; saveStaff(); renderStaffList(); refreshAll(); }; // 同じ職種の中で、上下に入れ替える
+      card.querySelector('.mv-up').onclick=()=>mv(-1); card.querySelector('.mv-dn').onclick=()=>mv(1); }
     card.querySelector('.del').onclick=()=>{showConfirm(`${s.name} を台帳から削除しますか？`,()=>{
       S.staff.splice(i,1);S.day.selected=S.day.selected.filter(x=>x!==s.id);
       Object.values(S.day.assign).forEach(r=>delete r[s.id]);saveStaff();saveDay();renderStaffList();refreshAll();
