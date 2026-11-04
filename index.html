@@ -1047,8 +1047,8 @@ const JOBS_BY_DEPT={day:[
   {id:"drv",name:"ドライバー",short:"ドライバー",noRow:true}]}; // ドライバー：台帳で選ぶ職種（送迎職員にも数える。下の人数の行は出さない）
 const DEF_REQ={day:{care:8,counselor:1,nurse:1,ft:1,driver:3,hiace:2}};
 const jobsOf=()=>JOBS_BY_DEPT[FSCOPE]||[];
-// デイサービスは、スタッフを職種ごとにまとめて並べる（介護職員→生活相談員→委託看護職員→機能訓練指導員→ドライバー→職種未設定）。台帳の並びが、そのまま、勤務表の並びになる
-const JOB_GROUPS=[{id:"care",name:"介護職員"},{id:"counselor",name:"生活相談員"},{id:"nurse",name:"委託看護職員"},{id:"ft",name:"機能訓練指導員"},{id:"drv",name:"ドライバー"},{id:"",name:"職種未設定"}];
+// デイサービスは、スタッフを職種ごとにまとめて並べる（生活相談員→介護職員→委託看護職員→機能訓練指導員→ドライバー→職種未設定）。台帳の並びが、そのまま、勤務表の並びになる
+const JOB_GROUPS=[{id:"counselor",name:"生活相談員"},{id:"care",name:"介護職員"},{id:"nurse",name:"委託看護職員"},{id:"ft",name:"機能訓練指導員"},{id:"drv",name:"ドライバー"},{id:"",name:"職種未設定"}];
 const groupedDept=()=>FSCOPE==="day";
 const jobKeyOf=s=>{ const j=s.job||""; return JOB_GROUPS.some(g=>g.id===j)?j:""; };
 const jobRank=s=>JOB_GROUPS.findIndex(g=>g.id===jobKeyOf(s));
