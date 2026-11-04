@@ -82,7 +82,10 @@ service cloud.firestore {
                   || (isMyDept()
                       && request.resource.data.scope == myRole()
                       && key.matches('yakuwari:' + myRole() + ':.*')
-                      && !key.matches('.*:staff'));   // スタッフ台帳は、管理者だけが変更できる
+                      && !key.matches('.*:staff'))   // スタッフ台帳は、管理者だけが変更できる
+                  || (isMyDept()
+                      && request.resource.data.scope == 'global'
+                      && key.matches('yakuwari:assist:.*:' + myRole()));   // 応援の記録（デイサービス⇔訪問介護）。所属の部署の人が書き、全部署から読める
       allow delete: if isAdmin();
     }
   }
