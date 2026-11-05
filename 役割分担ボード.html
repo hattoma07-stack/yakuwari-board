@@ -1387,7 +1387,9 @@ const partTblRows=s=>{ const w=s.workTime, a=hmToMin(w.s), b=hmToMin(w.e); retur
 // 6時間・6.5時間で、一覧に休憩あり／なしの両方の記号（A・B／C・D）がある時間のときだけ、休憩の選択を出す
 // 休憩の選択：6時間・6.5時間は「休憩あり／なし」（A・B／C・D）、7時間以上は「休憩45分／1時間」（A・B／E・F）。該当する記号が一覧にあるときだけ出す
 function partBreakKind(s){ if(!s||!isPartTimeType(typeById(s.typeId))||s.job==="drv"||partDurHours(s)==null)return null; const rows=partTblRows(s);
-  if(rows.some(r=>/休憩(あり|なし)/.test(r.cat)))return "yn"; if(rows.some(r=>/休憩(45分|1時間)/.test(r.cat)))return "len"; return null; }
+  if(rows.some(r=>/休憩(あり|なし)/.test(r.cat)))return "yn"; if(rows.some(r=>/休憩(45分|1時間)/.test(r.cat)))return "len";
+  if(!rows.length){ const d=partDurHours(s); if(d>=6&&d<7)return "yn"; if(d>=7&&d<=10)return "len"; } // 一覧に同じ時間の行がない人（開始が8:30・9:00以外など）も、勤務時間の長さで休憩の選択を出す
+  return null; }
 const partNeedsBreakChoice=s=>!!partBreakKind(s);
 function partSymbolOf(s){
   if(s&&(EXP_F||FSCOPE)==="day"&&s.job==="drv"){ const h=hoursPreset(s); return h==="both"?"朝夕":h==="am"?"朝":h==="pm"?"夕":null; } // ドライバー：台帳で選んだ朝夕・朝のみ・夕のみ
