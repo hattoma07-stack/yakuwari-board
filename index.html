@@ -276,7 +276,7 @@
   table.roster .rname .wt{font-size:10.5px;font-weight:700;color:var(--ink-soft);line-height:1.2;margin-top:1px;white-space:nowrap}
   table.roster td.rc .wish{color:#C62828}
   table.roster td.rc .hl{display:block;font-size:9px;font-weight:700;letter-spacing:-.3px;white-space:nowrap}
-  table.roster td.rc .tm{display:block;letter-spacing:-.3px;font-size:7.5px;line-height:1.1;font-weight:700;color:#C62828;white-space:nowrap}
+  table.roster td.rc .tm{display:block;letter-spacing:-.4px;font-size:8px;line-height:1.05;font-weight:700;color:#C62828;white-space:nowrap}
   table.roster td.rc .ps{display:block;font-weight:700;letter-spacing:-.3px;white-space:nowrap;line-height:1.1} /* 非常勤の記号（A6.5など）は、長さに合わせて小さく表示 */
   table.roster td.rc .hm{display:block;font-size:8px;line-height:1;margin-top:1px}
   /* 予定から変わったマスを色で示す（黄＝変更・時間変更／赤＝出勤の予定が休みに変わった） */
@@ -458,6 +458,18 @@
     td.cell{height:auto}
     td.cell.empty::after{display:none}
     table.roster td.rc{height:22px}
+    /* 印刷：日付の列の幅を、すべて同じにする（記号の長さ（B6.5・朝夕など）で、幅がばらつかないように） */
+    table.roster{table-layout:fixed;width:100%}
+    table.roster th.dcol{width:auto;min-width:0}
+    table.roster td.rc,table.roster .rname{overflow:hidden}
+    body:not(.print-all-mode) table.roster th.rname{width:104px;min-width:104px}
+    body:not(.print-all-mode) table.roster .rname .wt{font-size:9px;letter-spacing:-.2px}
+    /* 右側の集計（日・休・有・応・合計）：文字を小さくして、枠に収める */
+    body:not(.print-all-mode) table.roster th.pc,body:not(.print-all-mode) table.roster td.pc{width:28px;min-width:28px;font-size:10px;line-height:1.1;letter-spacing:-.3px}
+    body:not(.print-all-mode) table.roster th.pc{font-size:9.5px}
+    body:not(.print-all-mode) table.roster th.pc-total,body:not(.print-all-mode) table.roster td.pc-total{width:34px;min-width:34px}
+    table.roster td.rc .ps{overflow:visible}
+    table.roster th.pc .rt-sub{font-size:6px;line-height:1}
     table.roster th.pc,table.roster td.pc{display:table-cell;min-width:22px;width:22px;text-align:center;padding:0;border:1px solid #999;font-weight:700}
     table.roster col.pcol{display:table-column}
     table.roster .pc-total,table.roster th.pc:first-of-type{border-left:1px solid #999}
@@ -490,7 +502,9 @@
     body.print-all-mode table.roster th.dcol .dn{font-size:calc(6.5px*var(--ps,1))}
     body.print-all-mode table.roster th.dcol .rest{font-size:calc(4.5px*var(--ps,1))}
     body.print-all-mode table.roster td.rc .tm{font-size:calc(4.5px*var(--ps,1))}
-    body.print-all-mode table.roster .rname .wt{font-size:calc(4.5px*var(--ps,1));white-space:normal}
+    body.print-all-mode table.roster .rname .wt{font-size:calc(4.2px*var(--ps,1));white-space:nowrap;letter-spacing:-.3px}
+    body.print-all-mode table.roster th.pc-total,body.print-all-mode table.roster td.pc-total{width:calc(16px*var(--ps,1));min-width:calc(16px*var(--ps,1))}
+    body.print-all-mode table.roster th.pc .rt-sub{display:none}
     body.print-all-mode table.roster .rname{font-size:calc(6.5px*var(--ps,1));min-width:calc(34px*var(--ps,1));width:calc(34px*var(--ps,1));padding:1px}
     body.print-all-mode table.roster td.rc{height:calc(11px*var(--ps,1));font-size:calc(6.5px*var(--ps,1))}
     body.print-all-mode table.roster th.pc,body.print-all-mode table.roster td.pc{font-size:calc(6px*var(--ps,1));min-width:calc(11px*var(--ps,1));width:calc(11px*var(--ps,1))}
@@ -1316,7 +1330,7 @@ function timeMark(s,d,e){ const o=(S.rtime[s.id]||{})[d]; if(!o||!e.work)return"
   const st=o.s||u.s, en=o.e||u.e; // 開始〜終了をそろえて表示（変更していない側は通常の時刻）
   const sym=(st&&en)?partSymbolOf(staffOfDay(s,o)):null; // 変更後の時間と休憩に合う記号（A6・B7・P4など）。休憩の選択が済んでいないときなどで決まらなければ、時間を出す
   if(sym)return `<span class="ps" style="font-size:${sym.length<=2?11:sym.length===3?10:sym.length<=5?9:5.5}px">${escapeHtml(sym)}</span>`;
-  return `<span class="tm">${f(st)}〜<br>${f(en)}</span>`; }
+  return `<span class="tm" title="${f(st)}〜${f(en)}">${f(st)}<br>${f(en)}</span>`; } // 記号が決まらないときは、開始と終了を、2段で小さく出す
 let timeEditCtx=null;
 function openTimeEdit(sid,day){
   const s=staffById(sid); if(!s)return;
