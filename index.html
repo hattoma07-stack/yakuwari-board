@@ -363,6 +363,9 @@
   .staff-edit .line1{display:flex;gap:8px;align-items:center}
   .staff-edit .line1 input[type=color]{width:32px;height:32px;padding:0;border:1px solid var(--line-strong);border-radius:8px;background:none;cursor:pointer;flex:none}
   .staff-edit .line1 .nm-in{flex:1;min-width:80px;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:7px 9px;font-weight:700}
+  .staff-edit.locked{background:var(--surface)}
+  .lock-btn{font:inherit;font-weight:700;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--accent);background:var(--surface);color:var(--accent);cursor:pointer;white-space:nowrap}
+  .lock-btn.save{background:var(--accent);color:#fff}
   .staff-edit .line1 .del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:18px}
   .staff-edit .line1 .del:hover{color:var(--alert)}
   .staff-edit .line2{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;padding-left:2px}
@@ -1929,6 +1932,7 @@ function renderRoster(){
 function escapeHtml(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
 /* ================= editors ================= */
+const isLockedStaff=s=>s.locked!==false; // 保存済み（登録済み）のスタッフは、「編集」を押すまで変更できない。新しく追加したスタッフは、保存するまで編集できる
 function renderStaffList(){
   const w=$("#staffList");w.innerHTML=""; if(sortStaffByJob())saveStaff();
   let lastGrp=null;
@@ -1946,6 +1950,7 @@ function renderStaffList(){
         <input type="color" value="${s.color}" title="色">
         <input type="text" class="nm-in" placeholder="スタッフ名" value="">
         <button class="mv-up" title="職種の中で、1つ上へ" style="border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 8px;cursor:pointer;color:var(--ink)">▲</button><button class="mv-dn" title="職種の中で、1つ下へ" style="border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 8px;cursor:pointer;color:var(--ink)">▼</button>
+        <button class="lock-btn${isLockedStaff(s)?"":" save"}" title="${isLockedStaff(s)?"編集できる状態にします":"この内容で保存し、編集できない状態にします"}">${isLockedStaff(s)?"編集":"保存"}</button>
         <button class="del" title="削除">🗑</button>
       </div>
       ${jobsOf().length?`<div class="line2">
@@ -2043,12 +2048,14 @@ function renderStaffList(){
       S.staff.splice(i,1);S.day.selected=S.day.selected.filter(x=>x!==s.id);
       Object.values(S.day.assign).forEach(r=>delete r[s.id]);saveStaff();saveDay();renderStaffList();refreshAll();
     },"削除する");};
+    card.querySelector('.lock-btn').onclick=()=>{ s.locked=!isLockedStaff(s); saveStaff(); renderStaffList(); toast(s.locked?`${s.name||"スタッフ"} を保存しました（変更するときは「編集」）`:`${s.name||"スタッフ"} を編集できます`); };
+    if(isLockedStaff(s)){ card.classList.add("locked"); card.querySelectorAll("input,select,button").forEach(el=>{ if(!el.classList.contains("lock-btn"))el.disabled=true; }); } // 保存済みは、画面上で変更できない
     w.appendChild(card);
   });
 }
 function addStaffMaster(){
   const n=$("#newStaffName").value.trim();if(!n)return;
-  const s={id:uid(),name:n,color:STAFF_COLORS[S.staff.length%STAFF_COLORS.length],typeId:S.types[0].id,off:null,hours:null,job:"",canDrive:false,canHiace:false,canNight:false,nightOnly:false,nightCount:null};
+  const s={id:uid(),name:n,locked:false,color:STAFF_COLORS[S.staff.length%STAFF_COLORS.length],typeId:S.types[0].id,off:null,hours:null,job:"",canDrive:false,canHiace:false,canNight:false,nightOnly:false,nightCount:null};
   S.staff.push(s);S.day.selected.push(s.id);saveStaff();saveDay();
   $("#newStaffName").value="";renderStaffList();refreshAll();$("#newStaffName").focus();
 }
@@ -2856,7 +2863,7 @@ function renderAllStaff(){
         <td style="padding:6px 8px;text-align:center">${chk("as-drive",!!s.canDrive,f==="day")}</td>
         <td style="padding:6px 8px;text-align:center">${chk("as-hiace",!!s.canHiace,f==="day"&&!!s.canDrive,true)}</td>
         <td style="padding:6px 8px;text-align:center">${chk("as-night",!!s.canNight,NIGHT_DEPTS.includes(f),true)}</td>
-        <td style="padding:6px 8px"><button class="btn sm as-open">台帳を開く</button></td></tr>`; });
+        <td style="padding:6px 8px;white-space:nowrap"><button class="lock-btn as-lock${isLockedStaff(s)?"":" save"}">${isLockedStaff(s)?"編集":"保存"}</button> <button class="btn sm as-open">台帳を開く</button></td></tr>`; });
   });
   $("#asTable").innerHTML=`<thead><tr style="text-align:left;color:var(--ink-soft);font-size:12px"><th style="padding:6px 8px">部署</th><th style="padding:6px 8px">氏名</th><th style="padding:6px 8px">雇用形態</th><th style="padding:6px 8px">職種</th><th style="padding:6px 8px">KOT従業員コード</th><th style="padding:6px 8px;text-align:center">送迎可</th><th style="padding:6px 8px;text-align:center">ハイエース可</th><th style="padding:6px 8px;text-align:center">夜勤可</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="9" style="padding:14px;color:var(--ink-soft)">該当するスタッフがいません</td></tr>'}</tbody>`;
   $("#asCount").textContent=`${n}名`;
@@ -2867,6 +2874,8 @@ function renderAllStaff(){
     on("as-job",el=>{ s.job=el.value; if(f==="day"){ if(s.job==="drv"&&!s.hours)setHoursPreset(s,"both"); else if(s.job!=="drv")s.hours=null; } });
     on("as-drive",el=>{s.canDrive=el.checked; if(!s.canDrive)s.canHiace=false; setTimeout(renderAllStaff,0);});
     on("as-hiace",el=>{s.canHiace=el.checked;}); on("as-night",el=>{s.canNight=el.checked; if(!s.canNight){s.nightOnly=false;s.nightCount=null;}});
+    tr.querySelector(".as-lock").onclick=()=>{ s.locked=!isLockedStaff(s); saveStaffOf(f,arr); renderAllStaff(); toast(s.locked?`${s.name||"スタッフ"} を保存しました（変更するときは「編集」）`:`${s.name||"スタッフ"} を編集できます`); };
+    if(isLockedStaff(s))tr.querySelectorAll("input,select").forEach(el=>{el.disabled=true;}); // 保存済みは、一覧でも変更できない
     tr.querySelector(".as-open").onclick=async()=>{ if(f!==FSCOPE){ const fs=$("#facSwitchSel"); fs.value=f; await fs.onchange({target:fs}); } setStaffView("one"); };
   });
 }
