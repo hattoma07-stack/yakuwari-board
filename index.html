@@ -1109,7 +1109,9 @@ const SHIFT_NAMES={"早":"早番","日":"日勤","遅":"遅番","夜":"夜勤"};
 const shiftTimeLabel=c=>{const t=(S.shiftTimes||{})[c]; return t&&t.s&&t.e?`${t.s.replace(/^0/,"")}〜${t.e.replace(/^0/,"")}`:"";};
 const SHIFTROWS_MIN={office:true,rehab:true,kyotaku:true,support:true}; // この部署は記号別の行に「1日の最低出勤人数」の不足（赤）も出す
 // 送迎職員は「職種」ではなく、台帳の「送迎が可能」チェックで数える（兼任できる）。他の職種は職種の選択で数える
-const inJob=(j,s)=>j.hiace?(!!s.canDrive&&!!s.canHiace):j.drive?(!!s.canDrive||s.job==="drv"):s.job===j.id;
+// 職種：デイサービスだけ、複数選べる（例：生活相談員＋介護職員）。s.jobs＝選んだ職種すべて、s.job＝その中で並び順が先のもの（勤務表の並びに使う）
+const jobIdsOf=(s,fs)=>((fs||FSCOPE)==="day"&&Array.isArray(s.jobs)&&s.jobs.length)?s.jobs:(s.job?[s.job]:[]);
+const inJob=(j,s)=>j.hiace?(!!s.canDrive&&!!s.canHiace):j.drive?(!!s.canDrive||s.job==="drv"):jobIdsOf(s).includes(j.id);
 const DEF_ROLES=[
   {id:"r_leader",name:"リーダー",leader:true,cells:{}},
   {id:"r_a",name:"役割A",leader:false,cells:{}},
@@ -1956,7 +1958,7 @@ function renderStaffList(){
         <button class="del" title="削除">🗑</button>
       </div>
       ${jobsOf().length?`<div class="line2">
-        <div class="fl" style="flex:1"><span>職種</span><div class="seg jobseg">${[{id:"",name:"未設定"}].concat(jobsOf().filter(j=>!j.drive&&!j.hiace)).map(j=>`<button class="segbtn" data-job="${j.id}" aria-pressed="${(s.job||"")===j.id}">${escapeHtml(j.name)}</button>`).join("")}</div></div>
+        <div class="fl" style="flex:1"><span>職種</span><div class="seg jobseg">${[{id:"",name:"未設定"}].concat(jobsOf().filter(j=>!j.drive&&!j.hiace)).map(j=>`<button class="segbtn" data-job="${j.id}" aria-pressed="${j.id===""?jobIdsOf(s).length===0:jobIdsOf(s).includes(j.id)}">${escapeHtml(j.name)}</button>`).join("")}</div>${FSCOPE==="day"?'<div style="font-size:11px;color:var(--ink-soft);margin-top:4px">複数選べます（例：生活相談員と介護職員）。ドライバーは、ほかの職種と一緒には選べません</div>':""}</div>
       </div>`:""}
       ${hasDriveJob()?`<div class="line2">
         <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="drive-in" ${s.canDrive?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">送迎が可能（勤務表で「送迎職員」に数えます）</label>${s.canDrive?`
@@ -2014,7 +2016,11 @@ function renderStaffList(){
     const hchk=card.querySelector('.hiace-in');
     if(hchk)hchk.onchange=e=>{s.canHiace=e.target.checked;saveStaff();};
     card.querySelectorAll('.jobseg .segbtn').forEach(b=>b.onclick=()=>{
-      s.job=b.dataset.job;
+      if(FSCOPE==="day"){ const id=b.dataset.job; let cur=jobIdsOf(s).slice(); // デイサービス：押した職種を、入れる／外す（複数選択）
+        if(id==="")cur=[]; else if(id==="drv")cur=cur.includes("drv")?[]:["drv"]; else { cur=cur.filter(x=>x!=="drv"); cur=cur.includes(id)?cur.filter(x=>x!==id):cur.concat(id); }
+        const order=JOB_GROUPS_DAY.map(g=>g.id); cur.sort((a,c)=>order.indexOf(a)-order.indexOf(c));
+        s.jobs=cur; s.job=cur[0]||""; }
+      else s.job=b.dataset.job;
       if(FSCOPE==="day"){ if(s.job==="drv"&&!s.hours)setHoursPreset(s,"both"); else if(s.job!=="drv")s.hours=null; } // ドライバーは朝夕を初期値に、ほかの職種は時間帯の制限なし
       if(FSCOPE==="day"&&s.job==="drv"){ const pt=hourlyType(); if(pt)s.typeId=pt.id; s.workTime=null; } // ドライバーは時給（時間は入力しない）
       saveStaff();renderStaffList();
@@ -2860,7 +2866,7 @@ function renderAllStaff(){
         <td style="padding:6px 8px;white-space:nowrap">${FACILITY_ICON[f]} ${escapeHtml(FACILITY_NAME[f])}</td>
         <td style="padding:6px 8px;white-space:nowrap"><input type="color" class="as-color" value="${s.color||"#888888"}" style="width:26px;height:26px;border:none;padding:0;background:none;vertical-align:middle"> <input type="text" class="as-name" value="${escapeHtml(s.name||"")}" maxlength="12" style="font:inherit;width:120px;padding:4px 6px;border-radius:6px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink)"></td>
         <td style="padding:6px 8px">${sel("as-type",types.map(ty=>[ty.id,ty.name]),s.typeId)}</td>
-        <td style="padding:6px 8px">${jobs.length?sel("as-job",[["","未設定"]].concat(jobs.map(j=>[j.id,j.name])),s.job||""):'<span style="color:var(--ink-soft)">－</span>'}</td>
+        <td style="padding:6px 8px">${f==="day"?`<span style="font-size:12px">${escapeHtml(jobIdsOf(s,"day").map(id=>(JOB_GROUPS_DAY.find(g=>g.id===id)||{}).name).filter(Boolean).join("・")||"未設定")}</span>`:jobs.length?sel("as-job",[["","未設定"]].concat(jobs.map(j=>[j.id,j.name])),s.job||""):'<span style="color:var(--ink-soft)">－</span>'}</td>
         ${KOT_EXCLUDE.includes(f)?'<td style="padding:6px 8px"></td>':`<td style="padding:6px 8px"><input type="text" class="as-kot" value="${escapeHtml(s.kotCode||"")}" maxlength="20" inputmode="numeric" placeholder="未入力" style="font:inherit;width:96px;padding:4px 6px;border-radius:6px;border:1px solid ${kotCnt[(s.kotCode||"").trim()]>1?"var(--alert)":"var(--line-strong)"};background:var(--surface);color:var(--ink)"></td>`}
         <td style="padding:6px 8px;text-align:center">${chk("as-drive",!!s.canDrive,f==="day")}</td>
         <td style="padding:6px 8px;text-align:center">${chk("as-hiace",!!s.canHiace,f==="day"&&!!s.canDrive,true)}</td>
