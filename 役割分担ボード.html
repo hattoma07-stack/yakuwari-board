@@ -1438,8 +1438,7 @@ const DEF_OFF_MONTH=9;
 const offTable=()=>jget(K.offtable,{})||{};
 const NO_OFF_TABLE=["support"]; // 年間休日を設けない部署（サポート：別会社のため）。休日数の目標・赤の表示は、なし
 function monthOffOf(fac,ym){ if(NO_OFF_TABLE.includes(fac))return null; const arr=offTable()[fac]; const v=arr?arr[Number(ym.split("-")[1])-1]:undefined; if(v===undefined)return DEF_OFF_MONTH; return (v===null||v==="")?null:Number(v); }
-function staffTarget(s){ const t=typeById(s.typeId); if(isPartTimeType(t)&&typeName(s)!=="契約")return null; const m=monthOffOf(FSCOPE,S.ym); if(m==null||!isPartTimeType(t))return m;
-  let fixed=0; for(let d=1,nd=daysInMonth(S.ym);d<=nd;d++){ if(isSetOff(d)||!workDayOk(s,d))fixed++; } return Math.max(m,fixed); } // 公休の目標：月給と契約にある（時給はなし）。契約は、勤務できない日（曜日・休業日・祝日）が月の公休日数より多いときは、その日数を目標にする
+function staffTarget(s){ const t=typeById(s.typeId); if(isPartTimeType(t)&&typeName(s)!=="契約")return null; return monthOffOf(FSCOPE,S.ym); } // 公休の目標：月給と契約は、同じ月の公休日数（時給はなし）
 // 早番・遅番が可能か（訪問介護・看護）。台帳で選んでいなければ、月給は可能、契約・時給は不可
 const canEarlyOf=s=>(s.canEarly===undefined||s.canEarly===null)?!isPartTimeType(typeById(s.typeId)):!!s.canEarly;
 const canLateOf=s=>(s.canLate===undefined||s.canLate===null)?!isPartTimeType(typeById(s.typeId)):!!s.canLate;
@@ -2377,7 +2376,11 @@ $("#doAuto").onclick=()=>{
   S.rauto={};
   // 2) 事業所休業日の空欄 → 公休（自動印）
   S.staff.forEach(s=>{ if(!S.roster[s.id])S.roster[s.id]={};const rr=S.roster[s.id];
-    for(let d=1;d<=nd;d++){ if(!rr[d]&&(isSetOff(d)||!workDayOk(s,d))){rr[d]=rcode;setAuto(s.id,d,true);} } }); // 事業所の休業日と、非常勤の勤務できない曜日 → 公休
+    for(let d=1;d<=nd;d++){ if(!rr[d]&&isSetOff(d)){rr[d]=rcode;setAuto(s.id,d,true);} }          // 事業所の休業日 → 公休
+    const cand=[]; for(let d=1;d<=nd;d++){ if(!rr[d]&&!workDayOk(s,d))cand.push(d); }            // 非常勤の勤務できない曜日・祝日 → 公休
+    const tg0=staffTarget(s); let use=cand;
+    if(tg0!=null&&typeName(s)==="契約"){ let o=0; for(let d=1;d<=nd;d++){const c=rr[d],st=c&&statusByCode(c); if(st&&!st.work)o+=st.half?0.5:1;} use=spread(cand,Math.max(0,Math.floor(tg0-o+1e-9))); } // 契約は、公休が規定の日数を超えないよう、勤務できない日の一部を出勤にする
+    use.forEach(d=>{rr[d]=rcode;setAuto(s.id,d,true);}); });
   const wOfCode=(c,s,d)=>{ if(c==="応")return 0; if(!c)return (s&&s.nightOnly)?0:1; const st=statusByCode(c); if(st&&!st.work&&!isWishStatus(st)&&s&&d&&(S.rhalf[s.id]||{})[d])return 0.5; return st?(st.half?0.5:(st.work?1:0)):1; }; // 空欄=出勤候補1・半日=0.5
   // 2b) 夜勤の翌日は休み（夜勤の記号は手入力のもの。翌日が空欄なら公休にする。前月末の夜勤は当月1日を休みに）
   const isNight=c=>{const st=c&&statusByCode(c);return !!(st&&st.night);};
@@ -2460,14 +2463,14 @@ $("#doAuto").onclick=()=>{
   const shiftNeed=shiftOnPre?((Number(S.shiftN.early)||0)+(Number(S.shiftN.late)||0)):0;
   const isElig=s=>!isPartTimeType(typeById(s.typeId))&&!s.nightOnly;
   const availEL={}; for(let d=1;d<=nd;d++)availEL[d]=S.staff.filter(s=>{if(!isElig(s))return false;const c=S.roster[s.id][d];return !c||c==="早"||c==="遅";}).length;
-  let progress=true;
-  while(progress){ progress=false;
+  let progress=true, relax=false; // まず最低人数を守って配置。それでも規定の公休日数に届かない人は、最低人数より公休日数を優先して配置する
+  while(progress||!relax){ if(!progress){relax=true;} progress=false;
     for(const s of S.staff){ if(need[s.id]<=0)continue; const rr=S.roster[s.id]; const wu=weekUsed[s.id];
       let best=-1,bestScore=-Infinity;
       const myJobs=jobs.filter(j=>inJob(j,s)&&(Number(jreq[j.id])||0)>0);
-      for(let d=1;d<=nd;d++){ if(rr[d]||dayWork[d]<=min)continue;   // 空欄 かつ 休ませても最低人数を保てる日
-        if(myJobs.some(j=>dayJ[j.id][d]<=(Number(jreq[j.id])||0)))continue;                        // 職種ごとの最低人数も保てる日
-        if(shiftNeed&&isElig(s)&&availEL[d]<=shiftNeed)continue;                                   // 早番・遅番の人数も保てる日
+      for(let d=1;d<=nd;d++){ if(rr[d]||(!relax&&dayWork[d]<=min))continue;   // 空欄 かつ 休ませても最低人数を保てる日（最初の配置）
+        if(!relax&&myJobs.some(j=>dayJ[j.id][d]<=(Number(jreq[j.id])||0)))continue;                        // 職種ごとの最低人数も保てる日
+        if(!relax&&shiftNeed&&isElig(s)&&availEL[d]<=shiftNeed)continue;                                   // 早番・遅番の人数も保てる日
         const wi=weekIndexOf(d);
         const score=-((wu[wi]||0)*1000)+dayWork[d]*5+nearOff(rr,d); // 1: 休みが少ない週を優先 2: 出勤余力 3: 既存の休みから離す
         if(score>bestScore){bestScore=score;best=d;} }
@@ -2506,7 +2509,7 @@ $("#doAuto").onclick=()=>{
   if(noNightStaff)parts.push("夜勤が可能なスタッフが未設定です（スタッフ台帳でチェック）");
   else if(nightShort.length)parts.push(`夜勤の人数不足 ${nightShort.slice(0,6).join('・')}${nightShort.length>6?'…':''}日`);
   if(nightWarn.length)parts.push(`夜勤明けが休みになっていません → ${nightWarn.slice(0,5).join('、')}${nightWarn.length>5?'…':''}`);
-  if(lowDays.length)parts.push(`最低人数割れ ${lowDays.join("・")}日（希望休を調整）`);
+  if(lowDays.length)parts.push(`最低人数割れ ${lowDays.join("・")}日（公休日数を優先しました）`);
   jobs.forEach(j=>{const q=Number(jreq[j.id])||0; if(!q)return; const ds=[];
     for(let d=1;d<=nd;d++){ if(!isSetOff(d)&&dayJ[j.id][d]<q)ds.push(d); }
     if(ds.length)parts.push(`${j.short}不足 ${ds.length>6?ds.slice(0,6).join("・")+"…":ds.join("・")}日`); });
