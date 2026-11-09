@@ -15,7 +15,7 @@
 <style>
   :root{
     --ground:#F5F4EF; --surface:#FFFFFF; --surface-2:#FBFAF6;
-    --ink:#26302D; --ink-soft:#5E6A66; --ink-faint:#8A938E;
+    --ink:#26302D; --shift-black:#000; --ink-soft:#5E6A66; --ink-faint:#8A938E;
     --line:#E4E1D9; --line-strong:#D2CEC3;
     --accent:#2F7D6B; --accent-ink:#1F5A4C; --accent-soft:#E4F0EC;
     --warn:#B26B1E; --warn-soft:#F6EBDA;
@@ -27,7 +27,7 @@
   :root:not([data-theme="light"]){
     @media (prefers-color-scheme:dark){
       --ground:#171B1A; --surface:#1F2523; --surface-2:#242B29;
-      --ink:#E9EEEB; --ink-soft:#A6B0AB; --ink-faint:#7C8783;
+      --ink:#E9EEEB; --shift-black:#E9EEEB; --ink-soft:#A6B0AB; --ink-faint:#7C8783;
       --line:#333B39; --line-strong:#414A47;
       --accent:#5BB39C; --accent-ink:#8FCFBD; --accent-soft:#22322E;
       --warn:#D9A05A; --warn-soft:#33291A;
@@ -38,7 +38,7 @@
   }
   :root[data-theme="dark"]{
     --ground:#171B1A; --surface:#1F2523; --surface-2:#242B29;
-    --ink:#E9EEEB; --ink-soft:#A6B0AB; --ink-faint:#7C8783;
+    --ink:#E9EEEB; --shift-black:#E9EEEB; --ink-soft:#A6B0AB; --ink-faint:#7C8783;
     --line:#333B39; --line-strong:#414A47;
     --accent:#5BB39C; --accent-ink:#8FCFBD; --accent-soft:#22322E;
     --warn:#D9A05A; --warn-soft:#33291A;
@@ -1857,7 +1857,7 @@ function renderRoster(){
       const tmk=timeMark(s,d,e); // 時間変更した日は、記号（日勤など）を出さず、時間だけを赤で表示
       const hs=e.code&&statusByCode(e.code),hv=(S.rhalf[s.id]||{})[d],shown=(psym&&hs&&hs.work&&!hs.half&&(e.code==="日"||e.code==="出"))?psym:(e.code==="公"?"休":e.code), /* 公休は「休」と表示 */hm=(hs&&hs.half&&hv)?`<span class="hm">${hv==='pm'?'後':'前'}</span>`:'';
       const chg=planDiff(s.id,d);
-      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}${chg?' chg-'+chg.k:''}"${chg?` title="${escapeHtml(chg.text)}"`:''} data-sid="${s.id}" data-day="${d}" style="${e.color?`color:${e.color}`:''}">${tmk||(e.hr?`<span class="hl">${e.hr==='pm'?'PM':'AM'}${e.code==='公'?'休':e.code}</span>`:((hs&&isWishStatus(hs)?'<span class="wish">公</span>':(((shown!==e.code&&shown!=="休")||(drvSymOf(e.code)&&e.code.length>1))?`<span class="ps" style="font-size:${shown.length<=2?11:shown.length===3?10:shown.length<=5?9:5.5}px">${escapeHtml(shown)}</span>`:shown))+hm))}</td>`;}
+      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}${chg?' chg-'+chg.k:''}"${chg?` title="${escapeHtml(chg.text)}"`:''} data-sid="${s.id}" data-day="${d}" style="${(e.code==="日"||drvSymOf(e.code))?'color:var(--shift-black)':(e.color?`color:${e.color}`:'')}">${tmk||(e.hr?`<span class="hl">${e.hr==='pm'?'PM':'AM'}${e.code==='公'?'休':e.code}</span>`:((hs&&isWishStatus(hs)?'<span class="wish">公</span>':(((shown!==e.code&&shown!=="休")||(drvSymOf(e.code)&&e.code.length>1))?`<span class="ps" style="font-size:${shown.length<=2?11:shown.length===3?10:shown.length<=5?9:5.5}px">${escapeHtml(shown)}</span>`:shown))+hm))}</td>`;}
     const off=offCount(s.id),tgt=staffTarget(s);
     const cls=tgt==null?'ok':off<tgt?'under':off>tgt?'over':'ok';
     if(sc){ const tot=cnt.reduce((a,b)=>a+b,0); boxRows.push({cnt,tot,off,tgt});
