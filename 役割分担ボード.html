@@ -1448,11 +1448,11 @@ function staffTarget(s){ const t=typeById(s.typeId); if(isPartTimeType(t)&&typeN
 const canEarlyOf=s=>(s.canEarly===undefined||s.canEarly===null)?!isPartTimeType(typeById(s.typeId)):!!s.canEarly;
 const canLateOf=s=>(s.canLate===undefined||s.canLate===null)?!isPartTimeType(typeById(s.typeId)):!!s.canLate;
 // 勤務の入り方（訪問介護・看護）：早番・遅番・夜勤を、プルダウン1つで選ぶ
-const SHIFT_MODES=[["day","日勤のみ"],["el","早番・遅番 可能（夜勤なし）"],["all","早番・遅番・夜勤 可能"],["night","夜勤 可能（日勤と夜勤）"],["earlyOnly","早番のみ"],["lateOnly","遅番のみ"],["nightOnly","夜勤のみ"]];
+const SHIFT_MODES=[["day","日勤のみ"],["e","早番 可能（日勤と早番）"],["el","早番・遅番 可能（夜勤なし）"],["all","早番・遅番・夜勤 可能"],["night","夜勤 可能（日勤と夜勤）"],["earlyOnly","早番のみ"],["lateOnly","遅番のみ"],["nightOnly","夜勤のみ"]];
 function shiftModeOf(s){ if(s.nightOnly)return "nightOnly"; if(s.earlyOnly)return "earlyOnly"; if(s.lateOnly)return "lateOnly";
-  const e=canEarlyOf(s), l=canLateOf(s), n=!!s.canNight; if(n)return (e||l)?"all":"night"; return (e||l)?"el":"day"; }
+  const e=canEarlyOf(s), l=canLateOf(s), n=!!s.canNight; if(n)return (e||l)?"all":"night"; if(e&&!l)return "e"; return (e||l)?"el":"day"; }
 function applyShiftMode(s,m){ s.earlyOnly=m==="earlyOnly"; s.lateOnly=m==="lateOnly"; s.nightOnly=m==="nightOnly";
-  s.canEarly=["el","all","earlyOnly"].includes(m); s.canLate=["el","all","lateOnly"].includes(m); s.canNight=["all","night","nightOnly"].includes(m);
+  s.canEarly=["e","el","all","earlyOnly"].includes(m); s.canLate=["el","all","lateOnly"].includes(m); s.canNight=["all","night","nightOnly"].includes(m);
   if(!s.canNight)s.nightCount=null; }
 function typeName(s){const t=typeById(s.typeId);return t?t.name:"";}
 // 勤務時間帯（ドライバー等）: s.hours=null→終日 / {am:{s,e}|null, pm:{s,e}|null}
