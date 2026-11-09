@@ -274,9 +274,9 @@
   table.roster td.sumcell.s-off.over{color:var(--alert)}
   table.roster td.rc{cursor:pointer;height:34px;font-weight:700;font-size:14px}
   table.roster .rname .wt{font-size:10.5px;font-weight:700;color:var(--ink-soft);line-height:1.2;margin-top:1px;white-space:nowrap}
-  table.roster td.rc .wish{color:#C62828}
+  table.roster td.rc .wish{color:#C9524D}
   table.roster td.rc .hl{display:block;font-size:9px;font-weight:700;letter-spacing:-.3px;white-space:nowrap}
-  table.roster td.rc .tm{display:block;letter-spacing:-.4px;font-size:8px;line-height:1.05;font-weight:700;color:#C62828;white-space:nowrap}
+  table.roster td.rc .tm{display:block;letter-spacing:-.4px;font-size:8px;line-height:1.05;font-weight:700;color:#C9524D;white-space:nowrap}
   table.roster td.rc .ps{display:block;font-weight:700;letter-spacing:-.3px;white-space:nowrap;line-height:1.1} /* 非常勤の記号（A6.5など）は、長さに合わせて小さく表示 */
   table.roster td.rc .hm{display:block;font-size:8px;line-height:1;margin-top:1px}
   /* 予定から変わったマスを色で示す（黄＝変更・時間変更／赤＝出勤の予定が休みに変わった） */
@@ -454,7 +454,7 @@
     .panel{box-shadow:none;border:1px solid #999;margin-bottom:8px}
     .panel-head{background:#f0f0f0}
     .board-wrap,.rtable-wrap{overflow:visible;box-shadow:none;border:1px solid #999}
-    table.roster td.rc .wish{color:#C62828!important} /* 希望休は印刷・PDFでも赤 */
+    table.roster td.rc .wish{color:#C9524D!important} /* 希望休は印刷・PDFでも赤 */
     table.roster td.rc.auto{opacity:1} /* 自動作成の薄い表示は画面用。印刷では全マス同じ濃さ */
     table.board{min-width:0}
     table.board thead th,table.roster thead th{position:static;background:#f0f0f0}
@@ -1415,7 +1415,7 @@ function partActualHours(s){ const sym=partSymbolOf(s); if(!sym)return null; con
   return h; }
 function symActualText(s){ const h=partActualHours(s); return h==null?"":`（実働${fmtH(h)}時間）`; }
 // 希望休は勤務表に赤い「希」で表示（印刷・PDFでも赤）
-const WISH_RED="#C62828";
+const WISH_RED="#C9524D";
 const isWishStatus=st=>!!(st&&(st.code==="希"||/希望/.test(st.label||"")));
 const isPartTimeType=t=>!!(t&&/時給|契約|非常勤/.test(t.name||"")); // 時給・契約：勤務できる曜日と勤務時間を台帳で決める人（半休なし・休日数の目標なし）
 // 年間休日の表（部署×1〜12月）。管理者が設定。未設定の月は既定9日。非常勤は目標なし
