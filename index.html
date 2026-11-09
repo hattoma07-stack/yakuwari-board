@@ -1447,6 +1447,13 @@ function staffTarget(s){ const t=typeById(s.typeId); if(isPartTimeType(t)&&typeN
 // 早番・遅番が可能か（訪問介護・看護）。台帳で選んでいなければ、月給は可能、契約・時給は不可
 const canEarlyOf=s=>(s.canEarly===undefined||s.canEarly===null)?!isPartTimeType(typeById(s.typeId)):!!s.canEarly;
 const canLateOf=s=>(s.canLate===undefined||s.canLate===null)?!isPartTimeType(typeById(s.typeId)):!!s.canLate;
+// 勤務の入り方（訪問介護・看護）：早番・遅番・夜勤を、プルダウン1つで選ぶ
+const SHIFT_MODES=[["day","日勤のみ"],["el","早番・遅番 可能（夜勤なし）"],["all","早番・遅番・夜勤 可能"],["night","夜勤 可能（日勤と夜勤）"],["earlyOnly","早番のみ"],["lateOnly","遅番のみ"],["nightOnly","夜勤のみ"]];
+function shiftModeOf(s){ if(s.nightOnly)return "nightOnly"; if(s.earlyOnly)return "earlyOnly"; if(s.lateOnly)return "lateOnly";
+  const e=canEarlyOf(s), l=canLateOf(s), n=!!s.canNight; if(n)return (e||l)?"all":"night"; return (e||l)?"el":"day"; }
+function applyShiftMode(s,m){ s.earlyOnly=m==="earlyOnly"; s.lateOnly=m==="lateOnly"; s.nightOnly=m==="nightOnly";
+  s.canEarly=["el","all","earlyOnly"].includes(m); s.canLate=["el","all","lateOnly"].includes(m); s.canNight=["all","night","nightOnly"].includes(m);
+  if(!s.canNight)s.nightCount=null; }
 function typeName(s){const t=typeById(s.typeId);return t?t.name:"";}
 // 勤務時間帯（ドライバー等）: s.hours=null→終日 / {am:{s,e}|null, pm:{s,e}|null}
 const AM_DEF={s:"08:00",e:"10:00"}, PM_DEF={s:"16:00",e:"18:00"};
@@ -1964,14 +1971,11 @@ function renderStaffList(){
         <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="drive-in" ${s.canDrive?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">送迎が可能（勤務表で「送迎職員」に数えます）</label>${s.canDrive?`
         <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="hiace-in" ${s.canHiace?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">ハイエースが運転　可能</label>`:""}
       </div>`:""}
-      ${nightDeptOn()?`<div class="line2">
-        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="early-can" ${canEarlyOf(s)?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">早番が可能（自動作成で早番を割り振る対象になります）</label>
-        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;margin-top:6px"><input type="checkbox" class="late-can" ${canLateOf(s)?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">遅番が可能（自動作成で遅番を割り振る対象になります）</label>
-        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;margin-top:6px"><input type="checkbox" class="night-can" ${s.canNight?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">夜勤が可能（自動作成で夜勤を割り振る対象になります）</label>${(s.canNight||s.nightOnly)?`
-        <label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;margin-top:6px"><input type="checkbox" class="night-only" ${s.nightOnly?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">夜勤のみ（夜勤だけに入り、夜勤以外の日は休みにします）</label>`:""}${(s.canNight||s.nightOnly)?`
-        <label style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;margin-top:6px">月の夜勤回数
-          <input type="number" class="night-cnt" min="0" max="31" placeholder="指定なし" value="${s.nightCount==null?'':s.nightCount}" style="width:84px;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:5px 8px">回</label>`:""}
-      </div>`:""}
+      ${nightDeptOn()?(()=>{ const m=shiftModeOf(s), st="font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:7px 9px;font-weight:700";
+        return `<div class="line2"><div class="fl"><span>勤務の入り方（自動作成で使います）</span>
+          <select class="shift-mode" style="${st}">${SHIFT_MODES.map(([v,l])=>`<option value="${v}"${v===m?" selected":""}>${l}</option>`).join("")}</select></div>${["all","night","nightOnly"].includes(m)?`
+          <label style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;margin-top:6px">月の夜勤回数
+          <input type="number" class="night-cnt" min="0" max="31" placeholder="指定なし" value="${s.nightCount==null?'':s.nightCount}" style="width:84px;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:5px 8px">回</label>`:""}</div>`; })():""}
       ${isDrv?`<div class="line2"><div style="font-size:12px;color:var(--ink-soft)">雇用形態：時給（ドライバーは時給です）</div></div>`:`<div class="line2">
         <div class="fl"><span>雇用形態</span><div class="seg tyseg">${segs}</div></div>
       </div>`}
@@ -2000,15 +2004,10 @@ function renderStaffList(){
     card.querySelector('.nm-in').value=s.name;
     card.querySelector('input[type=color]').oninput=e=>{s.color=e.target.value;saveStaff();refreshAll();};
     card.querySelector('.nm-in').oninput=e=>{s.name=e.target.value;saveStaff();refreshAll();};
-    const nchk=card.querySelector('.night-can');
-    if(nchk){ nchk.onchange=e=>{s.canNight=e.target.checked;if(!s.canNight){s.nightOnly=false;s.nightCount=null;}saveStaff();renderStaffList();}; }
+    const smode=card.querySelector('.shift-mode'); // 勤務の入り方（訪問介護・看護）
+    if(smode)smode.onchange=e=>{ applyShiftMode(s,e.target.value); saveStaff(); renderStaffList(); };
     const hqc=card.querySelector('.hq-in'); if(hqc)hqc.onchange=e=>{s.hq=e.target.checked;saveStaff();}; // 本部・事務：本部所属のスタッフ
     const rdc=card.querySelector('.rd-in'); if(rdc)rdc.onchange=e=>{s.rdQual=e.target.checked;saveStaff();renderStaffList();refreshAll();}; // 栄養士・厨房：管理栄養士の資格者
-    const ech=card.querySelector('.early-can'), lch=card.querySelector('.late-can'); // 契約：早番・遅番が可能か（訪問介護・看護）
-    if(ech)ech.onchange=e=>{s.canEarly=e.target.checked;saveStaff();};
-    if(lch)lch.onchange=e=>{s.canLate=e.target.checked;saveStaff();};
-    const nonly=card.querySelector('.night-only');
-    if(nonly)nonly.onchange=e=>{s.nightOnly=e.target.checked;if(s.nightOnly)s.canNight=true;saveStaff();renderStaffList();};
     const ncnt=card.querySelector('.night-cnt');
     if(ncnt)ncnt.oninput=e=>{s.nightCount=e.target.value===''?null:Math.max(0,Number(e.target.value));saveStaff();};
     const dchk=card.querySelector('.drive-in');
@@ -2497,6 +2496,8 @@ $("#doAuto").onclick=()=>{
     const rr=S.roster[s.id]; for(let d=1;d<=nd;d++){ if(!rr[d]){rr[d]=s.nightOnly?rcode:wcode;setAuto(s.id,d,true);} } }); // 残り → 出勤（夜勤のみの人は休み）
   // 6) 早番・遅番の振り分け（自動で出勤にした日だけ。手入力した記号はそのまま。回数が少ない人から。遅番の翌日の早番は避ける）
   const shortE=[],shortL=[];
+  S.staff.forEach(s=>{ if(!(s.earlyOnly||s.lateOnly))return; const code=s.earlyOnly?"早":"遅"; if(!statusByCode(code)||!isStatusEnabled(code))return; // 早番のみ・遅番のみの人は、出勤する日をすべて早番（遅番）にする
+    for(let d=1;d<=nd;d++){ if(S.roster[s.id][d]===wcode&&(S.rauto[s.id]||{})[d])S.roster[s.id][d]=code; } });
   if(shiftMixOn()&&S.shiftN&&statusByCode("早")&&statusByCode("遅")&&isStatusEnabled("早")&&isStatusEnabled("遅")){
     const eN=Number(S.shiftN.early)||0, lN=Number(S.shiftN.late)||0;
     if(eN||lN){
