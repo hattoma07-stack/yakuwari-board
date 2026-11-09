@@ -2405,11 +2405,13 @@ $("#doAuto").onclick=()=>{
     if(tg0!=null&&typeName(s)==="契約"){ let o=0; for(let d=1;d<=nd;d++){const c=rr[d],st=c&&statusByCode(c); if(st&&!st.work&&!isPaidSt(st))o+=st.half?0.5:1;} use=spread(cand,Math.max(0,Math.floor(tg0-o+1e-9))); } // 契約は、公休が規定の日数を超えないよう、勤務できない日の一部を出勤にする
     use.forEach(d=>{rr[d]=rcode;setAuto(s.id,d,true);}); });
   const wOfCode=(c,s,d)=>{ if(c==="応")return 0; if(!c)return (s&&s.nightOnly)?0:1; const st=statusByCode(c); if(st&&!st.work&&!isWishStatus(st)&&s&&d&&(S.rhalf[s.id]||{})[d])return 0.5; return st?(st.half?0.5:(st.work?1:0)):1; }; // 空欄=出勤候補1・半日=0.5
+  // 夜勤明けの休みは、入れない（夜勤の翌日も、ほかの日と同じように扱う）。以前の動きに戻す場合は true
+  const NIGHT_AKE=false;
   // 2b) 夜勤の翌日は休み（夜勤の記号は手入力のもの。翌日が空欄なら公休にする。前月末の夜勤は当月1日を休みに）
   const isNight=c=>{const st=c&&statusByCode(c);return !!(st&&st.night);};
   const isRestC=c=>{const st=c&&statusByCode(c);return !!(st&&!st.work);};
   const nightWarn=[];
-  { const[py,pm]=S.ym.split("-").map(Number); const pd=new Date(py,pm-2,1);
+  if(NIGHT_AKE){ const[py,pm]=S.ym.split("-").map(Number); const pd=new Date(py,pm-2,1);
     const prevYm=pd.getFullYear()+"-"+String(pd.getMonth()+1).padStart(2,"0"), prevLast=daysInMonth(prevYm);
     const prevR=jget(K.roster+prevYm,{})||{};
     S.staff.forEach(s=>{ const rr=S.roster[s.id];
@@ -2417,6 +2419,12 @@ $("#doAuto").onclick=()=>{
       for(let d=1;d<nd;d++){ if(!isNight(rr[d]))continue;
         if(!rr[d+1]){rr[d+1]=rcode;setAuto(s.id,d+1,true);}
         else if(!isRestC(rr[d+1])&&!isNight(rr[d+1]))nightWarn.push(`${s.name} ${d+1}日`); } }); }
+  if(!NIGHT_AKE){ // 夜勤が2日続いた次の日は、休み（手で入れた夜勤も対象。前月末から続く場合は当月1日）
+    const[py,pm]=S.ym.split("-").map(Number); const pd=new Date(py,pm-2,1), prevYm=pd.getFullYear()+"-"+String(pd.getMonth()+1).padStart(2,"0"), prevLast=daysInMonth(prevYm), prevR=jget(K.roster+prevYm,{})||{};
+    S.staff.forEach(s=>{ const rr=S.roster[s.id], pr=prevR[s.id]||{};
+      if(isNight(pr[prevLast])&&isNight(pr[prevLast-1])&&!rr[1]){rr[1]=rcode;setAuto(s.id,1,true);}
+      if(isNight(pr[prevLast])&&isNight(rr[1])&&!rr[2]){rr[2]=rcode;setAuto(s.id,2,true);}
+      for(let d=2;d<nd;d++){ if(isNight(rr[d])&&isNight(rr[d-1])&&!rr[d+1]){rr[d+1]=rcode;setAuto(s.id,d+1,true);} } }); }
   // 2c) 夜勤の自動割り振り（「夜勤が可能」のスタッフだけ。夜勤明けの翌日は公休。夜勤が少ない人から順に）
   const nightSt=enabledStatuses().find(st=>st.night);
   const nightN=(nightDeptOn()&&nightSt)?(Number(S.nightN)||0):0;
@@ -2433,7 +2441,7 @@ $("#doAuto").onclick=()=>{
     const offOf=s=>{let o=0;const rr=S.roster[s.id];for(let d=1;d<=nd;d++){const st=rr[d]&&statusByCode(rr[d]);if(st&&!isPaidSt(st))o+=st.half?0.5:(!st.work?((S.rhalf[s.id]||{})[d]&&!isWishStatus(st)?0.5:1):0);}return o;};
     // 基本は1回ずつ。1回ずつでは、その晩に入れる人がいないときだけ、前の日に夜勤の人が続けて入る（最大 S.nightRun 回まで。続けた最後の翌日が休み）
     const runMax=Math.max(1,Number(S.nightRun)||1);
-    const tryExtend=d=>{ if(runMax<2||d<2)return false; let best=null,bs=Infinity;
+    const tryExtend=d=>{ if(!NIGHT_AKE||runMax<2||d<2)return false; let best=null,bs=Infinity;
       cands.forEach(s=>{ const rr=S.roster[s.id]; if(rr[d-1]!==nightSt.code)return;
         if(!(S.rauto[s.id]||{})[d]||!isRestC(rr[d]))return;                       // その日が、夜勤明けの自動の休みであること
         let run=0; for(let k=d-1;k>=1&&rr[k]===nightSt.code;k--)run++; if(run>=runMax)return;
@@ -2450,18 +2458,23 @@ $("#doAuto").onclick=()=>{
       while(have<nightN){
         let best=null,bs=Infinity;
         cands.forEach(s=>{const rr=S.roster[s.id]; if(rr[d])return;
+          if(!NIGHT_AKE){ let run=0; for(let k=d-1;k>=1&&isNight(rr[k]);k--)run++; if(run>=Math.min(runMax,2))return;   // 続けて入れる夜勤は、最大2回まで（2日続いたら次の日は休み）
+            if(run>=1&&d<nd&&!rr[d+1]&&!s.nightOnly&&staffTarget(s)!=null&&offOf(s)+1>staffTarget(s)&&swapDay(s,d)==null)return; } // 休みを入れると公休が規定を超えるときは、2日目に入れない
           const want=(s.nightCount==null||s.nightCount==='')?null:Number(s.nightCount); if(want!=null&&nCnt[s.id]>=want)return;   // 個人の月の夜勤回数に達したら入れない
           const nextBlank=d<nd&&!rr[d+1];
-          if(d<nd&&!nextBlank&&!isRestC(rr[d+1]))return;   // 翌日がすでに勤務なら不可
-          if(nextBlank&&!s.nightOnly&&staffTarget(s)!=null&&offOf(s)+1>staffTarget(s)&&swapDay(s,d)==null)return;   // 夜勤明けの休みで休日数の目標を超えないように
+          if(NIGHT_AKE&&d<nd&&!nextBlank&&!isRestC(rr[d+1]))return;   // 翌日がすでに勤務なら不可
+          if(NIGHT_AKE&&nextBlank&&!s.nightOnly&&staffTarget(s)!=null&&offOf(s)+1>staffTarget(s)&&swapDay(s,d)==null)return;   // 夜勤明けの休みで休日数の目標を超えないように
           // 回数を指定した人を最優先（残り回数÷残り日数が大きい人から）、次に夜勤のみの人、あとは夜勤が少ない人から
           let sc=want!=null?(-3000-((want-nCnt[s.id])/(nd-d+1))*1000):(nCnt[s.id]+(s.nightOnly?-1000:0)); if(weeklyTgt(s)&&!wkN[s.id][wkOf(d)])sc-=5000; /* その週にまだ夜勤がない契約・時給の人を優先 */ if(sc<bs){bs=sc;best=s;} });
         if(!best){ if(tryExtend(d)){have++;continue;} nightShort.push(d);break; }
         const rr=S.roster[best.id];
-        if(d<nd&&!rr[d+1]&&!best.nightOnly&&staffTarget(best)!=null&&offOf(best)+1>staffTarget(best)){ const x=swapDay(best,d); if(x){ delete rr[x]; delete (S.rauto[best.id]||{})[x]; } }
+        if(NIGHT_AKE&&d<nd&&!rr[d+1]&&!best.nightOnly&&staffTarget(best)!=null&&offOf(best)+1>staffTarget(best)){ const x=swapDay(best,d); if(x){ delete rr[x]; delete (S.rauto[best.id]||{})[x]; } }
         rr[d]=nightSt.code;setAuto(best.id,d,true);
         nCnt[best.id]++;wkN[best.id][wkOf(d)]=(wkN[best.id][wkOf(d)]||0)+1;have++;
-        if(d<nd&&!rr[d+1]){rr[d+1]=rcode;setAuto(best.id,d+1,true);}
+        if(NIGHT_AKE&&d<nd&&!rr[d+1]){rr[d+1]=rcode;setAuto(best.id,d+1,true);}
+        if(!NIGHT_AKE&&d>1&&d<nd&&isNight(rr[d-1])&&!rr[d+1]){ // 夜勤が2日続いたので、次の日は休み
+          if(!best.nightOnly&&staffTarget(best)!=null&&offOf(best)+1>staffTarget(best)){ const x=swapDay(best,d); if(x){ delete rr[x]; delete (S.rauto[best.id]||{})[x]; } }
+          rr[d+1]=rcode;setAuto(best.id,d+1,true); }
       } }
     cands.forEach(s=>{ if(!weeklyTgt(s))return; const wn=Math.floor((nd-1+dow(S.ym,1))/7); for(let w=0;w<=wn;w++){ const ds=[]; for(let d=1;d<=nd;d++)if(wkOf(d)===w)ds.push(d); if(ds.length>=4&&!wkN[s.id][w])nightWeekShort.push(`${s.name} ${ds[0]}〜${ds[ds.length-1]}日の週`); } });
     cands.forEach(s=>{ if(s.nightCount!=null&&s.nightCount!==''&&nCnt[s.id]<Number(s.nightCount))nightCountShort.push(`${s.name} ${nCnt[s.id]}/${s.nightCount}回`); }); }
@@ -2492,7 +2505,7 @@ $("#doAuto").onclick=()=>{
   // 早番・遅番に入れる人（常勤）が足りなくならないよう、その日の「早遅に入れる人数」を数えておく
   const shiftOnPre=shiftMixOn()&&S.shiftN&&statusByCode("早")&&statusByCode("遅")&&isStatusEnabled("早")&&isStatusEnabled("遅");
   const shiftNeed=shiftOnPre?((Number(S.shiftN.early)||0)+(Number(S.shiftN.late)||0)):0;
-  const isElig=s=>!isPartTimeType(typeById(s.typeId))&&!s.nightOnly;
+  const isElig=s=>(canEarlyOf(s)||canLateOf(s))&&!s.nightOnly; // 早番・遅番に入れる人（台帳の「勤務の入り方」で決まる）
   const availEL={}; for(let d=1;d<=nd;d++)availEL[d]=S.staff.filter(s=>{if(!isElig(s))return false;const c=S.roster[s.id][d];return !c||c==="早"||c==="遅";}).length;
   let progress=true, relax=false; // まず最低人数を守って配置。それでも規定の公休日数に届かない人は、最低人数より公休日数を優先して配置する
   while(progress||!relax){ if(!progress){relax=true;} progress=false;
@@ -2501,7 +2514,7 @@ $("#doAuto").onclick=()=>{
       const myJobs=jobs.filter(j=>inJob(j,s)&&(Number(jreq[j.id])||0)>0);
       for(let d=1;d<=nd;d++){ if(rr[d]||(!relax&&dayWork[d]<=min))continue;   // 空欄 かつ 休ませても最低人数を保てる日（最初の配置）
         if(!relax&&myJobs.some(j=>dayJ[j.id][d]<=(Number(jreq[j.id])||0)))continue;                        // 職種ごとの最低人数も保てる日
-        if(!relax&&shiftNeed&&isElig(s)&&availEL[d]<=shiftNeed)continue;                                   // 早番・遅番の人数も保てる日
+        if(shiftNeed&&isElig(s)&&availEL[d]<=shiftNeed)continue;                                   // 早番・遅番の人数は、公休日数よりも優先して守る（日勤は、そのあと）
         const wi=weekIndexOf(d);
         const score=-((wu[wi]||0)*1000)+dayWork[d]*5+nearOff(rr,d); // 1: 休みが少ない週を優先 2: 出勤余力 3: 既存の休みから離す
         if(score>bestScore){bestScore=score;best=d;} }
@@ -2527,10 +2540,11 @@ $("#doAuto").onclick=()=>{
           if(!pool.some(s=>elig(s,code))){(code==="早"?shortE:shortL).push(d);return;}
           let best=-1,bs=Infinity;
           pool.forEach((s,i)=>{ if(!elig(s,code))return; const prev=S.roster[s.id][d-1];
-            const sc=cnt[s.id][code]*10+cnt[s.id][other]+((code==="早"&&prev==="遅")?100:0)+((code==="遅"&&prev==="早")?0:0);
+            const sc=cnt[s.id][code]*10+cnt[s.id][other]+((code==="早"&&prev==="遅")?100:0)+(elig(s,other)?0:-5000); // そのシフトしかできない人を先に使う（もう一方の人数を確保しやすくする）
             if(sc<bs){bs=sc;best=i;} });
           const st=pool.splice(best,1)[0]; S.roster[st.id][d]=code; cnt[st.id][code]++; need--; } };
-        pick("早",eN-have("早"),"遅"); pick("遅",lN-have("遅"),"早");
+        if(pool.filter(s=>elig(s,"遅")).length<pool.filter(s=>elig(s,"早")).length){ pick("遅",lN-have("遅"),"早"); pick("早",eN-have("早"),"遅"); } // 入れる人が少ないほうのシフトから先に決める
+        else { pick("早",eN-have("早"),"遅"); pick("遅",lN-have("遅"),"早"); }
       } } }
   saveRoster();renderRoster();closeModal('#autoOverlay');
   // 5) 通知（最低人数割れ＝手入力希望休が原因の日／休日数が目標に届かない人）
