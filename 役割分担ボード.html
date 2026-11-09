@@ -2433,8 +2433,8 @@ $("#doAuto").onclick=()=>{
     if(tg0!=null&&typeName(s)==="契約"){ let o=0; for(let d=1;d<=nd;d++){const c=rr[d],st=c&&statusByCode(c); if(st&&!st.work&&!isPaidSt(st))o+=st.half?0.5:1;} use=spread(cand,Math.max(0,Math.floor(tg0-o+1e-9))); } // 契約は、公休が規定の日数を超えないよう、勤務できない日の一部を出勤にする
     use.forEach(d=>{rr[d]=rcode;setAuto(s.id,d,true);}); });
   const wOfCode=(c,s,d)=>{ if(c==="応")return 0; if(!c)return (s&&s.nightOnly)?0:1; const st=statusByCode(c); if(st&&!st.work&&!isWishStatus(st)&&s&&d&&(S.rhalf[s.id]||{})[d])return 0.5; return st?(st.half?0.5:(st.work?1:0)):1; }; // 空欄=出勤候補1・半日=0.5
-  // 夜勤明けの休みは、入れない（夜勤の翌日も、ほかの日と同じように扱う）。以前の動きに戻す場合は true
-  const NIGHT_AKE=false;
+  // 夜勤明け：夜勤の次の日は、休みにする（夜勤が続く場合は、最後の夜勤の次の日が休み）。夜勤明けの休みをなくす場合は false
+  const NIGHT_AKE=true;
   // 2b) 夜勤の翌日は休み（夜勤の記号は手入力のもの。翌日が空欄なら公休にする。前月末の夜勤は当月1日を休みに）
   const isNight=c=>{const st=c&&statusByCode(c);return !!(st&&st.night);};
   const isRestC=c=>{const st=c&&statusByCode(c);return !!(st&&!st.work);};
@@ -2476,7 +2476,7 @@ $("#doAuto").onclick=()=>{
     const tryExtend=d=>{ if(!NIGHT_AKE||runMax<2||d<2)return false; let best=null,bs=Infinity;
       cands.forEach(s=>{ const rr=S.roster[s.id]; if(rr[d-1]!==nightSt.code)return;
         if(!(S.rauto[s.id]||{})[d]||!isRestC(rr[d]))return;                       // その日が、夜勤明けの自動の休みであること
-        let run=0; for(let k=d-1;k>=1&&rr[k]===nightSt.code;k--)run++; if(run>=runMax)return;
+        let run=0; for(let k=d-1;k>=1&&rr[k]===nightSt.code;k--)run++; if(run>=Math.min(runMax,2))return;
         const want=(s.nightCount==null||s.nightCount==='')?null:Number(s.nightCount); if(want!=null&&nCnt[s.id]>=want)return;
         if(!workDayOk(s,d))return;
         if(d<nd&&rr[d+1]&&!isRestC(rr[d+1]))return;                                // 翌日がすでに勤務なら不可
