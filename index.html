@@ -2447,9 +2447,13 @@ $("#doAuto").onclick=()=>{
       for(let d=1;d<nd;d++){ if(!isNight(rr[d]))continue;
         if(!rr[d+1]){rr[d+1]=rcode;setAuto(s.id,d+1,true);}
         else if(!isRestC(rr[d+1])&&!isNight(rr[d+1]))nightWarn.push(`${s.name} ${d+1}日`); } }); }
+  const nightRunWarn=[], prevTail={}; // 前月末から続く夜勤の回数（人ごと）
+  { const[py,pm]=S.ym.split("-").map(Number); const pd=new Date(py,pm-2,1), prevYm=pd.getFullYear()+"-"+String(pd.getMonth()+1).padStart(2,"0"), prevLast=daysInMonth(prevYm), prevR=jget(K.roster+prevYm,{})||{};
+    S.staff.forEach(s=>{ const pr=prevR[s.id]||{}; let n=0; for(let k=prevLast;k>=1&&isNight(pr[k]);k--)n++; prevTail[s.id]=n; }); }
   if(!NIGHT_AKE){ // 夜勤が2日続いた次の日は、休み（手で入れた夜勤も対象。前月末から続く場合は当月1日）
     const[py,pm]=S.ym.split("-").map(Number); const pd=new Date(py,pm-2,1), prevYm=pd.getFullYear()+"-"+String(pd.getMonth()+1).padStart(2,"0"), prevLast=daysInMonth(prevYm), prevR=jget(K.roster+prevYm,{})||{};
     S.staff.forEach(s=>{ const rr=S.roster[s.id], pr=prevR[s.id]||{};
+      { let run=prevTail[s.id]||0; for(let d=1;d<=nd;d++){ if(isNight(rr[d])){ run++; if(run===3)nightRunWarn.push(`${s.name} ${d}日`); if(run>=2&&d<nd&&rr[d+1]&&!isRestC(rr[d+1])&&!isNight(rr[d+1]))nightWarn.push(`${s.name} ${d+1}日`); } else run=0; } } // 手入力で、夜勤が3日以上続く／2日続いた次の日が休みでない場合は、警告
       if(isNight(pr[prevLast])&&isNight(pr[prevLast-1])&&!rr[1]){rr[1]=rcode;setAuto(s.id,1,true);}
       if(isNight(pr[prevLast])&&isNight(rr[1])&&!rr[2]){rr[2]=rcode;setAuto(s.id,2,true);}
       for(let d=2;d<nd;d++){ if(isNight(rr[d])&&isNight(rr[d-1])&&!rr[d+1]){rr[d+1]=rcode;setAuto(s.id,d+1,true);} } }); }
@@ -2486,8 +2490,9 @@ $("#doAuto").onclick=()=>{
       while(have<nightN){
         let best=null,bs=Infinity;
         cands.forEach(s=>{const rr=S.roster[s.id]; if(rr[d])return;
-          if(!NIGHT_AKE){ let run=0; for(let k=d-1;k>=1&&isNight(rr[k]);k--)run++; if(run>=Math.min(runMax,2))return;   // 続けて入れる夜勤は、最大2回まで（2日続いたら次の日は休み）
-            if(run>=1&&d<nd&&!rr[d+1]&&!s.nightOnly&&staffTarget(s)!=null&&offOf(s)+1>staffTarget(s)&&swapDay(s,d)==null)return; } // 休みを入れると公休が規定を超えるときは、2日目に入れない
+          if(!NIGHT_AKE){ let run=0, k=d-1; for(;k>=1&&isNight(rr[k]);k--)run++; if(k<1)run+=(prevTail[s.id]||0); if(run>=Math.min(runMax,2))return;   // 続けて入れる夜勤は、最大2回まで（絶対）
+            if(run>=1&&d<nd&&rr[d+1]&&!isRestC(rr[d+1]))return; } // 2日続く夜勤は、次の日が休みにできるときだけ（次の日に手入力の勤務があれば、入れない）
+          { const w0=(s.nightCount==null||s.nightCount==='')?null:Number(s.nightCount); if(w0!=null&&w0<=4&&(wkN[s.id][wkOf(d)]||0)>=1)return; } // 月の夜勤が4回以下の人は、1週間に1回まで（週に1回のペース）
           const want=(s.nightCount==null||s.nightCount==='')?null:Number(s.nightCount); if(want!=null&&nCnt[s.id]>=want)return;   // 個人の月の夜勤回数に達したら入れない
           const nextBlank=d<nd&&!rr[d+1];
           if(NIGHT_AKE&&d<nd&&!nextBlank&&!isRestC(rr[d+1]))return;   // 翌日がすでに勤務なら不可
@@ -2500,7 +2505,7 @@ $("#doAuto").onclick=()=>{
         rr[d]=nightSt.code;setAuto(best.id,d,true);
         nCnt[best.id]++;wkN[best.id][wkOf(d)]=(wkN[best.id][wkOf(d)]||0)+1;have++;
         if(NIGHT_AKE&&d<nd&&!rr[d+1]){rr[d+1]=rcode;setAuto(best.id,d+1,true);}
-        if(!NIGHT_AKE&&d>1&&d<nd&&isNight(rr[d-1])&&!rr[d+1]){ // 夜勤が2日続いたので、次の日は休み
+        if(!NIGHT_AKE&&d<nd&&(d>1?isNight(rr[d-1]):(prevTail[best.id]||0)>0)&&!rr[d+1]){ // 夜勤が2日続いたので、次の日は休み（絶対。公休が規定を超えるときは、別の自動の公休を出勤に戻して数を保つ）
           if(!best.nightOnly&&staffTarget(best)!=null&&offOf(best)+1>staffTarget(best)){ const x=swapDay(best,d); if(x){ delete rr[x]; delete (S.rauto[best.id]||{})[x]; } }
           rr[d+1]=rcode;setAuto(best.id,d+1,true); }
       } }
@@ -2584,7 +2589,8 @@ $("#doAuto").onclick=()=>{
   if(nightWeekShort.length)parts.push(`週1回の夜勤に届かない週 → ${nightWeekShort.slice(0,4).join('、')}${nightWeekShort.length>4?'…':''}`);
   if(noNightStaff)parts.push("夜勤が可能なスタッフが未設定です（スタッフ台帳でチェック）");
   else if(nightShort.length)parts.push(`夜勤の人数不足 ${nightShort.slice(0,6).join('・')}${nightShort.length>6?'…':''}日`);
-  if(nightWarn.length)parts.push(`夜勤明けが休みになっていません → ${nightWarn.slice(0,5).join('、')}${nightWarn.length>5?'…':''}`);
+  if(nightRunWarn.length)parts.push(`夜勤が3日以上続いています（手入力） → ${nightRunWarn.slice(0,5).join('、')}${nightRunWarn.length>5?'…':''}`);
+  if(nightWarn.length)parts.push(`夜勤が2日続いた次の日が休みになっていません → ${nightWarn.slice(0,5).join('、')}${nightWarn.length>5?'…':''}`);
   if(lowDays.length)parts.push(`最低人数割れ ${lowDays.join("・")}日（公休日数を優先しました）`);
   jobs.forEach(j=>{const q=Number(jreq[j.id])||0; if(!q)return; const ds=[];
     for(let d=1;d<=nd;d++){ if(!isSetOff(d)&&dayJ[j.id][d]<q)ds.push(d); }
