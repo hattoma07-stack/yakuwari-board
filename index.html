@@ -272,6 +272,7 @@
   table.roster td.sumcell.s-off.under{color:var(--alert)}
   table.roster td.sumcell.s-off.ok{color:var(--accent-ink)}
   table.roster td.sumcell.s-off.over{color:var(--alert)}
+  table.roster,table.roster *{font-weight:400!important} /* 勤務表の文字は、細字（印刷・PDFも同じ） */
   table.roster td.rc{cursor:pointer;height:34px;font-weight:700;font-size:14px}
   table.roster .rname .wt{font-size:10.5px;font-weight:700;color:var(--ink-soft);line-height:1.2;margin-top:1px;white-space:nowrap}
   table.roster td.rc .wish{color:#C9524D}
@@ -280,6 +281,13 @@
   table.roster td.rc .ps{display:block;font-weight:700;letter-spacing:-.3px;white-space:nowrap;line-height:1.1} /* 非常勤の記号（A6.5など）は、長さに合わせて小さく表示 */
   table.roster td.rc .hm{display:block;font-size:8px;line-height:1;margin-top:1px}
   /* 予定から変わったマスを色で示す（黄＝変更・時間変更／赤＝出勤の予定が休みに変わった） */
+  /* 早番＝黄緑、遅番＝うすいオレンジ、夜勤＝青（文字は白）で、マスを塗る */
+  table.roster td.rc.sh-e{background:#CFE68E}
+  table.roster td.rc.sh-l{background:#FFD9AE}
+  table.roster td.rc.sh-n{background:#3F6FB5}
+  table.roster td.rc.sh-e,table.roster td.rc.sh-l{color:#000!important}
+  table.roster td.rc.sh-n{color:#fff!important}
+  table.roster td.rc.sh-n .tm{color:#FFD6D3}
   table.roster td.rc.chg-y{background:rgba(250,204,21,.45)!important}
   table.roster td.rc.chg-r{background:rgba(239,68,68,.34)!important}
   .btn[hidden]{display:none!important} /* 非表示のボタン（予定未確定のときの『実績として確定』、管理者以外の台帳ボタンなど）を確実に隠す */
@@ -1858,7 +1866,7 @@ function renderRoster(){
       const tmk=timeMark(s,d,e); // 時間変更した日は、記号（日勤など）を出さず、時間だけを赤で表示
       const hs=e.code&&statusByCode(e.code),hv=(S.rhalf[s.id]||{})[d],shown=(psym&&hs&&hs.work&&!hs.half&&(e.code==="日"||e.code==="出"))?psym:(e.code==="公"?"休":e.code), /* 公休は「休」と表示 */hm=(hs&&hs.half&&hv)?`<span class="hm">${hv==='pm'?'後':'前'}</span>`:'';
       const chg=planDiff(s.id,d);
-      bodyH+=`<td class="rc ${clsFor(d)}${e.auto?' auto':''}${chg?' chg-'+chg.k:''}"${chg?` title="${escapeHtml(chg.text)}"`:''} data-sid="${s.id}" data-day="${d}" style="${(e.code==="日"||drvSymOf(e.code))?'color:var(--shift-black)':((e.code===(closedStatus()||{}).code||isPaidSt(statusByCode(e.code)))?`color:${WISH_RED}`:(e.color?`color:${e.color}`:''))}">${tmk||(e.hr?`<span class="hl">${e.hr==='pm'?'PM':'AM'}${e.code==='公'?'休':e.code}</span>`:((hs&&isWishStatus(hs)?'<span class="wish">希</span>':(((shown!==e.code&&shown!=="休")||(drvSymOf(e.code)&&e.code.length>1))?`<span class="ps" style="font-size:${shown.length<=2?11:shown.length===3?10:shown.length<=5?9:5.5}px">${escapeHtml(shown)}</span>`:shown))+hm))}</td>`;}
+      bodyH+=`<td class="rc ${clsFor(d)}${e.code==="早"?' sh-e':e.code==="遅"?' sh-l':e.code==="夜"?' sh-n':''}${e.auto?' auto':''}${chg?' chg-'+chg.k:''}"${chg?` title="${escapeHtml(chg.text)}"`:''} data-sid="${s.id}" data-day="${d}" style="${(e.code==="日"||e.code==="早"||e.code==="遅"||drvSymOf(e.code))?'color:var(--shift-black)':((e.code===(closedStatus()||{}).code||isPaidSt(statusByCode(e.code)))?`color:${WISH_RED}`:(e.color?`color:${e.color}`:''))}">${tmk||(e.hr?`<span class="hl">${e.hr==='pm'?'PM':'AM'}${e.code==='公'?'休':e.code}</span>`:((hs&&isWishStatus(hs)?'<span class="wish">希</span>':(((shown!==e.code&&shown!=="休")||(drvSymOf(e.code)&&e.code.length>1))?`<span class="ps" style="font-size:${shown.length<=2?11:shown.length===3?10:shown.length<=5?9:5.5}px">${escapeHtml(shown)}</span>`:shown))+hm))}</td>`;}
     const off=offCount(s.id),tgt=staffTarget(s);
     const cls=tgt==null?'ok':off<tgt?'under':off>tgt?'over':'ok';
     if(sc){ const tot=cnt.reduce((a,b)=>a+b,0); boxRows.push({cnt,tot,off,tgt});
