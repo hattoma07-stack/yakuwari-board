@@ -289,10 +289,11 @@
   .planbar .lg{display:inline-flex;align-items:center;gap:5px}
   .planbar .lg i{display:inline-block;width:14px;height:14px;border-radius:3px;border:1px solid var(--line-strong)}
   table.roster td.rc:hover{outline:2px solid var(--accent);outline-offset:-2px}
-  table.roster col.sat,table.roster td.sat{background:var(--sat)}
-  table.roster col.sun,table.roster td.sun{background:var(--sun)}
+  /* 土日・祝日は、マスに色を付けず、日付の曜日の文字だけ色を変える（土＝青、日・祝＝赤） */
   table.roster col.off,table.roster td.off{background:var(--closed)}
   table.roster th.dcol.off .dn{color:var(--ink-soft)}
+  table.roster th.dcol.wsat .dow,table.roster th.dcol.wsat .dn{color:#4A7FB5}
+  table.roster th.dcol.wsun .dow,table.roster th.dcol.wsun .dn{color:var(--alert)}
   table.roster th.dcol .rest{font-size:9px;font-weight:700;color:var(--warn);line-height:1}
   table.roster td.rc.auto{opacity:1} /* 自動作成と手入力で、文字の濃さをそろえる */
   table.roster td.sumcell{font-weight:700;font-size:13px;background:var(--surface-2);color:var(--ink)}
@@ -1839,7 +1840,7 @@ function renderRoster(){
   const pcs=boxMode?sc.map((c,i)=>({c,i})).filter(x=>!x.c.blank):[]; // 画面では別枠に出す集計を、印刷では表の右端の列として出す
   if(boxMode)cols+='<col class="pcol">'.repeat(pcs.length+1);
   let head='<thead><tr><th class="rname">スタッフ</th>';
-  for(let d=1;d<=nd;d++){const w=dow(S.ym,d);head+=`<th class="dcol ${clsFor(d)}"${jpHoliday(S.ym,d)?` title="${escapeHtml(jpHoliday(S.ym,d))}"`:''}><div class="dow">${DOW[w]}</div><div class="dn num">${d}</div></th>`;}
+  for(let d=1;d<=nd;d++){const w=dow(S.ym,d);head+=`<th class="dcol ${clsFor(d)} ${(w===0||jpHoliday(S.ym,d))?"wsun":w===6?"wsat":""}"${jpHoliday(S.ym,d)?` title="${escapeHtml(jpHoliday(S.ym,d))}"`:''}><div class="dn num">${d}</div><div class="dow">${DOW[w]}</div></th>`;}
   const scR=i=>`right:${(sc.length-i)*SN_W}px`; // 右端から順に固定表示
   if(boxMode){ head+=pcs.map(x=>`<th class="pc">${x.c.label}</th>`).join("")+`<th class="pc pc-total">合計<div class="rt-sub">月${nd}日</div></th></tr></thead>`; }
   else if(sc){ sc.forEach((c,i)=>{if(!c.blank)head+=`<th class="sumcol sn" style="${scR(i)}">${c.label}</th>`;});
