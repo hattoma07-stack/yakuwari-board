@@ -1886,16 +1886,20 @@ function renderRoster(){
         Array.from({length:nd},(_,i)=>{ const d=i+1, on=(pp.days||[]).includes(d); return `<td class="rc ${clsFor(d)}" style="cursor:default${on?`;color:${ASSIST_COLOR}`:""}">${on?"応":""}</td>`; }).join("")+filler+'</tr>'; }); } }
   bodyH+='</tbody>';
   const minS=Number(S.minStaff)||0;
-  const footRow=(label,min,pred,note,code)=>{
+  const footRow=(label,min,pred,note,code,fn)=>{
     let r=`<tr><td class="rname">${label}${note&&min?`<span style="font-weight:400;color:var(--ink-soft)">（最低${min}）</span>`:''}</td>`;
-    for(let d=1;d<=nd;d++){let n=0;S.staff.forEach(s=>{if(pred(s)){const e=eff(s.id,d);n+=code?(e.code===code?1:((e.hr&&(code==="日"||code==="出"))?0.5:0)):e.w;}});
+    for(let d=1;d<=nd;d++){let n=0;S.staff.forEach(s=>{if(pred(s)){const e=eff(s.id,d);n+=code?(e.code===code?1:((e.hr&&(code==="日"||code==="出"))?0.5:0)):(fn?fn(s,e):e.w);}});
       const low=min&&used&&!isSetOff(d)&&n<min;
       r+=`<td class="${clsFor(d)} num${low?' low':''}">${n?fmtN(n):''}</td>`;}
     return r+(boxMode?'<td class="pc"></td>'.repeat(pcs.length+1):'')+(sc?'<td class="sumcol sn"></td>'.repeat(nShow):'<td class="sumcol s-work"></td><td class="sumcol s-off"></td>')+'</tr>';
   };
   const jobsRows=rowJobsOf().filter(j=>!j.hiace); // ハイエース運転可能者は最低人数の設定だけで、表の行には出さない
   let foot='<tfoot>'+(jobsRows.length||SHIFTROWS_BY_DEPT[FSCOPE]?'':footRow('出勤数',minS,()=>true,true));
-  jobsRows.forEach(j=>{foot+=footRow(escapeHtml(j.short),Number(S.req[j.id])||0,s=>inJob(j,s),false);});
+  // 送迎職員（デイサービス）：朝と夕に分けて数える。「朝」だけのドライバーは朝、「夕」だけは夕、「朝夕」と、ふつうに出勤する送迎可能な人は、両方に数える。半日の休みは、休みでない側（午前休み＝夕、午後休み＝朝）に数える
+  const drvHalf=(half)=>(s,e)=>{ if(s.job==="drv"&&e.w>0&&["","日","出"].includes(e.code||"")){ const h=hoursPreset(s); return (h!=="am"&&h!=="pm")||h===half?1:0; } /* ドライバーは、台帳で選んだ時間帯（朝のみ・夕のみ・朝夕）で数える */ if(e.code==="朝")return half==="am"?1:0; if(e.code==="夕")return half==="pm"?1:0; if(e.code==="朝夕")return 1; if(e.hr)return e.hr===(half==="am"?"am":"pm")?0:1; return e.w>0?1:0; };
+  jobsRows.forEach(j=>{
+    if(j.drive&&FSCOPE==="day"){ const q=Number(S.req[j.id])||0; foot+=footRow("送迎・朝",q,s=>inJob(j,s),false,null,drvHalf("am")); foot+=footRow("送迎・夕",q,s=>inJob(j,s),false,null,drvHalf("pm")); return; }
+    foot+=footRow(escapeHtml(j.short),Number(S.req[j.id])||0,s=>inJob(j,s),false); });
   (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st?escapeHtml(st.label.replace(c,'')):''),SHIFTROWS_MIN[FSCOPE]?minS:0,()=>true,false,c);});
   foot+='</tfoot>';
   T.style.setProperty('--kou',(statusByCode('公')||{}).color||'#9AA3A0'); // 印刷時の「公」の色
