@@ -905,6 +905,10 @@
       <div class="mlabel" style="margin-top:10px">夜勤が続く日数の上限（基本は1日ずつ。人数が足りない晩だけ、最大この日数まで続けて入ります。続けた最後の夜勤の翌日が休み）</div>
       <div class="edit-row"><input type="number" id="nightRunIn" min="1" max="3" style="width:72px"><span style="font-size:12px;color:var(--ink-soft)">日まで</span></div>
     </div>
+    <div id="kitReqBox" hidden>
+      <div class="mlabel" style="margin-top:14px">朝・朝日・日・日夜・夜の人数（1日あたり。勤務表の下に人数を表示し、足りない日を赤く表示します。0なら表示だけです）</div>
+      <div id="kitReqList"></div>
+    </div>
     <div id="jobReqBox" hidden>
       <div class="mlabel" style="margin-top:14px">職種ごとの最低出勤人数（勤務表の下に職種別の人数を表示し、不足日を赤く表示。自動作成でも下回らないよう公休を配置）</div>
       <div class="edit-list" id="jobReqList"></div>
@@ -1089,13 +1093,15 @@ const NIGHT_DEPTS=["home","nursing"];
 const DEF_NIGHTN={home:1,nursing:1};
 const nightDeptOn=()=>NIGHT_DEPTS.includes(FSCOPE);
 // 早番・遅番の自動振り分けを行う部署と、1日あたりの既定人数（残りは日勤）
-const DEF_SHIFTN={home:{early:2,late:2},nursing:{early:2,late:2},kitchen:{early:2,late:2}}; // 訪問介護と看護は同じ作り
+const DEF_SHIFTN={home:{early:2,late:2},nursing:{early:2,late:2},}; // 訪問介護と看護は同じ作り
 const shiftMixOn=()=>!!DEF_SHIFTN[FSCOPE];
 const hasDriveJob=()=>jobsOf().some(j=>j.drive);
 // 応援（デイサービス⇔訪問介護）：所属の部署の勤務表に「応」を入れる。応援先の勤務表には、「応援に来る人」の行が出る。所属の部署では、出勤にも休みにも数えない
 const KOT_EXCLUDE=["support"]; // KOTに反映しない部署（サポート）。台帳のコード入力も、CSVの書き出しも、なし
 const ASSIST_TO={day:"home",home:"day"}, ASSIST_COLOR="#B5762E", ASSIST_SHORT={day:"デイ",home:"訪問"};
 // 勤務表のマスに入れる、ドライバー（送迎）の記号。時間は勤務時間設定一覧の「ドライバー」の区分（朝 8:00〜10:00／夕 16:00〜18:00／朝夕＝朝＋夕）。出勤1日として数える
+const KIT_PATTERNS=[["朝","6:00〜9:00"],["朝日","6:00〜15:00"],["日","9:00〜15:00"],["日夜","9:00〜18:00"],["夜","15:00〜18:00"]]; // 栄養士・厨房の勤務（勤務時間設定一覧の「厨房」と同じ）
+const kitPatOf=s=>{ const p=s&&s.kPat; return KIT_PATTERNS.some(x=>x[0]===p)?p:"日"; };
 const DRV_SYMS=[{code:"朝",label:"送迎・朝",color:"#3E7CB1"},{code:"夕",label:"送迎・夕",color:"#B5762E"},{code:"朝夕",label:"送迎・朝夕",color:"#6C5BB0"}];
 const drvSymOf=c=>DRV_SYMS.find(x=>x.code===c);
 const rowJobsOf=()=>jobsOf().filter(j=>!j.noRow); // 下の人数の行・最低人数の設定の対象
@@ -1105,13 +1111,13 @@ const SUMCOLS_HOME=[
   {label:"休",codes:["公","希"]},{label:"有",codes:["有"]},{label:"応",codes:["応"]}];
 const SUMCOLS_OFFICE=[{label:"日",codes:["日","出"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 事務：早番・遅番・夜勤なし
 const SUMCOLS_DAY=[{label:"日",codes:["日","出","朝","夕","朝夕"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]},{label:"応",codes:["応"]}]; // デイサービス：日勤（過去の「出」・半休・研修を含む）。早・遅・夜はなし
-const SUMCOLS_KITCHEN=[{label:"早",codes:["早"]},{label:"遅",codes:["遅"]},{label:"日",codes:["日"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 栄養士・厨房：夜勤なし
+const SUMCOLS_KITCHEN=[{label:"朝",codes:["朝"]},{label:"朝日",codes:["朝日"]},{label:"日",codes:["日","早","遅"]},{label:"日夜",codes:["日夜"]},{label:"夜",codes:["夜"]},{label:"休",codes:["公","希"]},{label:"有",codes:["有"]}]; // 栄養士・厨房：朝・朝日・日・日夜・夜（過去の「早」「遅」は日に含める）
 const SUMCOLS_BY_DEPT={home:SUMCOLS_HOME,nursing:SUMCOLS_HOME,office:SUMCOLS_OFFICE,day:SUMCOLS_DAY,rehab:SUMCOLS_OFFICE,kitchen:SUMCOLS_KITCHEN,kyotaku:SUMCOLS_OFFICE,support:SUMCOLS_OFFICE};
 // 合計の列は値を出さない（月の日数との照合・赤字表示は行わない）
 const SUMTOTAL_BOX={home:true,nursing:true,office:true,day:true,rehab:true,kitchen:true,kyotaku:true,support:true}; // 合計は表の外の別枠（右側）に出す
 const sumColsOf=()=>SUMCOLS_BY_DEPT[FSCOPE]||null;
 // 勤務表の下に出す「日ごとの記号別スタッフ数」の行（指定した部署のみ）
-const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"],nursing:["早","日","遅","夜"],office:["日"],rehab:["日"],kitchen:["早","日","遅"],kyotaku:["日"],support:["日"]};
+const SHIFTROWS_BY_DEPT={home:["早","日","遅","夜"],nursing:["早","日","遅","夜"],office:["日"],rehab:["日"],kitchen:["朝","朝日","日","日夜","夜"],kyotaku:["日"],support:["日"]};
 // 早番・日勤・遅番・夜勤の勤務時間（訪問介護・看護）。設定画面で変更できる
 const DEF_SHIFTTIMES={home:{"早":{s:"06:00",e:"15:00"},"日":{s:"08:30",e:"17:30"},"遅":{s:"13:00",e:"22:00"},"夜":{s:"21:00",e:"07:00"}}};
 DEF_SHIFTTIMES.nursing=JSON.parse(JSON.stringify(DEF_SHIFTTIMES.home)); // 看護は、早番6:00〜・遅番13:00〜（常勤）
@@ -1135,6 +1141,9 @@ const DEF_STATUS=[
   {code:"早",label:"早番",color:"#4A7FB5",work:true},
   {code:"遅",label:"遅番",color:"#C9722E",work:true},
   {code:"夜",label:"夜勤",color:"#4C4C8E",work:true,night:true},
+  {code:"朝",label:"朝",color:"#5B8DB8",work:true,night:false},   // 栄養士・厨房の勤務（スタッフ台帳で、スタッフごとに選ぶ）
+  {code:"朝日",label:"朝日",color:"#6C9A5B",work:true,night:false},
+  {code:"日夜",label:"日夜",color:"#8A6BB0",work:true,night:false},
   {code:"公",label:"公休",color:"#9AA3A0",work:false},
   {code:"有",label:"有休",color:"#4A9E8F",work:false},
   {code:"希",label:"希望休",color:"#B0A99A",work:false}];
@@ -1144,7 +1153,7 @@ const DEF_STATUS_ENABLED={
   home:["日","早","遅","夜","公","有","希"],
   office:["日","公","有","希"],
   nursing:["日","早","遅","夜","公","有","希"],
-  kitchen:["日","早","遅","公","有","希"],
+  kitchen:["朝","朝日","日","日夜","夜","公","有","希"],
   rehab:["日","公","有","希"],
   kyotaku:["日","公","有","希"],
   support:["日","公","有","希"]
@@ -1266,7 +1275,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 /* ---------- state ---------- */
 const S={
   tab:"board", date:todayISO(), ym:todayISO().slice(0,7),
-  staff:[], status:[], times:[], tasks:[], types:[], roles:[], minStaff:3, req:{}, nightN:0, nightRun:2, shiftN:{}, shiftTimes:{},
+  staff:[], status:[], times:[], tasks:[], types:[], roles:[], minStaff:3, req:{}, kreq:{}, nightN:0, nightRun:2, shiftN:{}, shiftTimes:{},
   day:{selected:[],assign:{}}, roster:{}, rauto:{}, rhalf:{}, rtime:{}, rmeta:{offDows:[],offDates:[]}
 };
 function todayISO(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10);}
@@ -1289,6 +1298,7 @@ function loadMasters(){
   if(FSCOPE==="home"){ const o=S.shiftTimes["早"], l=S.shiftTimes["遅"]; if(o&&o.s==="06:00"&&o.e==="15:00")S.shiftTimes["早"]={...DEF_SHIFTTIMES.home["早"]}; if(l&&l.s==="13:00"&&l.e==="22:00")S.shiftTimes["遅"]={...DEF_SHIFTTIMES.home["遅"]}; } // 以前の標準（6:00〜・13:00〜）のままなら、訪問介護の新しい標準に更新
   { const nn=jget(K.meta,{}).nightN; S.nightN=(nn==null?(DEF_NIGHTN[FSCOPE]||0):nn); const nr=jget(K.meta,{}).nightRun; S.nightRun=(nr==null?2:nr); } // 夜勤を続けて入れられる最大回数（初期2）
   S.req=jget(K.meta,{}).req||JSON.parse(JSON.stringify(DEF_REQ[FSCOPE]||{}));
+  S.kreq=jget(K.meta,{}).kreq||{}; // 栄養士・厨房：朝・朝日・日・日夜・夜の、1日あたりの人数
   if(FSCOPE==="day"&&S.req.hiace===undefined)S.req.hiace=DEF_REQ.day.hiace; // 既存の設定にも、ハイエース運転可能者の最低人数（2名）を足す
   let seeded=jget(K.meta,{}).seeded;
   if(!S.status) S.status=JSON.parse(JSON.stringify(DEF_STATUS));
@@ -1301,6 +1311,7 @@ function loadMasters(){
     if(S.status.some(st=>st.code==="出")){ S.status=S.status.filter(st=>st.code!=="出"); if(!S.status.some(st=>st.code==="日"))S.status.unshift(JSON.parse(JSON.stringify(DEF_STATUS.find(st=>st.code==="日")))); jset(K.status,S.status); }
     if(S.statusEnabled&&S.statusEnabled.includes("出")){ S.statusEnabled=S.statusEnabled.map(c=>c==="出"?"日":c).filter((c,i,a)=>a.indexOf(c)===i); saveStatusEnabled(); } }
   S.status=JSON.parse(JSON.stringify(DEF_STATUS)); // 勤務記号は固定（設定では変更しない）。各部署の使う記号も、標準の組み合わせにそろえる
+  if(FSCOPE==="kitchen"){ const yn=S.status.find(st=>st.code==="夜"); if(yn){ yn.night=false; yn.label="夜"; yn.color="#4C6A8E"; } } // 栄養士・厨房の「夜」は、夕方の勤務（夜勤ではない。翌日の休みもなし）
   S.statusEnabled=(DEF_STATUS_ENABLED[FSCOPE]||S.status.map(s=>s.code)).slice();
   S.status.forEach(st=>{if(st.night===undefined)st.night=/夜/.test(st.label||st.code||"");}); // 夜勤の記号（翌日は休み）
   S.status.forEach(st=>{if(st.half===undefined)st.half=/^半/.test(st.label||st.code||"");}); // 「半休」「半有」など半日扱いの記号
@@ -1514,7 +1525,7 @@ function offCount(sid){
   for(let d=1;d<=nd;d++){ n+=effOf(md,S.ym,sid,d,used).r; }
   return n;
 }
-const saveMeta=()=>jset(K.meta,{...jget(K.meta,{}),minStaff:S.minStaff,req:S.req,nightN:S.nightN,nightRun:S.nightRun,shiftN:S.shiftN,shiftTimes:S.shiftTimes});
+const saveMeta=()=>jset(K.meta,{...jget(K.meta,{}),minStaff:S.minStaff,req:S.req,nightN:S.nightN,nightRun:S.nightRun,kreq:S.kreq,shiftN:S.shiftN,shiftTimes:S.shiftTimes});
 const staffById=id=>S.staff.find(s=>s.id===id);
 const taskById=id=>S.tasks.find(t=>t.id===id);
 const statusByCode=c=>S.status.find(s=>s.code===c);
@@ -1868,7 +1879,7 @@ function renderRoster(){
       const tmk=timeMark(s,d,e); // 時間変更した日は、記号（日勤など）を出さず、時間だけを赤で表示
       const hs=e.code&&statusByCode(e.code),hv=(S.rhalf[s.id]||{})[d],shown=(psym&&hs&&hs.work&&!hs.half&&(e.code==="日"||e.code==="出"))?psym:(e.code==="公"?"休":e.code), /* 公休は「休」と表示 */hm=(hs&&hs.half&&hv)?`<span class="hm">${hv==='pm'?'後':'前'}</span>`:'';
       const chg=planDiff(s.id,d);
-      bodyH+=`<td class="rc ${clsFor(d)}${e.code==="早"?' sh-e':e.code==="遅"?' sh-l':e.code==="夜"?' sh-n':''}${e.auto?' auto':''}${chg?' chg-'+chg.k:''}"${chg?` title="${escapeHtml(chg.text)}"`:''} data-sid="${s.id}" data-day="${d}" style="${(e.code==="日"||e.code==="早"||e.code==="遅"||drvSymOf(e.code))?'color:var(--shift-black)':((e.code===(closedStatus()||{}).code||isPaidSt(statusByCode(e.code)))?`color:${WISH_RED}`:(e.color?`color:${e.color}`:''))}">${tmk||(e.hr?`<span class="hl">${e.hr==='pm'?'PM':'AM'}${e.code==='公'?'休':e.code}</span>`:((hs&&isWishStatus(hs)?'<span class="wish">希</span>':(((shown!==e.code&&shown!=="休")||(drvSymOf(e.code)&&e.code.length>1))?`<span class="ps" style="font-size:${shown.length<=2?11:shown.length===3?10:shown.length<=5?9:5.5}px">${escapeHtml(shown)}</span>`:shown))+hm))}</td>`;}
+      bodyH+=`<td class="rc ${clsFor(d)}${e.code==="早"?' sh-e':e.code==="遅"?' sh-l':(e.code==="夜"&&nightDeptOn())?' sh-n':''}${e.auto?' auto':''}${chg?' chg-'+chg.k:''}"${chg?` title="${escapeHtml(chg.text)}"`:''} data-sid="${s.id}" data-day="${d}" style="${(e.code==="日"||e.code==="早"||e.code==="遅"||drvSymOf(e.code))?'color:var(--shift-black)':((e.code===(closedStatus()||{}).code||isPaidSt(statusByCode(e.code)))?`color:${WISH_RED}`:(e.color?`color:${e.color}`:''))}">${tmk||(e.hr?`<span class="hl">${e.hr==='pm'?'PM':'AM'}${e.code==='公'?'休':e.code}</span>`:((hs&&isWishStatus(hs)?'<span class="wish">希</span>':(((shown!==e.code&&shown!=="休")||(drvSymOf(e.code)&&e.code.length>1))?`<span class="ps" style="font-size:${shown.length<=2?11:shown.length===3?10:shown.length<=5?9:5.5}px">${escapeHtml(shown)}</span>`:shown))+hm))}</td>`;}
     const off=offCount(s.id),tgt=staffTarget(s);
     const cls=tgt==null?'ok':off<tgt?'under':off>tgt?'over':'ok';
     if(sc){ const tot=cnt.reduce((a,b)=>a+b,0); boxRows.push({cnt,tot,off,tgt});
@@ -1900,7 +1911,7 @@ function renderRoster(){
   jobsRows.forEach(j=>{
     if(j.drive&&FSCOPE==="day"){ const q=Number(S.req[j.id])||0; foot+=footRow("送迎・朝",q,s=>inJob(j,s),false,null,drvHalf("am")); foot+=footRow("送迎・夕",q,s=>inJob(j,s),false,null,drvHalf("pm")); return; }
     foot+=footRow(escapeHtml(j.short),Number(S.req[j.id])||0,s=>inJob(j,s),false); });
-  (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st?escapeHtml(st.label.replace(c,'')):''),SHIFTROWS_MIN[FSCOPE]?minS:0,()=>true,false,c);});
+  (SHIFTROWS_BY_DEPT[FSCOPE]||[]).forEach(c=>{const st=statusByCode(c);foot+=footRow(escapeHtml(c)+(st&&FSCOPE!=="kitchen"?escapeHtml(st.label.replace(c,'')):''),FSCOPE==="kitchen"?(Number((S.kreq||{})[c])||0):(SHIFTROWS_MIN[FSCOPE]?minS:0),()=>true,false,c);});
   foot+='</tfoot>';
   T.style.setProperty('--kou',(statusByCode('公')||{}).color||'#9AA3A0'); // 印刷時の「公」の色
   T.innerHTML=`<colgroup>${cols}</colgroup>`+head+bodyH+foot;
@@ -2012,6 +2023,7 @@ function renderStaffList(){
       </div>`:""}
       ${hdetail}
       ${FSCOPE==="office"?`<div class="line2"><label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="hq-in" ${s.hq?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">本部所属</label></div>`:""}
+      ${FSCOPE==="kitchen"?`<div class="line2"><div class="fl"><span>勤務（出勤する日の記号）</span><select class="kit-pat" style="font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;padding:7px 9px;font-weight:700">${KIT_PATTERNS.map(([c,lb])=>`<option value="${c}"${kitPatOf(s)===c?" selected":""}>${c}（${lb}）</option>`).join("")}</select></div></div>`:""}
       ${FSCOPE==="kitchen"?`<div class="line2"><label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="rd-in" ${s.rdQual?"checked":""} style="width:18px;height:18px;accent-color:var(--accent)">管理栄養士</label></div>`:""}
       ${(!isDrv&&!isPartTimeType(typeById(s.typeId))&&(FSCOPE==="home"||FSCOPE==="nursing"))?`<div class="line2"><div class="fl"><span>日勤の開始時間（KOT用）</span>
         <div style="display:flex;gap:16px;flex-wrap:wrap"><label class="wk" style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px"><input type="checkbox" class="ds-a"${s.dayStart==="09:00"?"":" checked"} style="width:18px;height:18px;accent-color:var(--accent)">8:30（日勤A　8:30〜17:30）</label>
@@ -2022,6 +2034,7 @@ function renderStaffList(){
     const smode=card.querySelector('.shift-mode'); // 勤務の入り方（訪問介護・看護）
     if(smode)smode.onchange=e=>{ applyShiftMode(s,e.target.value); saveStaff(); renderStaffList(); };
     const hqc=card.querySelector('.hq-in'); if(hqc)hqc.onchange=e=>{s.hq=e.target.checked;saveStaff();}; // 本部・事務：本部所属のスタッフ
+    const kpat=card.querySelector('.kit-pat'); if(kpat)kpat.onchange=e=>{s.kPat=e.target.value;saveStaff();if(S.tab==='roster')renderRoster();}; // 栄養士・厨房：勤務の種類（朝・朝日・日・日夜・夜）
     const rdc=card.querySelector('.rd-in'); if(rdc)rdc.onchange=e=>{s.rdQual=e.target.checked;saveStaff();renderStaffList();refreshAll();}; // 栄養士・厨房：管理栄養士の資格者
     const ncnt=card.querySelector('.night-cnt');
     if(ncnt)ncnt.oninput=e=>{s.nightCount=e.target.value===''?null:Math.max(0,Number(e.target.value));saveStaff();};
@@ -2323,6 +2336,10 @@ function openSettings(){
   $("#jobReqBox").hidden=!jobs.length;
   $("#nightReqBox").hidden=!nightDeptOn();
   $("#shiftReqBox").hidden=!shiftMixOn();
+  $("#kitReqBox").hidden=FSCOPE!=="kitchen";
+  { const kl=$("#kitReqList"); kl.innerHTML=""; if(FSCOPE==="kitchen")KIT_PATTERNS.forEach(([c,lb])=>{ const row=document.createElement('div'); row.className="edit-row";
+      row.innerHTML=`<span style="width:150px;flex:none;font-weight:700;font-size:13px">${escapeHtml(c)}<span style="font-weight:400;color:var(--ink-soft)">（${lb}）</span></span><input type="number" min="0" max="99" style="width:72px" value="${Number((S.kreq||{})[c])||0}"><span style="font-size:12px;color:var(--ink-soft)">名以上</span>`;
+      row.querySelector('input').oninput=e=>{ if(!S.kreq)S.kreq={}; S.kreq[c]=e.target.value===''?0:Number(e.target.value); saveMeta(); if(S.tab==="roster")renderRoster(); }; kl.appendChild(row); }); }
   $("#shiftTimeBox").hidden=!DEF_SHIFTTIMES[FSCOPE];
   const stl=$("#shiftTimeList"); stl.innerHTML="";
   if(DEF_SHIFTTIMES[FSCOPE]) Object.keys(SHIFT_NAMES).forEach(c=>{ const t=S.shiftTimes[c]||DEF_SHIFTTIMES[FSCOPE][c]; const row=document.createElement('div'); row.className="edit-row";
@@ -2560,7 +2577,7 @@ $("#doAuto").onclick=()=>{
     }
   }
   S.staff.forEach(s=>{ if(need[s.id]>0)warn.push(`${s.name}(休${staffTarget(s)-need[s.id]}/目標${staffTarget(s)}日)`);
-    const rr=S.roster[s.id]; for(let d=1;d<=nd;d++){ if(!rr[d]){rr[d]=s.nightOnly?rcode:wcode;setAuto(s.id,d,true);} } }); // 残り → 出勤（夜勤のみの人は休み）
+    const rr=S.roster[s.id]; for(let d=1;d<=nd;d++){ if(!rr[d]){rr[d]=s.nightOnly?rcode:(FSCOPE==="kitchen"?kitPatOf(s):wcode);setAuto(s.id,d,true);} } }); // 残り → 出勤（夜勤のみの人は休み。栄養士・厨房は、台帳で選んだ勤務の記号）
   // 6) 早番・遅番の振り分け（自動で出勤にした日だけ。手入力した記号はそのまま。回数が少ない人から。遅番の翌日の早番は避ける）
   const shortE=[],shortL=[];
   S.staff.forEach(s=>{ if(!(s.earlyOnly||s.lateOnly))return; const code=s.earlyOnly?"早":"遅"; if(!statusByCode(code)||!isStatusEnabled(code))return; // 早番のみ・遅番のみの人は、出勤する日をすべて早番（遅番）にする
@@ -2599,6 +2616,7 @@ $("#doAuto").onclick=()=>{
   jobs.forEach(j=>{const q=Number(jreq[j.id])||0; if(!q)return; const ds=[];
     for(let d=1;d<=nd;d++){ if(!isSetOff(d)&&dayJ[j.id][d]<q)ds.push(d); }
     if(ds.length)parts.push(`${j.short}不足 ${ds.length>6?ds.slice(0,6).join("・")+"…":ds.join("・")}日`); });
+  if(FSCOPE==="kitchen")KIT_PATTERNS.forEach(([c])=>{ const q=Number((S.kreq||{})[c])||0; if(!q)return; const ds=[]; for(let d=1;d<=nd;d++){ if(isSetOff(d))continue; if(S.staff.filter(s=>S.roster[s.id][d]===c).length<q)ds.push(d); } if(ds.length)parts.push(`${c}の人数不足 ${ds.slice(0,6).join('・')}${ds.length>6?'…':''}日`); });
   if(warn.length)parts.push(`休日数が目標未達 → ${warn.join("、")}`);
   toast(parts.length?`作成しました｜要確認：${parts.join(" ／ ")}`:"休日数に合わせて作成しました");
 };
@@ -3040,14 +3058,14 @@ function kotTimes(f,s,code,half,tm,shiftTimes){
     if(half==="am")return mk(kotRowOf("PM休",c=>c==="常勤"),null,true);
     if(half==="pm")return mk(kotRowOf("AM休",c=>c==="常勤"),null,true);
     return null; }
-  if(code==="朝"||code==="夕"||code==="朝夕")return mk(kotRowOf(code,c=>c==="ドライバー"));
+  if(f!=="kitchen"&&(code==="朝"||code==="夕"||code==="朝夕"))return mk(kotRowOf(code,c=>c==="ドライバー"));
   if(f==="day"&&s.job==="drv"&&["日","出"].includes(code)){ const sym=partSymbolOf(s); return sym?mk(kotRowOf(sym,c=>c==="ドライバー")):{err:"ドライバーの勤務時間帯（朝夕・朝のみ・夕のみ）が未設定です"}; } // ドライバー：台帳で選んだ朝夕・朝のみ・夕のみ
   const isPart=isPartTimeType(typeById(s.typeId)), w0=s.workTime;
   if(isPart&&["日","出","夜"].includes(code)&&w0&&w0.s&&w0.e){ // 非常勤：台帳の勤務時間（その日だけの時間変更を含む）から記号を決め、一覧の休憩を使う
     const w={s:(tm&&tm.s)||w0.s,e:(tm&&tm.e)||w0.e}, sym=partSymbolOf(staffOfDay(s,tm)), r=sym&&kotRowOf(sym,c=>/^非常勤/.test(c));
     return r?mk(r,w):{st:normHM(w.s),en:normHM(w.e),bs:"",be:""}; }
   if(isPart&&["日","出"].includes(code))return {err:"非常勤の勤務時間が未設定です"};
-  if(f==="kitchen"&&["早","日","遅"].includes(code))return mk(kotRowOf(code,c=>c==="厨房"));
+  if(f==="kitchen"&&["朝","朝日","早","日","日夜","遅","夜"].includes(code))return mk(kotRowOf(code,c=>c==="厨房"));
   if(code==="日"||code==="出")return mk(kotRowOf((s.dayStart==="09:00"&&(f==="home"||f==="nursing"))?"日勤B":"日勤A",c=>c==="常勤") /* 日勤の開始時間を選べるのは、訪問介護と看護だけ。ほかの部署は8:30（日勤A） */);
   if(code==="早"||code==="遅"||code==="夜"){ const mt=(shiftTimes||{})[code]; return mk((code!=="夜"&&(f==="home"||f==="nursing")&&kotRowOf(code+(f==="home"?"介":"看"),c=>c==="常勤"))||kotRowOf(code,c=>c==="常勤"),mt&&mt.s&&mt.e?mt:null); } // 早番・遅番は、訪問介護が「早介・遅介」、看護が「早看・遅看」の行（なければ従来の「早・遅」）
   return {err:`記号「${code}」は、KOT用の時間が決まっていません`}; }
